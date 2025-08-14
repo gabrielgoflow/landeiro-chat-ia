@@ -8,7 +8,7 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.sender === "user";
-  const timestamp = ChatService.formatTimestamp(message.timestamp);
+  const timestamp = ChatService.formatTimestamp(message.timestamp || new Date());
 
   if (isUser) {
     return (

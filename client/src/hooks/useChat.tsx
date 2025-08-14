@@ -147,6 +147,7 @@ export function useChat() {
 
   return {
     threads: chatHistory.threads,
+    allMessages: chatHistory.messages,
     currentMessages: getCurrentMessages(),
     currentThread: getCurrentThread(),
     isLoading,

@@ -13,8 +13,8 @@ export const chatThreads = pgTable("chat_threads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   email: text("email").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const messages = pgTable("messages", {
@@ -22,7 +22,7 @@ export const messages = pgTable("messages", {
   threadId: varchar("thread_id").notNull().references(() => chatThreads.id),
   content: text("content").notNull(),
   sender: varchar("sender", { enum: ["user", "ai"] }).notNull(),
-  timestamp: timestamp("timestamp").defaultNow(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({

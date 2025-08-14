@@ -60,7 +60,7 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError }: 
   };
 
   return (
-    <div className="bg-white border-t border-gray-200 px-4 py-4">
+    <div className="bg-white border-t border-gray-200 px-4 py-4 flex-shrink-0">
       <div className="max-w-4xl mx-auto">
         <form onSubmit={handleSubmit} className="flex items-end space-x-3" data-testid="message-form">
           <div className="flex-1">

@@ -14,6 +14,7 @@ export default function Chat() {
   
   const {
     threads,
+    allMessages,
     currentMessages,
     currentThread,
     isLoading,
@@ -49,14 +50,11 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex h-full" data-testid="chat-page">
+    <div className="flex h-screen overflow-hidden" data-testid="chat-page">
       <ChatSidebar
         threads={threads}
         currentThread={currentThread}
-        messages={threads.reduce((acc, thread) => {
-          acc[thread.id] = currentMessages;
-          return acc;
-        }, {} as any)}
+        messages={allMessages}
         onSelectThread={selectThread}
         onDeleteThread={deleteThread}
         onStartNewThread={startNewThread}
@@ -101,7 +99,7 @@ export default function Chat() {
         </div>
 
         {/* Messages Container */}
-        <div className="flex-1 overflow-y-auto px-4 py-6" data-testid="messages-container">
+        <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0" data-testid="messages-container">
           <div className="max-w-4xl mx-auto space-y-6">
             
             {/* Welcome Message */}
