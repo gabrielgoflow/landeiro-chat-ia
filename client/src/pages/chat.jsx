@@ -112,7 +112,7 @@ export default function Chat() {
                 </Avatar>
                 <div className="flex-1">
                   <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
-                    <p className="text-gray-800">Olá! Sou o assistente da Landeiro. Como posso ajudar você hoje?</p>
+                    <p className="text-gray-800">Olá! Podemos iniciar nossa sessao?</p>
                   </div>
                   <div className="text-xs text-gray-500 mt-1 ml-1">Agora mesmo</div>
                 </div>
