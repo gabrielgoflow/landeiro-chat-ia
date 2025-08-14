@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'wouter'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,18 @@ export default function Register() {
     password: '',
     confirmPassword: ''
   })
+
+  // Auto-fill admin credentials if seed parameter is present
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('seed') === 'admin') {
+      setFormData({
+        email: 'admin@goflow.digital',
+        password: '!@#GOflow2700',
+        confirmPassword: '!@#GOflow2700'
+      })
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -84,6 +96,24 @@ export default function Register() {
           <CardDescription className="text-center">
             Crie sua conta para acessar o chat IA da Landeiro
           </CardDescription>
+          
+          {/* Admin Seed Button */}
+          <div className="flex justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFormData({
+                email: 'admin@goflow.digital',
+                password: '!@#GOflow2700',
+                confirmPassword: '!@#GOflow2700'
+              })}
+              className="text-xs"
+              data-testid="seed-admin-button"
+            >
+              Criar Usuário Admin
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
