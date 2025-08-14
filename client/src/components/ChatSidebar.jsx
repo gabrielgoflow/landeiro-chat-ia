@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChatService } from "@/services/chatService.js";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
+import { useAuth } from "@/hooks/useAuth.jsx";
+import { useToast } from "@/hooks/use-toast";
 
 export function ChatSidebar({
   threads,
@@ -14,6 +16,24 @@ export function ChatSidebar({
   onClose
 }) {
   const isMobile = useIsMobile();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: 'Erro ao sair',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } else {
+      toast({
+        title: 'Logout realizado',
+        description: 'Você foi desconectado com sucesso'
+      });
+    }
+  };
 
   const getLastMessage = (threadId) => {
     const threadMessages = messages[threadId] || [];
@@ -142,18 +162,30 @@ export function ChatSidebar({
 
           {/* User Info */}
           <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center space-x-3">
-              <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-gray-300 text-gray-600">
-                  <i className="fas fa-user text-sm"></i>
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 truncate">
-                  gabriel@goflow.digital
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Avatar className="w-8 h-8">
+                  <AvatarFallback className="bg-gray-300 text-gray-600">
+                    <i className="fas fa-user text-sm"></i>
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {user?.email || 'Usuário'}
+                  </div>
+                  <div className="text-xs text-gray-500">Conectado</div>
                 </div>
-                <div className="text-xs text-gray-500">Usuário ativo</div>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                data-testid="logout-button"
+                title="Sair da conta"
+              >
+                <i className="fas fa-sign-out-alt text-sm"></i>
+              </Button>
             </div>
           </div>
         </div>
