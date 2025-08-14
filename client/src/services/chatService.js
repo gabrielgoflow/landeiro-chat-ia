@@ -35,14 +35,25 @@ export class ChatService {
     }
   }
 
-  static createNewThread() {
-    return {
+  static createNewThread(sessionData = null) {
+    const thread = {
       id: this.generateThreadId(),
       title: "Nova Conversa",
       email: USER_EMAIL,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+
+    // Add session data if provided
+    if (sessionData) {
+      thread.sessionData = {
+        diagnostico: sessionData.diagnostico,
+        protocolo: sessionData.protocolo
+      };
+      thread.title = `${sessionData.diagnostico} - ${sessionData.protocolo}`;
+    }
+
+    return thread;
   }
 
   static createUserMessage(threadId, content) {
@@ -65,12 +76,18 @@ export class ChatService {
     };
   }
 
-  static async sendMessage(message, threadId) {
+  static async sendMessage(message, threadId, sessionData = null) {
     const request = {
       message,
       email: USER_EMAIL,
       thread: threadId,
     };
+
+    // Add session data if provided
+    if (sessionData) {
+      request.diagnostico = sessionData.diagnostico;
+      request.protocolo = sessionData.protocolo;
+    }
 
     try {
       const response = await fetch(WEBHOOK_URL, {

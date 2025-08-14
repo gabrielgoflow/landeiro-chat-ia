@@ -26,8 +26,8 @@ export function useChat() {
     ChatService.saveHistory(chatHistory);
   }, [chatHistory]);
 
-  const startNewThread = useCallback(() => {
-    const newThread = ChatService.createNewThread();
+  const startNewThread = useCallback((sessionData = null) => {
+    const newThread = ChatService.createNewThread(sessionData);
     
     setChatHistory(prev => ({
       threads: [newThread, ...prev.threads],
@@ -114,8 +114,12 @@ export function useChat() {
     setError(null);
 
     try {
+      // Get current thread to access session data
+      const currentThread = chatHistory.threads.find(t => t.id === threadId);
+      const sessionData = currentThread?.sessionData || null;
+      
       // Send to webhook and get AI response
-      const aiResponse = await ChatService.sendMessage(content, threadId);
+      const aiResponse = await ChatService.sendMessage(content, threadId, sessionData);
       const aiMessage = ChatService.createAiMessage(threadId, aiResponse);
 
       setChatHistory(prev => ({

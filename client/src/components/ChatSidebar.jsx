@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChatService } from "@/services/chatService.js";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
 import { useAuth } from "@/hooks/useAuth.jsx";
 import { useToast } from "@/hooks/use-toast";
+import { NewChatDialog } from "./NewChatDialog.jsx";
 
 export function ChatSidebar({
   threads,
@@ -18,6 +20,7 @@ export function ChatSidebar({
   const isMobile = useIsMobile();
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const [showNewChatDialog, setShowNewChatDialog] = useState(false);
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -33,6 +36,15 @@ export function ChatSidebar({
         description: 'Você foi desconectado com sucesso'
       });
     }
+  };
+
+  const handleNewChatConfirm = (formData) => {
+    // Chama a função original passando os dados do diagnóstico e protocolo
+    onStartNewThread(formData);
+    toast({
+      title: 'Nova conversa iniciada',
+      description: `Diagnóstico: ${formData.diagnostico} | Protocolo: ${formData.protocolo}`
+    });
   };
 
   const getLastMessage = (threadId) => {
@@ -87,7 +99,7 @@ export function ChatSidebar({
           {/* New Chat Button */}
           <div className="p-4">
             <Button
-              onClick={onStartNewThread}
+              onClick={() => setShowNewChatDialog(true)}
               className="w-full flex items-center justify-center px-4 py-3 bg-primary text-white rounded-lg hover:bg-indigo-600 transition-colors duration-200"
               data-testid="new-chat-button"
             >
@@ -190,6 +202,13 @@ export function ChatSidebar({
           </div>
         </div>
       </div>
+
+      {/* New Chat Dialog */}
+      <NewChatDialog 
+        open={showNewChatDialog}
+        onOpenChange={setShowNewChatDialog}
+        onConfirm={handleNewChatConfirm}
+      />
     </>
   );
 }
