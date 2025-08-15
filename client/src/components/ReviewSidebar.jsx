@@ -1,14 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { ChatReview } from "@shared/schema";
 
-interface ReviewSidebarProps {
-  review: ChatReview | null;
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
+export function ReviewSidebar({ review, isOpen, onClose }) {
   if (!isOpen || !review) return null;
 
   return (

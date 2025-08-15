@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChatService } from "@/services/chatService.js";
+import { ChatService } from "@/services/chatService";
 import type { ChatHistory, ChatThreadExtended, Message } from "@shared/schema";
 
 export function useChat() {
@@ -158,26 +158,6 @@ export function useChat() {
     return chatHistory.threads.find(t => t.id === currentThreadId) || null;
   }, [currentThreadId, chatHistory.threads]);
 
-  const loadMessageHistory = useCallback(async (threadId: string, openaiChatId: string) => {
-    try {
-      console.log('Loading message history for thread:', threadId, 'with OpenAI chat ID:', openaiChatId);
-      // @ts-ignore - ChatService.getMessageHistory exists in JS file
-      const messages = await ChatService.getMessageHistory(openaiChatId);
-      
-      setChatHistory(prev => ({
-        ...prev,
-        messages: {
-          ...prev.messages,
-          [threadId]: messages
-        }
-      }));
-      
-      console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
-    } catch (error) {
-      console.error('Error loading message history:', error);
-    }
-  }, []);
-
   return {
     threads: chatHistory.threads,
     allMessages: chatHistory.messages,
@@ -189,7 +169,6 @@ export function useChat() {
     selectThread,
     deleteThread,
     sendMessage,
-    clearError: () => setError(null),
-    loadMessageHistory
+    clearError: () => setError(null)
   };
 }

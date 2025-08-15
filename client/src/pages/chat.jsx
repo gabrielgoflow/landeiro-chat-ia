@@ -1,0 +1,333 @@
+import { useState, useEffect, useRef } from "react";
+import { useParams, Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useIsMobile } from "@/hooks/use-mobile.jsx";
+import { useAuth } from "@/hooks/useAuth.jsx";
+import { useChat } from "@/hooks/useChat.jsx";
+import { supabaseService } from "@/services/supabaseService.js";
+import { ChatMessage } from "@/components/ChatMessage.jsx";
+import { ChatSidebar } from "@/components/ChatSidebar.jsx";
+import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
+import { MessageInput } from "@/components/MessageInput.jsx";
+import { NewChatDialog } from "@/components/NewChatDialog.jsx";
+import { ReviewSidebar } from "@/components/ReviewSidebar.jsx";
+
+export default function Chat() {
+  const { chatId } = useParams();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [showNewChatDialog, setShowNewChatDialog] = useState(false);
+  const [isFinalizingChat, setIsFinalizingChat] = useState(false);
+  const [showReviewSidebar, setShowReviewSidebar] = useState(false);
+  const [currentReview, setCurrentReview] = useState(null);
+  const messagesEndRef = useRef(null);
+  const initializedRef = useRef(false);
+  const isMobile = useIsMobile();
+  const { user } = useAuth();
+  
+  const {
+    threads,
+    allMessages,
+    currentMessages,
+    currentThread,
+    isLoading,
+    error,
+    startNewThread,
+    selectThread,
+    deleteThread,
+    sendMessage,
+    createThreadFromSupabase,
+    clearError
+  } = useChat();
+
+  // Auto-scroll to bottom when new messages are added
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [currentMessages]);
+
+  // Close sidebar on mobile when thread changes
+  useEffect(() => {
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    }
+  }, [currentThread, isMobile]);
+
+  // Initialize based on chatId parameter
+  useEffect(() => {
+    const initializeChat = async () => {
+      if (chatId && chatId !== 'new') {
+        // Load specific chat by ID
+        const existingThread = threads.find(t => t.id === chatId);
+        if (existingThread) {
+          console.log('Found existing thread locally:', chatId);
+          selectThread(existingThread.id);
+        } else {
+          // Chat ID not found in current threads, try to load from Supabase
+          console.log('Thread not found locally, trying to load from Supabase:', chatId);
+          const createdThread = await createThreadFromSupabase(chatId);
+          if (createdThread) {
+            console.log('Thread created from Supabase, now selecting:', chatId);
+            selectThread(chatId);
+          } else {
+            console.warn('Chat ID not found in Supabase, redirecting to new chat:', chatId);
+            setShowNewChatDialog(true);
+          }
+        }
+      } else if (chatId === 'new' || (threads.length === 0 && !chatId)) {
+        // Create new thread for /chat/new or when no threads exist
+        setShowNewChatDialog(true);
+      }
+    };
+
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      initializeChat();
+    }
+  }, [chatId, threads, selectThread, startNewThread, createThreadFromSupabase]);
+
+
+
+  const handleSendMessage = async (message) => {
+    await sendMessage(message);
+  };
+
+  const handleNewChatConfirm = (formData) => {
+    startNewThread(formData);
+    setShowNewChatDialog(false);
+  };
+
+  const handleFinalizeChat = async () => {
+    if (!currentThread) return;
+    
+    setIsFinalizingChat(true);
+    try {
+      // Get review from external service
+      const reviewResponse = await fetch('https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: currentThread.id
+        })
+      });
+      
+      if (reviewResponse.ok) {
+        const reviewData = await reviewResponse.json();
+        console.log('Review data received:', reviewData);
+        
+        // Extract from output field and transform nested arrays to flat strings for storage
+        const reviewOutput = reviewData.output;
+        const transformedReview = {
+          chatId: currentThread.id,
+          resumoAtendimento: reviewOutput.resumoAtendimento,
+          feedbackDireto: reviewOutput.feedbackDireto,
+          sinaisPaciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
+          pontosPositivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
+          pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item)
+        };
+        
+        // Save review to our database
+        const saveResponse = await fetch('/api/reviews', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(transformedReview)
+        });
+        
+        if (saveResponse.ok) {
+          console.log('Review saved successfully');
+          setCurrentReview(transformedReview);
+          setShowReviewSidebar(true);
+        } else {
+          console.error('Error saving review:', saveResponse.status);
+        }
+      } else {
+        console.error('Error getting review:', reviewResponse.status);
+      }
+    } catch (error) {
+      console.error('Error finalizing chat:', error);
+    } finally {
+      setIsFinalizingChat(false);
+    }
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden" data-testid="chat-page">
+      <ChatSidebar
+        threads={threads}
+        currentThread={currentThread}
+        messages={allMessages}
+        onSelectThread={selectThread}
+        onDeleteThread={deleteThread}
+        onStartNewThread={() => setShowNewChatDialog(true)}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Chat Header */}
+        <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Link href="/">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                data-testid="back-to-chats-button"
+              >
+                <i className="fas fa-arrow-left mr-2"></i>
+                Voltar
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              data-testid="open-sidebar-button"
+            >
+              <i className="fas fa-bars"></i>
+            </Button>
+            <Avatar className="w-8 h-8 bg-secondary">
+              <AvatarFallback className="bg-secondary text-white">
+                <i className="fas fa-robot text-sm"></i>
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Assistente IA</h2>
+              <p className="text-sm text-gray-500">Online • Responde instantaneamente</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            {currentThread && (
+              <Button
+                onClick={handleFinalizeChat}
+                disabled={isFinalizingChat}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                data-testid="finalize-chat-button"
+              >
+                {isFinalizingChat ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin mr-2"></i>
+                    Finalizando...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-check-circle mr-2"></i>
+                    Finalizar Atendimento
+                  </>
+                )}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              data-testid="settings-button"
+            >
+              <i className="fas fa-cog"></i>
+            </Button>
+          </div>
+        </div>
+
+        {/* Messages Container */}
+        <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0" data-testid="messages-container">
+          <div className="max-w-4xl mx-auto space-y-6">
+            
+            {/* Welcome Message */}
+            {currentMessages.length === 0 && (
+              <div className="flex items-start space-x-3">
+                <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
+                  <AvatarFallback className="bg-secondary text-white">
+                    <i className="fas fa-robot text-sm"></i>
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
+                    <p className="text-gray-800">Olá! Podemos iniciar nossa sessão?</p>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1 ml-1">Agora mesmo</div>
+                </div>
+              </div>
+            )}
+
+            {/* Chat Messages */}
+            {currentMessages.map((message) => (
+              <ChatMessage key={message.id} message={message} />
+            ))}
+
+            {/* Loading Message */}
+            {isLoading && (
+              <div className="flex items-start space-x-3" data-testid="loading-message">
+                <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
+                  <AvatarFallback className="bg-secondary text-white">
+                    <i className="fas fa-robot text-sm"></i>
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                      </div>
+                      <span className="text-sm text-gray-500">Digitando...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* Debug Info (Admin only) */}
+        {user?.email === 'admin@goflow.digital' && (
+          <div className="px-4 pb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDebug(!showDebug)}
+              className="text-xs text-gray-500 hover:text-gray-700"
+            >
+              <i className="fas fa-bug mr-1"></i>
+              {showDebug ? 'Ocultar Debug' : 'Mostrar Debug'}
+            </Button>
+          </div>
+        )}
+        
+        <ChatDebugInfo 
+          currentThread={currentThread}
+          sessionData={currentThread?.sessionData}
+          visible={showDebug}
+        />
+
+        {/* Message Input */}
+        <MessageInput
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading}
+          error={error}
+          onClearError={clearError}
+        />
+      </div>
+      
+      <NewChatDialog
+        open={showNewChatDialog}
+        onOpenChange={setShowNewChatDialog}
+        onConfirm={handleNewChatConfirm}
+      />
+      
+      <ReviewSidebar
+        review={currentReview}
+        isOpen={showReviewSidebar}
+        onClose={() => setShowReviewSidebar(false)}
+      />
+    </div>
+  );
+}
