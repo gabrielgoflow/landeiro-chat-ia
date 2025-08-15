@@ -260,21 +260,6 @@ export default function Chat() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            {/* Debug button - always visible for testing */}
-            <Button
-              onClick={loadReview}
-              disabled={isLoadingReview}
-              className="bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              data-testid="view-review-debug-button"
-            >
-              {isLoadingReview ? (
-                <i className="fas fa-spinner fa-spin mr-2"></i>
-              ) : (
-                <i className="fas fa-file-alt mr-2"></i>
-              )}
-              Ver Review (Debug)
-            </Button>
-            
             {/* Conditional review button - only shows when review exists */}
             {hasReview && (
               <Button
