@@ -280,7 +280,7 @@ export function useChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentThreadId]);
+  }, [currentThreadId, chatHistory]);
 
   const getCurrentMessages = useCallback(() => {
     if (!currentThreadId) return [];
