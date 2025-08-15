@@ -10,15 +10,22 @@ export default function AdminSetup() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [sqlScript, setSqlScript] = useState('')
+  const [fixRlsScript, setFixRlsScript] = useState('')
 
   const isAdmin = user?.email === 'admin@goflow.digital'
 
   useEffect(() => {
-    // Carregar o script SQL
+    // Carregar o script SQL principal
     fetch('/supabase_schema.sql')
       .then(res => res.text())
       .then(text => setSqlScript(text))
       .catch(err => console.error('Erro ao carregar SQL:', err))
+      
+    // Carregar o script de correção RLS
+    fetch('/fix_rls_policies.sql')
+      .then(res => res.text())
+      .then(text => setFixRlsScript(text))
+      .catch(err => console.error('Erro ao carregar script RLS:', err))
   }, [])
 
   const copySqlToClipboard = () => {
@@ -26,6 +33,14 @@ export default function AdminSetup() {
     toast({
       title: 'SQL copiado!',
       description: 'Cole no SQL Editor do Supabase Dashboard'
+    })
+  }
+
+  const copyFixRlsToClipboard = () => {
+    navigator.clipboard.writeText(fixRlsScript)
+    toast({
+      title: 'Script RLS copiado!',
+      description: 'Execute este script para corrigir políticas de segurança'
     })
   }
 
@@ -65,15 +80,65 @@ export default function AdminSetup() {
             <DatabaseSetup />
           </div>
 
+          {/* Erro RLS Alert */}
+          <Card className="border-red-200 bg-red-50">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 text-red-700">
+                <i className="fas fa-exclamation-triangle"></i>
+                <span>Erro RLS Detectado</span>
+              </CardTitle>
+              <CardDescription>
+                Execute o script de correção se houver erro de segurança
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-sm text-red-700">
+                Se você está vendo erros como "violates row-level security policy", execute este script:
+              </div>
+              
+              <div className="bg-gray-900 rounded-lg p-4 max-h-48 overflow-y-auto">
+                <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
+                  {fixRlsScript || 'Carregando script de correção...'}
+                </pre>
+              </div>
+              
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={copyFixRlsToClipboard}
+                  size="sm"
+                  className="flex-1 bg-red-600 hover:bg-red-700"
+                  disabled={!fixRlsScript}
+                >
+                  <i className="fas fa-copy mr-2"></i>
+                  Copiar Correção RLS
+                </Button>
+                <Button 
+                  onClick={() => {
+                    copyFixRlsToClipboard();
+                    window.open('https://app.supabase.com', '_blank');
+                  }}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <i className="fas fa-external-link-alt mr-2"></i>
+                  Copiar + Abrir Supabase
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div>
           {/* Script SQL */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <i className="fas fa-code text-primary"></i>
-                <span>Script de Migração</span>
+                <span>Script de Migração Inicial</span>
               </CardTitle>
               <CardDescription>
-                Execute este SQL no Supabase Dashboard
+                Execute primeiro (se as tabelas não existem)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -158,23 +223,19 @@ export default function AdminSetup() {
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">📋 Passos OBRIGATÓRIOS para criar as tabelas:</h4>
+                <h4 className="font-medium text-gray-900 mb-2">📋 Resolução do Problema:</h4>
                 <ol className="text-sm text-gray-600 space-y-2">
-                  <li><strong>1. Abra o Supabase:</strong> <a href="https://app.supabase.com" target="_blank" className="text-blue-600 underline">app.supabase.com</a></li>
-                  <li><strong>2. Selecione o projeto</strong> do Landeiro Chat</li>
-                  <li><strong>3. No menu lateral, clique em "SQL Editor"</strong></li>
-                  <li><strong>4. Clique em "New Query"</strong> (novo script)</li>
-                  <li><strong>5. COPIE todo o SQL</strong> da caixa acima</li>
-                  <li><strong>6. COLE no editor</strong> do Supabase</li>
-                  <li><strong>7. Clique em "RUN"</strong> (botão azul)</li>
-                  <li><strong>8. Aguarde a confirmação</strong> "Success. No rows returned"</li>
-                  <li><strong>9. Verifique aqui</strong> se as tabelas foram criadas</li>
+                  <li><strong>1. Erro RLS:</strong> Execute primeiro o script de correção RLS (caixa vermelha)</li>
+                  <li><strong>2. Tabelas:</strong> Se não existem, execute o script de migração inicial</li>
+                  <li><strong>3. Acesso:</strong> <a href="https://app.supabase.com" target="_blank" className="text-blue-600 underline">app.supabase.com</a> → SQL Editor → New Query</li>
+                  <li><strong>4. Execução:</strong> Cole o script e clique em "RUN"</li>
+                  <li><strong>5. Verificação:</strong> Use o botão "Verificar Novamente" abaixo</li>
                 </ol>
                 
-                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-xs text-yellow-800">
-                    ⚠️ <strong>IMPORTANTE:</strong> As tabelas NÃO são criadas automaticamente. 
-                    Você DEVE executar o SQL manualmente no Supabase Dashboard.
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs text-red-800">
+                    🚨 <strong>ERRO ATUAL:</strong> RLS (Row Level Security) está bloqueando inserções. 
+                    Execute o script de correção RLS primeiro!
                   </p>
                 </div>
               </div>
