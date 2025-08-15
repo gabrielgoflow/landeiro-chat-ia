@@ -4,7 +4,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth.jsx";
-import { ProtectedRoute } from "@/components/ProtectedRoute.jsx";
+import ProtectedRoute from "@/components/ProtectedRoute.jsx";
+import ChatsPage from "@/pages/chats.jsx";
 import Chat from "@/pages/chat.jsx";
 import Login from "@/pages/login.jsx";
 import Register from "@/pages/register.jsx";
@@ -21,9 +22,19 @@ function Router() {
           <AdminSetup />
         </ProtectedRoute>
       </Route>
-      <Route path="/">
+      <Route path="/chat/new">
         <ProtectedRoute>
           <Chat />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/chat/:chatId">
+        <ProtectedRoute>
+          <Chat />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/">
+        <ProtectedRoute>
+          <ChatsPage />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />

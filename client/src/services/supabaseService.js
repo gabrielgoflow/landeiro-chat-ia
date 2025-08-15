@@ -184,3 +184,6 @@ export class SupabaseService {
     }
   }
 }
+
+export { SupabaseService as supabaseService }
+export default SupabaseService

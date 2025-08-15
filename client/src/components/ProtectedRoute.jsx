@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
-import { useLocation } from 'wouter'
 import { useAuth } from '@/hooks/useAuth.jsx'
+import { useLocation } from 'wouter'
+import { useEffect } from 'react'
 
-export function ProtectedRoute({ children }) {
+export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   const [, setLocation] = useLocation()
 
@@ -10,26 +10,21 @@ export function ProtectedRoute({ children }) {
     if (!loading && !user) {
       setLocation('/login')
     }
-  }, [user, loading, setLocation])
+  }, [loading, user, setLocation])
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-            <i className="fas fa-robot text-white text-xl"></i>
-          </div>
-          <div className="flex items-center justify-center space-x-2">
-            <i className="fas fa-spinner fa-spin text-primary"></i>
-            <span className="text-gray-600">Carregando...</span>
-          </div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
         </div>
       </div>
     )
   }
 
   if (!user) {
-    return null
+    return null // Will redirect via useEffect
   }
 
   return children
