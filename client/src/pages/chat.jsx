@@ -17,6 +17,7 @@ export default function Chat() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
+  const [isFinalizingChat, setIsFinalizingChat] = useState(false);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -93,6 +94,34 @@ export default function Chat() {
     setShowNewChatDialog(false);
   };
 
+  const handleFinalizeChat = async () => {
+    if (!currentThread) return;
+    
+    setIsFinalizingChat(true);
+    try {
+      const response = await fetch('https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: currentThread.id
+        })
+      });
+      
+      if (response.ok) {
+        console.log('Chat finalized successfully');
+        // Optionally show success message or redirect
+      } else {
+        console.error('Error finalizing chat:', response.status);
+      }
+    } catch (error) {
+      console.error('Error finalizing chat:', error);
+    } finally {
+      setIsFinalizingChat(false);
+    }
+  };
+
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
       <ChatSidebar
@@ -142,6 +171,26 @@ export default function Chat() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {currentThread && (
+              <Button
+                onClick={handleFinalizeChat}
+                disabled={isFinalizingChat}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                data-testid="finalize-chat-button"
+              >
+                {isFinalizingChat ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin mr-2"></i>
+                    Finalizando...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-check-circle mr-2"></i>
+                    Finalizar Atendimento
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
