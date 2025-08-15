@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useChat } from "@/hooks/useChat";
+import { ChatService } from "@/services/chatService.js";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { MessageInput } from "@/components/MessageInput";
@@ -29,7 +30,8 @@ export default function Chat() {
     selectThread,
     deleteThread,
     sendMessage,
-    clearError
+    clearError,
+    loadMessageHistory
   } = useChat();
 
   // Auto-scroll to bottom when new messages are added
@@ -73,14 +75,25 @@ export default function Chat() {
     }
   };
 
-  // Check for review when thread changes
+  // Check for review and load messages when thread changes
   useEffect(() => {
-    if (currentThread?.id) {
-      checkForReview(currentThread.id);
-    } else {
-      setCurrentReview(null);
-    }
-  }, [currentThread?.id]);
+    const loadThreadData = async () => {
+      if (currentThread?.id) {
+        // Check for existing review
+        await checkForReview(currentThread.id);
+        
+        // Load message history if thread has an OpenAI chat ID and no local messages
+        if (currentThread.openaiChatId && (!allMessages[currentThread.id] || allMessages[currentThread.id].length === 0)) {
+          console.log('Loading message history for thread:', currentThread.id);
+          await loadMessageHistory(currentThread.id, currentThread.openaiChatId);
+        }
+      } else {
+        setCurrentReview(null);
+      }
+    };
+    
+    loadThreadData();
+  }, [currentThread?.id, currentThread?.openaiChatId, allMessages]);
 
   // Finalize chat function
   const handleFinalizeChat = async () => {
@@ -233,7 +246,7 @@ export default function Chat() {
             ) : (
               <Button
                 onClick={handleFinalizeChat}
-                disabled={isFinalizing || !currentThread?.id || currentMessages.length === 0}
+                disabled={isFinalizing || !currentThread?.id}
                 className="bg-green-500 hover:bg-green-600 text-white px-4 py-2"
                 data-testid="finalize-chat-button"
               >
