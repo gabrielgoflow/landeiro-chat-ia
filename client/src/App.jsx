@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth.jsx";
 import ProtectedRoute from "@/components/ProtectedRoute.jsx";
 import ChatsPage from "@/pages/chats.jsx";
-import Chat from "@/pages/chat.jsx";
+import Chat from "@/pages/chat.tsx";
 import Login from "@/pages/login.jsx";
 import Register from "@/pages/register.jsx";
 import AdminSetup from "@/pages/admin-setup.jsx";
