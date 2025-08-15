@@ -1,0 +1,45 @@
+{
+    "output": {
+        "resumoAtendimento": "Lucas, um designer gráfico de 28 anos, expressou sentimentos intensos de ansiedade, especialmente relacionados a sua rotina diária corrida e incapacidade de desligar-se do trabalho. Ele menciona dificuldades em relaxar e desconectar dos pensamentos ansiosos, afetando suas noites de sono e seus hobbies. Relatou também que a ansiedade intercede em seus relacionamentos, levando-o a evitar sair.",
+        "feedbackDireto": "Você iniciou o atendimento com uma saudação que faltou acolhimento e entusiasmo necessários para quebrar o gelo. Lucas abriu-se rapidamente sobre sua ansiedade e sintomas físicos, como coração acelerado e dificuldades de sono, mostrando vulnerabilidade. Você fez bem ao pedir mais detalhes sobre sua rotina, mas poderia ter validado suas emoções antes disso, para mostrar compreensão e empatia. Diga algo como 'Parece que você está passando por um momento realmente complicado.' Isso teria sido útil para demonstrar apoio. Você também poderia ter explorado mais sobre o impacto dos sintomas em diferentes áreas da vida de Lucas, como o trabalho e relacionamentos, usando técnicas de automonitoramento ou diário de humor. Lembre-se de enquadrar as sessões iniciais com psicoeducação para ajudar o paciente a entender que ansiedade em níveis moderados pode ser útil e para orientá-lo sobre práticas fora da sessão.",
+        "sinaisPaciente": [
+            [
+                "Sentimento de sufocamento"
+            ],
+            [
+                "Dificuldade em desligar do trabalho"
+            ],
+            [
+                "Dificuldades para dormir"
+            ],
+            [
+                "Evitamento de atividades sociais"
+            ],
+            [
+                "Sobrecarga com tarefas"
+            ]
+        ],
+        "pontosPositivos": [
+            [
+                "Você estimulou Lucas a falar sobre sua rotina, o que ajuda a entender o contexto da ansiedade."
+            ],
+            [
+                "Você abordou o impacto da rotina corrida na ansiedade, permitindo um entendimento inicial do problema."
+            ]
+        ],
+        "pontosNegativos": [
+            [
+                "Não houve acolhimento inicial para validar os sentimentos de Lucas."
+            ],
+            [
+                "Faltou empatia ao responder como estava após a expressão dos sentimentos dele."
+            ],
+            [
+                "Você não usou psicoeducação para explicar a natureza da ansiedade."
+            ],
+            [
+                "Houve falta de investigação sobre o impacto dos sintomas no desempenho e relações."
+            ]
+        ]
+    }
+}

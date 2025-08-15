@@ -99,7 +99,8 @@ export default function Chat() {
     
     setIsFinalizingChat(true);
     try {
-      const response = await fetch('https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review', {
+      // Get review from external service
+      const reviewResponse = await fetch('https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,11 +110,37 @@ export default function Chat() {
         })
       });
       
-      if (response.ok) {
-        console.log('Chat finalized successfully');
-        // Optionally show success message or redirect
+      if (reviewResponse.ok) {
+        const reviewData = await reviewResponse.json();
+        console.log('Review data received:', reviewData);
+        
+        // Transform nested arrays to flat strings for storage
+        const transformedReview = {
+          chatId: currentThread.id,
+          resumoAtendimento: reviewData.resumoAtendimento,
+          feedbackDireto: reviewData.feedbackDireto,
+          sinaisPaciente: reviewData.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
+          pontosPositivos: reviewData.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
+          pontosNegativos: reviewData.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item)
+        };
+        
+        // Save review to our database
+        const saveResponse = await fetch('/api/reviews', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(transformedReview)
+        });
+        
+        if (saveResponse.ok) {
+          console.log('Review saved successfully');
+          // Optionally show success message or redirect
+        } else {
+          console.error('Error saving review:', saveResponse.status);
+        }
       } else {
-        console.error('Error finalizing chat:', response.status);
+        console.error('Error getting review:', reviewResponse.status);
       }
     } catch (error) {
       console.error('Error finalizing chat:', error);
