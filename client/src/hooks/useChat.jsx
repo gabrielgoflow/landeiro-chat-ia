@@ -251,7 +251,7 @@ export function useChat() {
       const currentThread = chatHistory.threads.find(t => t.id === threadId);
       const sessionData = currentThread?.sessionData || null;
       
-      // Send to webhook and get AI response (passing chat_id as threadId for now)
+      // Send to webhook and get AI response (using threadId as chat_id for Supabase)
       const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, threadId);
       const aiMessage = ChatService.createAiMessage(threadId, aiResponse);
 

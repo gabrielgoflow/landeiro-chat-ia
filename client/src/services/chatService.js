@@ -133,7 +133,10 @@ export class ChatService {
 
     // Add chat_id if provided
     if (chatId) {
+      console.log('Sending message with chat_id:', chatId);
       request.chat_id = chatId;
+    } else {
+      console.log('Sending message without chat_id');
     }
 
     // Add session data if provided
