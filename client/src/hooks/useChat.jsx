@@ -73,14 +73,8 @@ export function useChat() {
     try {
       setIsLoading(true);
       
-      // Find the thread to get its thread_id (OpenAI thread ID)
-      const currentThread = chatHistory.threads.find(t => t.id === threadId);
-      if (!currentThread?.threadId) {
-        console.warn('No OpenAI thread_id found for chat:', threadId);
-        return;
-      }
-
-      const historyMessages = await ChatService.getMessageHistory(currentThread.threadId);
+      // Use the threadId (which is actually our chat_id) to load history
+      const historyMessages = await ChatService.getMessageHistory(threadId);
       
       // Update chat history with loaded messages
       setChatHistory(prev => ({
@@ -98,7 +92,7 @@ export function useChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [chatHistory.threads]);
+  }, []);
 
   const selectThread = useCallback(async (threadId) => {
     setCurrentThreadId(threadId);

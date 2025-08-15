@@ -76,7 +76,7 @@ export class ChatService {
     };
   }
 
-  static async getMessageHistory(threadId) {
+  static async getMessageHistory(chatId) {
     try {
       const response = await fetch('https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-get-history', {
         method: 'POST',
@@ -84,7 +84,7 @@ export class ChatService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          thread_id: threadId,
+          chat_id: chatId,
           email: USER_EMAIL
         })
       });
