@@ -43,9 +43,10 @@ export function useChat() {
       }
 
       const newThread = {
-        id: chatData.chat_id,
+        id: chatData.chat_threads?.chat_id || chatData.id, // Use internal chat_id as local ID
         title: `${chatData.diagnostico} - ${chatData.protocolo}`,
         threadId: chatData.thread_id,
+        openaiChatId: chatData.chat_id, // This is the OpenAI chat_id for webhook
         sessionData: {
           diagnostico: chatData.diagnostico,
           protocolo: chatData.protocolo
@@ -247,12 +248,15 @@ export function useChat() {
     setError(null);
 
     try {
-      // Get current thread to access session data
+      // Get current thread to access session data and OpenAI chat_id
       const currentThread = chatHistory.threads.find(t => t.id === threadId);
       const sessionData = currentThread?.sessionData || null;
+      const openaiChatId = currentThread?.openaiChatId || null;
       
-      // Send to webhook and get AI response (using threadId as chat_id for Supabase)
-      const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, threadId);
+      console.log('Current thread for message:', { threadId, openaiChatId, sessionData });
+      
+      // Send to webhook and get AI response (using correct OpenAI chat_id)
+      const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, openaiChatId);
       const aiMessage = ChatService.createAiMessage(threadId, aiResponse);
 
       setChatHistory(prev => ({
