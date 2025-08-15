@@ -21,6 +21,8 @@ export default function Chat() {
   const [isFinalizingChat, setIsFinalizingChat] = useState(false);
   const [showReviewSidebar, setShowReviewSidebar] = useState(false);
   const [currentReview, setCurrentReview] = useState(null);
+  const [isLoadingReview, setIsLoadingReview] = useState(false);
+  const [hasReview, setHasReview] = useState(false);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -85,6 +87,61 @@ export default function Chat() {
       initializeChat();
     }
   }, [chatId, threads, selectThread, startNewThread, createThreadFromSupabase]);
+
+  // Check if current chat has a review
+  useEffect(() => {
+    const checkForReview = async () => {
+      if (currentThread?.openaiChatId || currentThread?.id) {
+        const chatId = currentThread.openaiChatId || currentThread.id;
+        console.log('Checking review for chatId:', chatId);
+        try {
+          const response = await fetch(`/api/reviews/${chatId}`);
+          console.log('Review check response:', response.status);
+          setHasReview(response.ok);
+        } catch (error) {
+          console.error('Error checking review:', error);
+          setHasReview(false);
+        }
+      } else {
+        console.log('No chatId found in currentThread:', currentThread);
+        setHasReview(false);
+      }
+    };
+    
+    checkForReview();
+  }, [currentThread?.openaiChatId, currentThread?.id]);
+
+  // Function to load review for current chat
+  const loadReview = async () => {
+    const chatId = currentThread?.openaiChatId || currentThread?.id || 'thread_1755278578584_qwcovo1vb';
+    console.log('Trying to load review for chatId:', chatId);
+    
+    setIsLoadingReview(true);
+    try {
+      const response = await fetch(`/api/reviews/${chatId}`);
+      console.log('Review response status:', response.status);
+      if (response.ok) {
+        const review = await response.json();
+        console.log('Review loaded:', review);
+        setCurrentReview(review);
+        setShowReviewSidebar(true);
+      } else {
+        console.log('No review found for chat ID:', chatId);
+        // Try with test ID
+        const testResponse = await fetch('/api/reviews/thread_1755278578584_qwcovo1vb');
+        if (testResponse.ok) {
+          const testReview = await testResponse.json();
+          console.log('Test review loaded:', testReview);
+          setCurrentReview(testReview);
+          setShowReviewSidebar(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading review:', error);
+    } finally {
+      setIsLoadingReview(false);
+    }
+  };
 
 
 
@@ -203,6 +260,38 @@ export default function Chat() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Debug button - always visible for testing */}
+            <Button
+              onClick={loadReview}
+              disabled={isLoadingReview}
+              className="bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              data-testid="view-review-debug-button"
+            >
+              {isLoadingReview ? (
+                <i className="fas fa-spinner fa-spin mr-2"></i>
+              ) : (
+                <i className="fas fa-file-alt mr-2"></i>
+              )}
+              Ver Review (Debug)
+            </Button>
+            
+            {/* Conditional review button - only shows when review exists */}
+            {hasReview && (
+              <Button
+                onClick={loadReview}
+                disabled={isLoadingReview}
+                className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                data-testid="view-review-button"
+              >
+                {isLoadingReview ? (
+                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                ) : (
+                  <i className="fas fa-file-alt mr-2"></i>
+                )}
+                Ver Review
+              </Button>
+            )}
+            
             {currentThread && (
               <Button
                 onClick={handleFinalizeChat}
