@@ -114,7 +114,6 @@ export function ChatDebugInfo({ currentThread, sessionData, visible = false }) {
 {JSON.stringify({
   message: "[mensagem do usuário]",
   email: "gabriel@goflow.digital",
-  thread: currentThread?.id,
   chat_id: currentThread?.id,
   diagnostico: sessionData?.diagnostico,
   protocolo: sessionData?.protocolo

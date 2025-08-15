@@ -80,7 +80,6 @@ export class ChatService {
     const request = {
       message,
       email: USER_EMAIL,
-      thread: threadId,
     };
 
     // Add chat_id if provided
