@@ -31,6 +31,7 @@ export default function Chat() {
     selectThread,
     deleteThread,
     sendMessage,
+    createThreadFromSupabase,
     clearError
   } = useChat();
 
@@ -48,24 +49,36 @@ export default function Chat() {
 
   // Initialize based on chatId parameter
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-    
-    if (chatId && chatId !== 'new') {
-      // Load specific chat by ID
-      const existingThread = threads.find(t => t.id === chatId);
-      if (existingThread) {
-        selectThread(existingThread.id);
-      } else {
-        // Chat ID not found in current threads, redirect to new chat
-        console.warn('Chat ID not found, redirecting to new chat:', chatId);
+    const initializeChat = async () => {
+      if (chatId && chatId !== 'new') {
+        // Load specific chat by ID
+        const existingThread = threads.find(t => t.id === chatId);
+        if (existingThread) {
+          console.log('Found existing thread locally:', chatId);
+          selectThread(existingThread.id);
+        } else {
+          // Chat ID not found in current threads, try to load from Supabase
+          console.log('Thread not found locally, trying to load from Supabase:', chatId);
+          const createdThread = await createThreadFromSupabase(chatId);
+          if (createdThread) {
+            console.log('Thread created from Supabase, now selecting:', chatId);
+            selectThread(chatId);
+          } else {
+            console.warn('Chat ID not found in Supabase, redirecting to new chat:', chatId);
+            startNewThread();
+          }
+        }
+      } else if (chatId === 'new' || (threads.length === 0 && !chatId)) {
+        // Create new thread for /chat/new or when no threads exist
         startNewThread();
       }
-    } else if (chatId === 'new' || (threads.length === 0 && !chatId)) {
-      // Create new thread for /chat/new or when no threads exist
-      startNewThread();
+    };
+
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      initializeChat();
     }
-  }, [chatId, threads, selectThread, startNewThread]);
+  }, [chatId, threads, selectThread, startNewThread, createThreadFromSupabase]);
 
 
 
