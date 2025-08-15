@@ -29,6 +29,45 @@ export function useChat() {
     ChatService.saveHistory(chatHistory);
   }, [chatHistory]);
 
+  const createThreadFromSupabase = useCallback(async (chatId) => {
+    try {
+      if (!user) return null;
+      
+      console.log('Creating thread from Supabase data for:', chatId);
+      const userChats = await SupabaseService.getUserChats(user.id);
+      const chatData = userChats.find(chat => chat.chat_id === chatId);
+      
+      if (!chatData) {
+        console.warn('Chat not found in Supabase:', chatId);
+        return null;
+      }
+
+      const newThread = {
+        id: chatData.chat_id,
+        title: `${chatData.diagnostico} - ${chatData.protocolo}`,
+        threadId: chatData.thread_id,
+        sessionData: {
+          diagnostico: chatData.diagnostico,
+          protocolo: chatData.protocolo
+        },
+        createdAt: new Date(chatData.created_at),
+        updatedAt: new Date(chatData.created_at)
+      };
+
+      // Add thread to local storage
+      setChatHistory(prev => ({
+        threads: [newThread, ...prev.threads.filter(t => t.id !== chatId)],
+        messages: { ...prev.messages, [chatId]: [] }
+      }));
+
+      console.log('Thread created from Supabase:', newThread);
+      return newThread;
+    } catch (error) {
+      console.error('Error creating thread from Supabase:', error);
+      return null;
+    }
+  }, [user]);
+
   const startNewThread = useCallback(async (sessionData = null) => {
     const newThread = ChatService.createNewThread(sessionData);
     
@@ -72,6 +111,7 @@ export function useChat() {
   const loadChatHistory = useCallback(async (threadId) => {
     try {
       setIsLoading(true);
+      console.log('Loading chat history for:', threadId);
       
       // Use the threadId (which is actually our chat_id) to load history
       const historyMessages = await ChatService.getMessageHistory(threadId);
@@ -95,16 +135,35 @@ export function useChat() {
   }, []);
 
   const selectThread = useCallback(async (threadId) => {
+    console.log('Selecting thread:', threadId);
+    
+    // Check if thread exists locally
+    const existingThread = chatHistory.threads.find(t => t.id === threadId);
+    
+    if (!existingThread) {
+      console.log('Thread not found locally, creating from Supabase...');
+      const createdThread = await createThreadFromSupabase(threadId);
+      if (!createdThread) {
+        console.log('Failed to create thread from Supabase');
+        return;
+      }
+    }
+    
     setCurrentThreadId(threadId);
     setError(null);
     
     // Check if we already have messages for this thread
     const existingMessages = chatHistory.messages[threadId];
+    console.log('Existing messages for thread:', existingMessages?.length || 0);
+    
     if (!existingMessages || existingMessages.length === 0) {
+      console.log('No existing messages, loading history...');
       // Load history from OpenAI if we don't have local messages
       await loadChatHistory(threadId);
+    } else {
+      console.log('Using existing messages');
     }
-  }, [chatHistory.messages, loadChatHistory]);
+  }, [chatHistory.threads, chatHistory.messages, loadChatHistory, createThreadFromSupabase]);
 
   const deleteThread = useCallback(async (threadId) => {
     setChatHistory(prev => {
@@ -240,6 +299,7 @@ export function useChat() {
     selectThread,
     deleteThread,
     sendMessage,
+    createThreadFromSupabase,
     clearError: () => setError(null)
   };
 }
