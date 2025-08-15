@@ -56,17 +56,28 @@ export default function Chat() {
 
   // Function to load review for current chat
   const loadReview = async () => {
-    if (!currentThread?.openaiChatId) return;
+    const chatId = currentThread?.openaiChatId || currentThread?.id || 'thread_1755278578584_qwcovo1vb';
+    console.log('Trying to load review for chatId:', chatId);
     
     setIsLoadingReview(true);
     try {
-      const response = await fetch(`/api/reviews/${currentThread.openaiChatId}`);
+      const response = await fetch(`/api/reviews/${chatId}`);
+      console.log('Review response status:', response.status);
       if (response.ok) {
         const review = await response.json();
+        console.log('Review loaded:', review);
         setCurrentReview(review);
         setIsReviewSidebarOpen(true);
       } else {
-        console.log('No review found for this chat');
+        console.log('No review found for chat ID:', chatId);
+        // Try with test ID
+        const testResponse = await fetch('/api/reviews/thread_1755278578584_qwcovo1vb');
+        if (testResponse.ok) {
+          const testReview = await testResponse.json();
+          console.log('Test review loaded:', testReview);
+          setCurrentReview(testReview);
+          setIsReviewSidebarOpen(true);
+        }
       }
     } catch (error) {
       console.error('Error loading review:', error);
@@ -78,16 +89,26 @@ export default function Chat() {
   // Check if current chat has a review
   const [hasReview, setHasReview] = useState(false);
   
+  // Add debug logging
+  useEffect(() => {
+    console.log('Current thread changed:', currentThread);
+    console.log('OpenAI Chat ID:', currentThread?.openaiChatId);
+  }, [currentThread]);
+  
   useEffect(() => {
     const checkForReview = async () => {
       if (currentThread?.openaiChatId) {
+        console.log('Checking review for openaiChatId:', currentThread.openaiChatId);
         try {
           const response = await fetch(`/api/reviews/${currentThread.openaiChatId}`);
+          console.log('Review check response:', response.status);
           setHasReview(response.ok);
-        } catch {
+        } catch (error) {
+          console.error('Error checking review:', error);
           setHasReview(false);
         }
       } else {
+        console.log('No openaiChatId found in currentThread:', currentThread);
         setHasReview(false);
       }
     };
@@ -133,21 +154,39 @@ export default function Chat() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Debug button - sempre visible para testar */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadReview}
+              disabled={isLoadingReview}
+              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300"
+              data-testid="view-review-button"
+            >
+              {isLoadingReview ? (
+                <i className="fas fa-spinner fa-spin mr-2"></i>
+              ) : (
+                <i className="fas fa-file-alt mr-2"></i>
+              )}
+              Ver Review (Debug)
+            </Button>
+            
+            {/* Original conditional button */}
             {hasReview && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={loadReview}
                 disabled={isLoadingReview}
-                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300"
-                data-testid="view-review-button"
+                className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300"
+                data-testid="view-review-button-conditional"
               >
                 {isLoadingReview ? (
                   <i className="fas fa-spinner fa-spin mr-2"></i>
                 ) : (
                   <i className="fas fa-file-alt mr-2"></i>
                 )}
-                Ver Review
+                Ver Review (Condicional)
               </Button>
             )}
             <Button

@@ -11,7 +11,7 @@ import { ChatSidebar } from "@/components/ChatSidebar.jsx";
 import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
 import { MessageInput } from "@/components/MessageInput.jsx";
 import { NewChatDialog } from "@/components/NewChatDialog.jsx";
-import { ReviewSidebar } from "@/components/ReviewSidebar.jsx";
+import { ReviewSidebar } from "@/components/ReviewSidebar";
 
 export default function Chat() {
   const { chatId } = useParams();
