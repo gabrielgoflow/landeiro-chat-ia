@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "wouter";
+import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
@@ -84,6 +84,17 @@ export default function Chat() {
         {/* Chat Header */}
         <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
+            <Link href="/">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                data-testid="back-to-chats-button"
+              >
+                <i className="fas fa-arrow-left mr-2"></i>
+                Voltar
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="sm"
