@@ -94,23 +94,30 @@ export class ChatService {
       }
 
       const data = await response.json();
+      console.log('Raw response from history endpoint:', data);
       
       // Transform OpenAI messages to our format
       const messages = [];
       if (data[0] && data[0].data) {
         // Sort by created_at ascending (oldest first)
         const sortedMessages = data[0].data.sort((a, b) => a.created_at - b.created_at);
+        console.log('Sorted messages from OpenAI:', sortedMessages);
         
         for (const msg of sortedMessages) {
-          messages.push({
+          const transformedMsg = {
             id: msg.id,
             text: msg.content[0]?.text?.value || '',
             sender: msg.role === 'user' ? 'user' : 'assistant',
             timestamp: new Date(msg.created_at * 1000), // Convert Unix timestamp to Date
-          });
+          };
+          messages.push(transformedMsg);
+          console.log('Transformed message:', transformedMsg);
         }
+      } else {
+        console.log('No data array found in response:', data);
       }
 
+      console.log('Final messages array:', messages);
       return messages;
     } catch (error) {
       console.error('Error fetching message history:', error);
