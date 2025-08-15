@@ -10,11 +10,13 @@ import { ChatMessage } from "@/components/ChatMessage.jsx";
 import { ChatSidebar } from "@/components/ChatSidebar.jsx";
 import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
 import { MessageInput } from "@/components/MessageInput.jsx";
+import { NewChatDialog } from "@/components/NewChatDialog.jsx";
 
 export default function Chat() {
   const { chatId } = useParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [showNewChatDialog, setShowNewChatDialog] = useState(false);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -65,12 +67,12 @@ export default function Chat() {
             selectThread(chatId);
           } else {
             console.warn('Chat ID not found in Supabase, redirecting to new chat:', chatId);
-            startNewThread();
+            setShowNewChatDialog(true);
           }
         }
       } else if (chatId === 'new' || (threads.length === 0 && !chatId)) {
         // Create new thread for /chat/new or when no threads exist
-        startNewThread();
+        setShowNewChatDialog(true);
       }
     };
 
@@ -86,6 +88,11 @@ export default function Chat() {
     await sendMessage(message);
   };
 
+  const handleNewChatConfirm = (formData) => {
+    startNewThread(formData);
+    setShowNewChatDialog(false);
+  };
+
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
       <ChatSidebar
@@ -94,7 +101,7 @@ export default function Chat() {
         messages={allMessages}
         onSelectThread={selectThread}
         onDeleteThread={deleteThread}
-        onStartNewThread={startNewThread}
+        onStartNewThread={() => setShowNewChatDialog(true)}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
@@ -228,6 +235,12 @@ export default function Chat() {
           onClearError={clearError}
         />
       </div>
+      
+      <NewChatDialog
+        open={showNewChatDialog}
+        onOpenChange={setShowNewChatDialog}
+        onConfirm={handleNewChatConfirm}
+      />
     </div>
   );
 }
