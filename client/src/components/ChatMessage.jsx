@@ -10,7 +10,7 @@ export function ChatMessage({ message }) {
       <div className="flex items-start justify-end space-x-3" data-testid={`message-${message.id}`}>
         <div className="flex-1 flex justify-end">
           <div className="bg-primary text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-md">
-            <p className="whitespace-pre-wrap">{message.content}</p>
+            <p className="whitespace-pre-wrap">{message.text || message.content}</p>
           </div>
         </div>
         <Avatar className="w-8 h-8 flex-shrink-0">
@@ -31,7 +31,7 @@ export function ChatMessage({ message }) {
       </Avatar>
       <div className="flex-1">
         <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
-          <p className="text-gray-800 whitespace-pre-wrap">{message.content}</p>
+          <p className="text-gray-800 whitespace-pre-wrap">{message.text || message.content}</p>
         </div>
         <div className="text-xs text-gray-500 mt-1 ml-1">{timestamp}</div>
       </div>
