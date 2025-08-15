@@ -98,9 +98,9 @@ export class ChatService {
       
       // Transform OpenAI messages to our format
       const messages = [];
-      if (data[0] && data[0].data) {
+      if (data && data.data) {
         // Sort by created_at ascending (oldest first)
-        const sortedMessages = data[0].data.sort((a, b) => a.created_at - b.created_at);
+        const sortedMessages = data.data.sort((a, b) => a.created_at - b.created_at);
         console.log('Sorted messages from OpenAI:', sortedMessages);
         
         for (const msg of sortedMessages) {
