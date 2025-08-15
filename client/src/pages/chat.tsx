@@ -6,9 +6,14 @@ import { useChat } from "@/hooks/useChat";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { MessageInput } from "@/components/MessageInput";
+import { ReviewSidebar } from "@/components/ReviewSidebar";
+import type { ChatReview } from "@shared/schema";
 
 export default function Chat() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isReviewSidebarOpen, setIsReviewSidebarOpen] = useState(false);
+  const [currentReview, setCurrentReview] = useState<ChatReview | null>(null);
+  const [isLoadingReview, setIsLoadingReview] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   
@@ -49,6 +54,47 @@ export default function Chat() {
     await sendMessage(message);
   };
 
+  // Function to load review for current chat
+  const loadReview = async () => {
+    if (!currentThread?.openaiChatId) return;
+    
+    setIsLoadingReview(true);
+    try {
+      const response = await fetch(`/api/reviews/${currentThread.openaiChatId}`);
+      if (response.ok) {
+        const review = await response.json();
+        setCurrentReview(review);
+        setIsReviewSidebarOpen(true);
+      } else {
+        console.log('No review found for this chat');
+      }
+    } catch (error) {
+      console.error('Error loading review:', error);
+    } finally {
+      setIsLoadingReview(false);
+    }
+  };
+
+  // Check if current chat has a review
+  const [hasReview, setHasReview] = useState(false);
+  
+  useEffect(() => {
+    const checkForReview = async () => {
+      if (currentThread?.openaiChatId) {
+        try {
+          const response = await fetch(`/api/reviews/${currentThread.openaiChatId}`);
+          setHasReview(response.ok);
+        } catch {
+          setHasReview(false);
+        }
+      } else {
+        setHasReview(false);
+      }
+    };
+    
+    checkForReview();
+  }, [currentThread?.openaiChatId]);
+
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
       <ChatSidebar
@@ -87,6 +133,23 @@ export default function Chat() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {hasReview && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadReview}
+                disabled={isLoadingReview}
+                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300"
+                data-testid="view-review-button"
+              >
+                {isLoadingReview ? (
+                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                ) : (
+                  <i className="fas fa-file-alt mr-2"></i>
+                )}
+                Ver Review
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -159,6 +222,16 @@ export default function Chat() {
           onClearError={clearError}
         />
       </div>
+      
+      {/* Review Sidebar */}
+      <ReviewSidebar
+        review={currentReview}
+        isOpen={isReviewSidebarOpen}
+        onClose={() => {
+          setIsReviewSidebarOpen(false);
+          setCurrentReview(null);
+        }}
+      />
     </div>
   );
 }
