@@ -1,4 +1,5 @@
-const WEBHOOK_URL = "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia";
+const WEBHOOK_URL =
+  "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia";
 const USER_EMAIL = "gabriel@goflow.digital";
 const STORAGE_KEY = "landeiro_chat_history";
 
@@ -48,7 +49,7 @@ export class ChatService {
     if (sessionData) {
       thread.sessionData = {
         diagnostico: sessionData.diagnostico,
-        protocolo: sessionData.protocolo
+        protocolo: sessionData.protocolo,
       };
       thread.title = `${sessionData.diagnostico} - ${sessionData.protocolo}`;
     }
@@ -78,65 +79,76 @@ export class ChatService {
 
   static async getMessageHistory(chatId) {
     try {
-      const response = await fetch('https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-get-history', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-get-history",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chat_id: chatId,
+            email: USER_EMAIL,
+          }),
         },
-        body: JSON.stringify({
-          chat_id: chatId,
-          email: USER_EMAIL
-        })
-      });
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Raw response from history endpoint:', data);
-      
+      console.log("Raw response from history endpoint:", data);
+
       // Transform OpenAI messages to our format
       const messages = [];
       if (data && data.data) {
         // Sort by created_at ascending (oldest first)
-        const sortedMessages = data.data.sort((a, b) => a.created_at - b.created_at);
-        console.log('Sorted messages from OpenAI:', sortedMessages);
-        
+        const sortedMessages = data.data.sort(
+          (a, b) => a.created_at - b.created_at,
+        );
+        console.log("Sorted messages from OpenAI:", sortedMessages);
+
         for (const msg of sortedMessages) {
           const transformedMsg = {
             id: msg.id,
-            text: msg.content[0]?.text?.value || '',
-            sender: msg.role === 'user' ? 'user' : 'assistant',
+            text: msg.content[0]?.text?.value || "",
+            sender: msg.role === "user" ? "user" : "assistant",
             timestamp: new Date(msg.created_at * 1000), // Convert Unix timestamp to Date
           };
           messages.push(transformedMsg);
-          console.log('Transformed message:', transformedMsg);
+          console.log("Transformed message:", transformedMsg);
         }
       } else {
-        console.log('No data array found in response:', data);
+        console.log("No data array found in response:", data);
       }
 
-      console.log('Final messages array:', messages);
+      console.log("Final messages array:", messages);
       return messages;
     } catch (error) {
-      console.error('Error fetching message history:', error);
+      console.error("Error fetching message history:", error);
       throw error;
     }
   }
 
-  static async sendMessage(message, threadId, sessionData = null, chatId = null) {
+  static async sendMessage(
+    message,
+    threadId,
+    sessionData = null,
+    chatId = null,
+  ) {
     const request = {
       message,
       email: USER_EMAIL,
+      chat_id: chatId,
     };
 
     // Add chat_id if provided
     if (chatId) {
-      console.log('Sending message with chat_id:', chatId);
+      console.log("Sending message with chat_id:", chatId);
       request.chat_id = chatId;
     } else {
-      console.log('Sending message without chat_id');
+      console.log("Sending message without chat_id");
     }
 
     // Add session data if provided
@@ -162,7 +174,9 @@ export class ChatService {
       return data.output || "Desculpe, não consegui processar sua mensagem.";
     } catch (error) {
       console.error("Error sending message to webhook:", error);
-      throw new Error("Falha ao enviar mensagem. Verifique sua conexão e tente novamente.");
+      throw new Error(
+        "Falha ao enviar mensagem. Verifique sua conexão e tente novamente.",
+      );
     }
   }
 
