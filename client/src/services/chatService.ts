@@ -72,7 +72,7 @@ export class ChatService {
     threadId: string,
     sessionData: { diagnostico?: string; protocolo?: string } | null = null,
     chatId: string | null = null,
-  ): Promise<string> {
+  ): Promise<WebhookResponse> {
     const request: WebhookRequest = {
       message,
       email: USER_EMAIL,
@@ -107,7 +107,7 @@ export class ChatService {
       }
 
       const data: WebhookResponse = await response.json();
-      return data.output || "Desculpe, não consegui processar sua mensagem.";
+      return data;
     } catch (error) {
       console.error("Error sending message to webhook:", error);
       throw new Error("Falha ao enviar mensagem. Verifique sua conexão e tente novamente.");

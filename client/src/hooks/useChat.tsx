@@ -124,10 +124,17 @@ export function useChat() {
       
       // Send to webhook and get AI response (using correct OpenAI chat_id)
       const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, openaiChatId);
-      const aiMessage = ChatService.createAiMessage(threadId, aiResponse);
+      const aiMessage = ChatService.createAiMessage(threadId, aiResponse.output || "Desculpe, não consegui processar sua mensagem.");
 
       setChatHistory(prev => ({
-        ...prev,
+        threads: prev.threads.map(thread => 
+          thread.id === threadId 
+            ? { 
+                ...thread, 
+                openaiChatId: aiResponse.thread_id || thread.openaiChatId // Store OpenAI thread_id for future messages
+              }
+            : thread
+        ),
         messages: {
           ...prev.messages,
           [threadId!]: [...prev.messages[threadId!], aiMessage]

@@ -73,4 +73,5 @@ export type WebhookRequest = {
 
 export type WebhookResponse = {
   output: string;
+  thread_id?: string;
 };
