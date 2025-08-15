@@ -277,7 +277,7 @@ export default function Chat() {
               </Button>
             )}
             
-            {currentThread && (
+            {currentThread && !hasReview && (
               <Button
                 onClick={handleFinalizeChat}
                 disabled={isFinalizingChat}
