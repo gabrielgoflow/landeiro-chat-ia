@@ -2,7 +2,7 @@ const WEBHOOK_URL = "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia
 const USER_EMAIL = "gabriel@goflow.digital";
 const STORAGE_KEY = "landeiro_chat_history";
 
-import type { ChatHistory, ChatThread, Message, WebhookRequest, WebhookResponse } from "@shared/schema";
+import type { ChatHistory, ChatThreadExtended, Message, WebhookRequest, WebhookResponse } from "@shared/schema";
 
 export class ChatService {
   static generateThreadId(): string {
@@ -37,7 +37,7 @@ export class ChatService {
     }
   }
 
-  static createNewThread(): ChatThread {
+  static createNewThread(): ChatThreadExtended {
     return {
       id: this.generateThreadId(),
       title: "Nova Conversa",
@@ -67,12 +67,31 @@ export class ChatService {
     };
   }
 
-  static async sendMessage(message: string, threadId: string): Promise<string> {
+  static async sendMessage(
+    message: string,
+    threadId: string,
+    sessionData: { diagnostico?: string; protocolo?: string } | null = null,
+    chatId: string | null = null,
+  ): Promise<string> {
     const request: WebhookRequest = {
       message,
       email: USER_EMAIL,
-      thread: threadId,
+      chat_id: chatId || undefined,
     };
+
+    // Add chat_id if provided
+    if (chatId) {
+      console.log("Sending message with chat_id:", chatId);
+      request.chat_id = chatId;
+    } else {
+      console.log("Sending message without chat_id");
+    }
+
+    // Add session data if provided
+    if (sessionData) {
+      request.diagnostico = sessionData.diagnostico;
+      request.protocolo = sessionData.protocolo;
+    }
 
     try {
       const response = await fetch(WEBHOOK_URL, {

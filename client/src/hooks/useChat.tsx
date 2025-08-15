@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChatService } from "@/services/chatService";
-import type { ChatHistory, ChatThread, Message } from "@shared/schema";
+import type { ChatHistory, ChatThreadExtended, Message } from "@shared/schema";
 
 export function useChat() {
   const [chatHistory, setChatHistory] = useState<ChatHistory>({ threads: [], messages: {} });
@@ -115,8 +115,15 @@ export function useChat() {
     setError(null);
 
     try {
-      // Send to webhook and get AI response
-      const aiResponse = await ChatService.sendMessage(content, threadId);
+      // Get current thread to access session data and OpenAI chat_id
+      const currentThread = chatHistory.threads.find(t => t.id === threadId);
+      const sessionData = currentThread?.sessionData || null;
+      const openaiChatId = currentThread?.openaiChatId || null;
+      
+      console.log('Current thread for message:', { threadId, openaiChatId, sessionData });
+      
+      // Send to webhook and get AI response (using correct OpenAI chat_id)
+      const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, openaiChatId);
       const aiMessage = ChatService.createAiMessage(threadId, aiResponse);
 
       setChatHistory(prev => ({
@@ -140,7 +147,7 @@ export function useChat() {
     return chatHistory.messages[currentThreadId] || [];
   }, [currentThreadId, chatHistory.messages]);
 
-  const getCurrentThread = useCallback((): ChatThread | null => {
+  const getCurrentThread = useCallback((): ChatThreadExtended | null => {
     if (!currentThreadId) return null;
     return chatHistory.threads.find(t => t.id === currentThreadId) || null;
   }, [currentThreadId, chatHistory.threads]);

@@ -49,15 +49,26 @@ export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 
 // Frontend-only types for localStorage
+export type ChatThreadExtended = ChatThread & {
+  openaiChatId?: string;
+  sessionData?: {
+    diagnostico?: string;
+    protocolo?: string;
+  };
+};
+
 export type ChatHistory = {
-  threads: ChatThread[];
+  threads: ChatThreadExtended[];
   messages: { [threadId: string]: Message[] };
 };
 
 export type WebhookRequest = {
   message: string;
   email: string;
-  thread: string;
+  thread?: string;
+  chat_id?: string;
+  diagnostico?: string;
+  protocolo?: string;
 };
 
 export type WebhookResponse = {
