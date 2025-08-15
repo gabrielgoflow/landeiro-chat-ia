@@ -102,10 +102,10 @@ export default function ChatsPage() {
                       <MessageSquare className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
                       <div className="flex flex-col space-y-2 ml-3 flex-1">
                         <Badge variant="secondary" className="w-fit">
-                          {chat.diagnostico || 'Diagnóstico'}
+                          {(chat.diagnostico || 'Diagnóstico').toUpperCase()}
                         </Badge>
                         <Badge variant="outline" className="w-fit">
-                          {chat.protocolo || 'Protocolo'}
+                          {(chat.protocolo || 'Protocolo').toUpperCase()}
                         </Badge>
                       </div>
                     </div>
