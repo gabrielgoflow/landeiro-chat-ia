@@ -77,8 +77,8 @@ export default function AdminSetup() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-gray-100 rounded-lg p-4 max-h-96 overflow-y-auto">
-                <pre className="text-xs text-gray-800 whitespace-pre-wrap">
+              <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+                <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
                   {sqlScript || 'Carregando script SQL...'}
                 </pre>
               </div>
@@ -94,18 +94,58 @@ export default function AdminSetup() {
                   Copiar SQL
                 </Button>
                 <Button 
-                  onClick={() => window.open('https://app.supabase.com', '_blank')}
-                  variant="outline"
+                  onClick={() => {
+                    copySqlToClipboard();
+                    window.open('https://app.supabase.com', '_blank');
+                  }}
                   size="sm"
                   className="flex-1"
                 >
                   <i className="fas fa-external-link-alt mr-2"></i>
-                  Abrir Supabase
+                  Copiar SQL + Abrir Supabase
                 </Button>
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Exemplo Visual */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <i className="fas fa-eye text-green-500"></i>
+              <span>Onde Encontrar o SQL Editor</span>
+            </CardTitle>
+            <CardDescription>
+              Procure por estes elementos no Supabase Dashboard
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-blue-500">
+              <div className="flex items-center space-x-2 mb-2">
+                <div className="w-4 h-4 bg-gray-800 rounded"></div>
+                <span className="font-medium">Menu Lateral Esquerdo</span>
+              </div>
+              <p className="text-sm text-gray-600">Procure por "SQL Editor" na lista de opções</p>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-green-500">
+              <div className="flex items-center space-x-2 mb-2">
+                <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                <span className="font-medium">Botão "New Query"</span>
+              </div>
+              <p className="text-sm text-gray-600">Após abrir SQL Editor, clique em "New Query" ou "+"</p>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-lg border-l-4 border-purple-500">
+              <div className="flex items-center space-x-2 mb-2">
+                <div className="w-4 h-4 bg-blue-600 rounded"></div>
+                <span className="font-medium">Botão "RUN"</span>
+              </div>
+              <p className="text-sm text-gray-600">Cole o SQL e clique no botão azul "RUN" no canto inferior direito</p>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Instruções */}
         <Card>
@@ -118,15 +158,25 @@ export default function AdminSetup() {
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Passos para criar as tabelas:</h4>
-                <ol className="text-sm text-gray-600 space-y-1">
-                  <li>1. Acesse o <strong>Supabase Dashboard</strong></li>
-                  <li>2. Selecione seu projeto</li>
-                  <li>3. Vá para <strong>SQL Editor</strong></li>
-                  <li>4. Cole o script SQL fornecido</li>
-                  <li>5. Clique em <strong>Run</strong> para executar</li>
-                  <li>6. Verifique o status aqui após executar</li>
+                <h4 className="font-medium text-gray-900 mb-2">📋 Passos OBRIGATÓRIOS para criar as tabelas:</h4>
+                <ol className="text-sm text-gray-600 space-y-2">
+                  <li><strong>1. Abra o Supabase:</strong> <a href="https://app.supabase.com" target="_blank" className="text-blue-600 underline">app.supabase.com</a></li>
+                  <li><strong>2. Selecione o projeto</strong> do Landeiro Chat</li>
+                  <li><strong>3. No menu lateral, clique em "SQL Editor"</strong></li>
+                  <li><strong>4. Clique em "New Query"</strong> (novo script)</li>
+                  <li><strong>5. COPIE todo o SQL</strong> da caixa acima</li>
+                  <li><strong>6. COLE no editor</strong> do Supabase</li>
+                  <li><strong>7. Clique em "RUN"</strong> (botão azul)</li>
+                  <li><strong>8. Aguarde a confirmação</strong> "Success. No rows returned"</li>
+                  <li><strong>9. Verifique aqui</strong> se as tabelas foram criadas</li>
                 </ol>
+                
+                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-xs text-yellow-800">
+                    ⚠️ <strong>IMPORTANTE:</strong> As tabelas NÃO são criadas automaticamente. 
+                    Você DEVE executar o SQL manualmente no Supabase Dashboard.
+                  </p>
+                </div>
               </div>
               
               <div>
