@@ -1,0 +1,45 @@
+{
+    "output": {
+        "resumoAtendimento": "O paciente, Lucas, apresentou sintomas de ansiedade intensa, como coração acelerado e pensamentos repetitivos. Ele relatou uma rotina corrida e dificuldade para desligar a mente, mesmo durante atividades de lazer. Lucas mencionou evitar sair com amigos e a namorada devido à sobrecarga.",
+        "feedbackDireto": "Você começou a conversa de forma acolhedora, mas poderia ter demonstrado mais empatia ao responder ao relato inicial do Lucas, validando seus sentimentos de ansiedade. Sua pergunta sobre a rotina foi pertinente e permitiu que Lucas se abrisse sobre como a ansiedade influencia seu dia a dia. No entanto, tente ser mais claro e assertivo em suas perguntas para direcionar a sessão conforme o modelo sugerido. Para as próximas sessões, inclua mais estratégias da TCC, como o automonitoramento dos pensamentos e emoções de Lucas. Incentive atividades que promovam o relaxamento de forma ativa, como a prática regular de hobbies que ele já demonstrou gostar.",
+        "sinaisPaciente": [
+            [
+                "Coração acelerado e pensamentos incessantes sobre o que pode dar errado."
+            ],
+            [
+                "Sentimento de sufocamento e nervosismo presente."
+            ],
+            [
+                "Rotina corrida que contribui para a ansiedade."
+            ],
+            [
+                "Dificuldade em se desconectar e relaxar."
+            ],
+            [
+                "Sono interrompido com sintomas físicos de ansiedade."
+            ],
+            [
+                "Evitação de amigos e namorada devido à sobrecarga."
+            ]
+        ],
+        "pontosPositivos": [
+            [
+                "Pergunta sobre a rotina permitiu aprofundar no tema da ansiedade."
+            ],
+            [
+                "Lucas se sentiu confortável em compartilhar detalhes de sua vida pessoal e sintomas."
+            ]
+        ],
+        "pontosNegativos": [
+            [
+                "Faltou validação emocional e acolhimento inicial para tranquilizar o paciente."
+            ],
+            [
+                "O uso de técnicas específicas da TCC, como automonitoramento, não foi introduzido."
+            ],
+            [
+                "Podia ter oferecido estratégias iniciais para lidar com a ansiedade do Lucas, como o relaxamento muscular progressivo."
+            ]
+        ]
+    }
+}

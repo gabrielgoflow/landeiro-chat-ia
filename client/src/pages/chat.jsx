@@ -11,6 +11,7 @@ import { ChatSidebar } from "@/components/ChatSidebar.jsx";
 import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
 import { MessageInput } from "@/components/MessageInput.jsx";
 import { NewChatDialog } from "@/components/NewChatDialog.jsx";
+import { ReviewSidebar } from "@/components/ReviewSidebar.jsx";
 
 export default function Chat() {
   const { chatId } = useParams();
@@ -18,6 +19,8 @@ export default function Chat() {
   const [showDebug, setShowDebug] = useState(false);
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
   const [isFinalizingChat, setIsFinalizingChat] = useState(false);
+  const [showReviewSidebar, setShowReviewSidebar] = useState(false);
+  const [currentReview, setCurrentReview] = useState(null);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -114,14 +117,15 @@ export default function Chat() {
         const reviewData = await reviewResponse.json();
         console.log('Review data received:', reviewData);
         
-        // Transform nested arrays to flat strings for storage
+        // Extract from output field and transform nested arrays to flat strings for storage
+        const reviewOutput = reviewData.output;
         const transformedReview = {
           chatId: currentThread.id,
-          resumoAtendimento: reviewData.resumoAtendimento,
-          feedbackDireto: reviewData.feedbackDireto,
-          sinaisPaciente: reviewData.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
-          pontosPositivos: reviewData.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
-          pontosNegativos: reviewData.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item)
+          resumoAtendimento: reviewOutput.resumoAtendimento,
+          feedbackDireto: reviewOutput.feedbackDireto,
+          sinaisPaciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
+          pontosPositivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
+          pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item)
         };
         
         // Save review to our database
@@ -135,7 +139,8 @@ export default function Chat() {
         
         if (saveResponse.ok) {
           console.log('Review saved successfully');
-          // Optionally show success message or redirect
+          setCurrentReview(transformedReview);
+          setShowReviewSidebar(true);
         } else {
           console.error('Error saving review:', saveResponse.status);
         }
@@ -316,6 +321,12 @@ export default function Chat() {
         open={showNewChatDialog}
         onOpenChange={setShowNewChatDialog}
         onConfirm={handleNewChatConfirm}
+      />
+      
+      <ReviewSidebar
+        review={currentReview}
+        isOpen={showReviewSidebar}
+        onClose={() => setShowReviewSidebar(false)}
       />
     </div>
   );
