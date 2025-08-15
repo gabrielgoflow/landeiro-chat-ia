@@ -69,10 +69,48 @@ export function useChat() {
     }
   }, [user]);
 
-  const selectThread = useCallback((threadId) => {
+  const loadChatHistory = useCallback(async (threadId) => {
+    try {
+      setIsLoading(true);
+      
+      // Find the thread to get its thread_id (OpenAI thread ID)
+      const currentThread = chatHistory.threads.find(t => t.id === threadId);
+      if (!currentThread?.threadId) {
+        console.warn('No OpenAI thread_id found for chat:', threadId);
+        return;
+      }
+
+      const historyMessages = await ChatService.getMessageHistory(currentThread.threadId);
+      
+      // Update chat history with loaded messages
+      setChatHistory(prev => ({
+        ...prev,
+        messages: {
+          ...prev.messages,
+          [threadId]: historyMessages
+        }
+      }));
+
+      console.log(`Loaded ${historyMessages.length} messages for thread ${threadId}`);
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+      setError('Erro ao carregar histórico da conversa');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [chatHistory.threads]);
+
+  const selectThread = useCallback(async (threadId) => {
     setCurrentThreadId(threadId);
     setError(null);
-  }, []);
+    
+    // Check if we already have messages for this thread
+    const existingMessages = chatHistory.messages[threadId];
+    if (!existingMessages || existingMessages.length === 0) {
+      // Load history from OpenAI if we don't have local messages
+      await loadChatHistory(threadId);
+    }
+  }, [chatHistory.messages, loadChatHistory]);
 
   const deleteThread = useCallback(async (threadId) => {
     setChatHistory(prev => {
@@ -165,7 +203,14 @@ export function useChat() {
       const aiMessage = ChatService.createAiMessage(threadId, aiResponse);
 
       setChatHistory(prev => ({
-        ...prev,
+        threads: prev.threads.map(thread => 
+          thread.id === threadId 
+            ? { 
+                ...thread, 
+                threadId: aiResponse.thread_id || thread.threadId // Store OpenAI thread_id for history loading
+              }
+            : thread
+        ),
         messages: {
           ...prev.messages,
           [threadId]: [...prev.messages[threadId], aiMessage]

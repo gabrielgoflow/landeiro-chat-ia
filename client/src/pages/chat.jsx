@@ -53,14 +53,35 @@ export default function Chat() {
         selectThread(existingThread.id);
       } else {
         // Chat ID not found in current threads, could be from database
-        // For now, redirect to new chat or show error
+        // Try to load it as a new thread with history from Supabase
         console.warn('Chat ID not found:', chatId);
+        loadChatFromDatabase(chatId);
       }
     } else if (chatId === 'new' || (threads.length === 0 && !chatId)) {
       // Create new thread for /chat/new or when no threads exist
       startNewThread();
     }
   }, [chatId, threads, selectThread, startNewThread]);
+
+  const loadChatFromDatabase = async (chatId) => {
+    try {
+      setError(null);
+      // For now, we'll show an error message since we don't have the full integration
+      // In a complete implementation, we would load the chat data from Supabase
+      // and recreate the thread with the correct threadId to load history
+      console.error('Chat loading from database not fully implemented yet');
+      setError('Chat não encontrado. Redirecionando para nova conversa...');
+      setTimeout(() => {
+        startNewThread();
+      }, 2000);
+    } catch (error) {
+      console.error('Error loading chat from database:', error);
+      setError('Erro ao carregar chat. Criando nova conversa...');
+      setTimeout(() => {
+        startNewThread();
+      }, 2000);
+    }
+  };
 
   const handleSendMessage = async (message) => {
     await sendMessage(message);

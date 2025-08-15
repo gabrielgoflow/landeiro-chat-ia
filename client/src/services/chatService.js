@@ -76,6 +76,48 @@ export class ChatService {
     };
   }
 
+  static async getMessageHistory(threadId) {
+    try {
+      const response = await fetch('https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-get-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          thread_id: threadId,
+          email: USER_EMAIL
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Transform OpenAI messages to our format
+      const messages = [];
+      if (data[0] && data[0].data) {
+        // Sort by created_at ascending (oldest first)
+        const sortedMessages = data[0].data.sort((a, b) => a.created_at - b.created_at);
+        
+        for (const msg of sortedMessages) {
+          messages.push({
+            id: msg.id,
+            text: msg.content[0]?.text?.value || '',
+            sender: msg.role === 'user' ? 'user' : 'assistant',
+            timestamp: new Date(msg.created_at * 1000), // Convert Unix timestamp to Date
+          });
+        }
+      }
+
+      return messages;
+    } catch (error) {
+      console.error('Error fetching message history:', error);
+      throw error;
+    }
+  }
+
   static async sendMessage(message, threadId, sessionData = null, chatId = null) {
     const request = {
       message,

@@ -1,0 +1,70 @@
+[
+  {
+    "object": "list",
+    "data": [
+      {
+        "id": "msg_n82Q6gc55ibncgzRdYXszUzf",
+        "object": "thread.message",
+        "created_at": 1755274472,
+        "assistant_id": "asst_CYNXe9KSJtlOjAMepqCTEPPg",
+        "thread_id": "thread_sthqtnFncbudPEyFykoggqaU",
+        "run_id": "run_jqzDKDS5pswSmqcVl3qEBcQ1",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": {
+              "value": "Oi… meu nome é Lucas, tenho 28 anos e sou desenvolvedor de software. Ultimamente, eu tenho sentido uma ansiedade enorme, sabe? É como se uma nuvem pesada estivesse sempre sobre mim. Meu coração acelera, e às vezes tenho dificuldade até pra respirar... O que me deixa mais inquieto é que isso acontece em momentos em que nem sempre consigo entender o porquê. Estou aqui porque realmente preciso de ajuda.",
+              "annotations": []
+            }
+          }
+        ],
+        "attachments": [],
+        "metadata": {}
+      },
+      {
+        "id": "msg_rMA8LsnZhv8Xo98JmimbiI9A",
+        "object": "thread.message",
+        "created_at": 1755274470,
+        "assistant_id": null,
+        "thread_id": "thread_sthqtnFncbudPEyFykoggqaU",
+        "run_id": null,
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": {
+              "value": "ol'a1",
+              "annotations": []
+            }
+          }
+        ],
+        "attachments": [],
+        "metadata": {}
+      },
+      {
+        "id": "msg_m1rqPu2jHb9pleNJz1ptMNJj",
+        "object": "thread.message",
+        "created_at": 1755274468,
+        "assistant_id": null,
+        "thread_id": "thread_sthqtnFncbudPEyFykoggqaU",
+        "run_id": null,
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": {
+              "value": "ol'a1",
+              "annotations": []
+            }
+          }
+        ],
+        "attachments": [],
+        "metadata": {}
+      }
+    ],
+    "first_id": "msg_n82Q6gc55ibncgzRdYXszUzf",
+    "last_id": "msg_m1rqPu2jHb9pleNJz1ptMNJj",
+    "has_more": false
+  }
+]
