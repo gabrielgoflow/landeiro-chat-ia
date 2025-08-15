@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
 import { useAuth } from "@/hooks/useAuth.jsx";
 import { useChat } from "@/hooks/useChat.jsx";
+import { supabaseService } from "@/services/supabaseService.js";
 import { ChatMessage } from "@/components/ChatMessage.jsx";
 import { ChatSidebar } from "@/components/ChatSidebar.jsx";
 import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
@@ -15,6 +16,7 @@ export default function Chat() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const messagesEndRef = useRef(null);
+  const initializedRef = useRef(false);
   const isMobile = useIsMobile();
   const { user } = useAuth();
   
@@ -46,16 +48,18 @@ export default function Chat() {
 
   // Initialize based on chatId parameter
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    
     if (chatId && chatId !== 'new') {
       // Load specific chat by ID
       const existingThread = threads.find(t => t.id === chatId);
       if (existingThread) {
         selectThread(existingThread.id);
       } else {
-        // Chat ID not found in current threads, could be from database
-        // Try to load it as a new thread with history from Supabase
-        console.warn('Chat ID not found:', chatId);
-        loadChatFromDatabase(chatId);
+        // Chat ID not found in current threads, redirect to new chat
+        console.warn('Chat ID not found, redirecting to new chat:', chatId);
+        startNewThread();
       }
     } else if (chatId === 'new' || (threads.length === 0 && !chatId)) {
       // Create new thread for /chat/new or when no threads exist
@@ -63,25 +67,7 @@ export default function Chat() {
     }
   }, [chatId, threads, selectThread, startNewThread]);
 
-  const loadChatFromDatabase = async (chatId) => {
-    try {
-      setError(null);
-      // For now, we'll show an error message since we don't have the full integration
-      // In a complete implementation, we would load the chat data from Supabase
-      // and recreate the thread with the correct threadId to load history
-      console.error('Chat loading from database not fully implemented yet');
-      setError('Chat não encontrado. Redirecionando para nova conversa...');
-      setTimeout(() => {
-        startNewThread();
-      }, 2000);
-    } catch (error) {
-      console.error('Error loading chat from database:', error);
-      setError('Erro ao carregar chat. Criando nova conversa...');
-      setTimeout(() => {
-        startNewThread();
-      }, 2000);
-    }
-  };
+
 
   const handleSendMessage = async (message) => {
     await sendMessage(message);
