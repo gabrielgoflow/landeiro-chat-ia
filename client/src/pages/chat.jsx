@@ -2,15 +2,19 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
+import { useAuth } from "@/hooks/useAuth.jsx";
 import { useChat } from "@/hooks/useChat.jsx";
 import { ChatMessage } from "@/components/ChatMessage.jsx";
 import { ChatSidebar } from "@/components/ChatSidebar.jsx";
+import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
 import { MessageInput } from "@/components/MessageInput.jsx";
 
 export default function Chat() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const messagesEndRef = useRef(null);
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   
   const {
     threads,
@@ -150,6 +154,27 @@ export default function Chat() {
             <div ref={messagesEndRef} />
           </div>
         </div>
+
+        {/* Debug Info (Admin only) */}
+        {user?.email === 'admin@goflow.digital' && (
+          <div className="px-4 pb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDebug(!showDebug)}
+              className="text-xs text-gray-500 hover:text-gray-700"
+            >
+              <i className="fas fa-bug mr-1"></i>
+              {showDebug ? 'Ocultar Debug' : 'Mostrar Debug'}
+            </Button>
+          </div>
+        )}
+        
+        <ChatDebugInfo 
+          currentThread={currentThread}
+          sessionData={currentThread?.sessionData}
+          visible={showDebug}
+        />
 
         {/* Message Input */}
         <MessageInput

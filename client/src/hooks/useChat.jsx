@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChatService } from "@/services/chatService.js";
+import { SupabaseService } from "@/services/supabaseService.js";
+import { useAuth } from "@/hooks/useAuth.jsx";
 
 export function useChat() {
+  const { user } = useAuth();
   const [chatHistory, setChatHistory] = useState({ threads: [], messages: {} });
   const [currentThreadId, setCurrentThreadId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,9 +29,10 @@ export function useChat() {
     ChatService.saveHistory(chatHistory);
   }, [chatHistory]);
 
-  const startNewThread = useCallback((sessionData = null) => {
+  const startNewThread = useCallback(async (sessionData = null) => {
     const newThread = ChatService.createNewThread(sessionData);
     
+    // Save to local storage first
     setChatHistory(prev => ({
       threads: [newThread, ...prev.threads],
       messages: { ...prev.messages, [newThread.id]: [] }
@@ -36,14 +40,41 @@ export function useChat() {
     
     setCurrentThreadId(newThread.id);
     setError(null);
-  }, []);
+
+    // Save to Supabase if user is authenticated and session data exists
+    if (user && sessionData) {
+      try {
+        const { data: chatThreadData, error: chatThreadError } = await SupabaseService.createChatThread(
+          newThread.id, // chat_id (internal thread ID)
+          '', // thread_id will be empty initially - filled later by OpenAI
+          sessionData.diagnostico,
+          sessionData.protocolo
+        );
+
+        if (!chatThreadError && chatThreadData) {
+          // Create user_chat relationship
+          await SupabaseService.createUserChat(
+            user.id,
+            newThread.id, // using internal chat ID as OpenAI chat_id for now
+            chatThreadData.id
+          );
+          console.log('Thread saved to Supabase successfully');
+        } else {
+          console.error('Error saving to Supabase:', chatThreadError);
+        }
+      } catch (error) {
+        console.error('Error saving thread to Supabase:', error);
+        // Don't show error to user, just log it
+      }
+    }
+  }, [user]);
 
   const selectThread = useCallback((threadId) => {
     setCurrentThreadId(threadId);
     setError(null);
   }, []);
 
-  const deleteThread = useCallback((threadId) => {
+  const deleteThread = useCallback(async (threadId) => {
     setChatHistory(prev => {
       const newMessages = { ...prev.messages };
       delete newMessages[threadId];
@@ -54,6 +85,17 @@ export function useChat() {
       };
     });
     
+    // Delete from Supabase if user is authenticated
+    if (user) {
+      try {
+        await SupabaseService.deleteChatThread(threadId);
+        console.log('Thread deleted from Supabase successfully');
+      } catch (error) {
+        console.error('Error deleting thread from Supabase:', error);
+        // Don't show error to user, just log it
+      }
+    }
+    
     // If deleting current thread, switch to another or create new
     if (currentThreadId === threadId) {
       const remainingThreads = chatHistory.threads.filter(t => t.id !== threadId);
@@ -63,7 +105,7 @@ export function useChat() {
         startNewThread();
       }
     }
-  }, [currentThreadId, chatHistory.threads, startNewThread]);
+  }, [currentThreadId, chatHistory.threads, startNewThread, user]);
 
   const sendMessage = useCallback(async (content) => {
     if (!content.trim()) return;
@@ -118,8 +160,8 @@ export function useChat() {
       const currentThread = chatHistory.threads.find(t => t.id === threadId);
       const sessionData = currentThread?.sessionData || null;
       
-      // Send to webhook and get AI response
-      const aiResponse = await ChatService.sendMessage(content, threadId, sessionData);
+      // Send to webhook and get AI response (passing chat_id as threadId for now)
+      const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, threadId);
       const aiMessage = ChatService.createAiMessage(threadId, aiResponse);
 
       setChatHistory(prev => ({

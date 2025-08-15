@@ -76,12 +76,17 @@ export class ChatService {
     };
   }
 
-  static async sendMessage(message, threadId, sessionData = null) {
+  static async sendMessage(message, threadId, sessionData = null, chatId = null) {
     const request = {
       message,
       email: USER_EMAIL,
       thread: threadId,
     };
+
+    // Add chat_id if provided
+    if (chatId) {
+      request.chat_id = chatId;
+    }
 
     // Add session data if provided
     if (sessionData) {
