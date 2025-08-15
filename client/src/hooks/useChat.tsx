@@ -115,15 +115,14 @@ export function useChat() {
     setError(null);
 
     try {
-      // Get current thread to access session data and OpenAI chat_id
+      // Get current thread to access session data
       const currentThread = chatHistory.threads.find(t => t.id === threadId);
       const sessionData = currentThread?.sessionData || null;
-      const openaiChatId = currentThread?.openaiChatId || null;
       
-      console.log('Current thread for message:', { threadId, openaiChatId, sessionData });
+      console.log('Current thread for message:', { threadId, sessionData });
       
-      // Send to webhook and get AI response (using correct OpenAI chat_id)
-      const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, openaiChatId);
+      // Send to webhook and get AI response (using threadId as chat_id)
+      const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, threadId);
       const aiMessage = ChatService.createAiMessage(threadId, aiResponse.output || "Desculpe, não consegui processar sua mensagem.");
 
       setChatHistory(prev => ({
