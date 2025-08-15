@@ -109,6 +109,8 @@ export class ChatService {
         );
         console.log("Sorted messages from OpenAI:", sortedMessages);
 
+        let firstUserMessageSkipped = false;
+        
         for (const msg of sortedMessages) {
           const transformedMsg = {
             id: msg.id,
@@ -116,6 +118,14 @@ export class ChatService {
             sender: msg.role === "user" ? "user" : "assistant",
             timestamp: new Date(msg.created_at * 1000), // Convert Unix timestamp to Date
           };
+          
+          // Skip the first user message (it's always duplicated)
+          if (msg.role === "user" && !firstUserMessageSkipped) {
+            firstUserMessageSkipped = true;
+            console.log("Skipped first user message:", transformedMsg);
+            continue;
+          }
+          
           messages.push(transformedMsg);
           console.log("Transformed message:", transformedMsg);
         }
