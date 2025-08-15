@@ -185,7 +185,18 @@ export function ChatSidebar({
                   <div className="text-sm font-medium text-gray-900 truncate">
                     {user?.email || 'Usuário'}
                   </div>
-                  <div className="text-xs text-gray-500">Conectado</div>
+                  <div className="text-xs text-gray-500 flex items-center space-x-2">
+                    <span>Conectado</span>
+                    {user?.email === 'admin@goflow.digital' && (
+                      <a 
+                        href="/admin-setup"
+                        className="text-blue-500 hover:text-blue-600"
+                        title="Configurações Admin"
+                      >
+                        <i className="fas fa-cog text-xs"></i>
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
               <Button

@@ -31,6 +31,19 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 
 **Development Storage**: In-memory storage using Map data structures for users and chat data
 
+**Supabase Database Schema**:
+- **Authentication**: Supabase Auth for user management and security
+- **chat_threads**: Relaciona chat interno com thread_id do OpenAI Assistant
+  - chat_id (VARCHAR): ID único do chat interno
+  - thread_id (VARCHAR): ID do thread do OpenAI Assistant  
+  - diagnostico (VARCHAR): Diagnóstico selecionado (ex: ansiedade)
+  - protocolo (VARCHAR): Protocolo selecionado (ex: tcc)
+- **user_chats**: Relaciona user_id com chat_id do OpenAI
+  - user_id (UUID): Referência ao usuário autenticado
+  - chat_id (VARCHAR): ID do chat do OpenAI
+  - chat_threads_id (UUID): Referência à tabela chat_threads
+- **Row Level Security (RLS)**: Implementado para garantir isolamento de dados por usuário
+
 **Database Schema** (configured but not actively used):
 - **PostgreSQL** with Drizzle ORM for type-safe database operations
 - **Users table**: Basic authentication structure with username/password
