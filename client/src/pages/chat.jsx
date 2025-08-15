@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
@@ -10,6 +11,7 @@ import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
 import { MessageInput } from "@/components/MessageInput.jsx";
 
 export default function Chat() {
+  const { chatId } = useParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const messagesEndRef = useRef(null);
@@ -42,12 +44,23 @@ export default function Chat() {
     }
   }, [currentThread, isMobile]);
 
-  // Initialize with first thread or create new one
+  // Initialize based on chatId parameter
   useEffect(() => {
-    if (threads.length === 0) {
+    if (chatId && chatId !== 'new') {
+      // Load specific chat by ID
+      const existingThread = threads.find(t => t.id === chatId);
+      if (existingThread) {
+        selectThread(existingThread.id);
+      } else {
+        // Chat ID not found in current threads, could be from database
+        // For now, redirect to new chat or show error
+        console.warn('Chat ID not found:', chatId);
+      }
+    } else if (chatId === 'new' || (threads.length === 0 && !chatId)) {
+      // Create new thread for /chat/new or when no threads exist
       startNewThread();
     }
-  }, [threads.length, startNewThread]);
+  }, [chatId, threads, selectThread, startNewThread]);
 
   const handleSendMessage = async (message) => {
     await sendMessage(message);

@@ -85,10 +85,21 @@ export class SupabaseService {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return { data, error: null }
+      
+      // Transform data to flatten chat_threads info
+      const transformedData = data?.map(userChat => ({
+        ...userChat,
+        chat_id: userChat.chat_threads?.chat_id || userChat.chat_id,
+        thread_id: userChat.chat_threads?.thread_id,
+        diagnostico: userChat.chat_threads?.diagnostico,
+        protocolo: userChat.chat_threads?.protocolo,
+        created_at: userChat.chat_threads?.created_at || userChat.created_at
+      })) || []
+      
+      return transformedData
     } catch (error) {
       console.error('Error getting user chats:', error)
-      return { data: null, error: error.message }
+      return []
     }
   }
 
