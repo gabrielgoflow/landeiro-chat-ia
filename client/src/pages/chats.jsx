@@ -11,6 +11,7 @@ export default function ChatsPage() {
   const { user } = useAuth()
   const [userChats, setUserChats] = useState([])
   const [loading, setLoading] = useState(true)
+  const [chatReviews, setChatReviews] = useState({})
 
   useEffect(() => {
     if (user) {
@@ -23,6 +24,19 @@ export default function ChatsPage() {
       setLoading(true)
       const chats = await supabaseService.getUserChats(user.id)
       setUserChats(chats)
+      
+      // Check review status for each chat
+      const reviewStatuses = {}
+      for (const chat of chats) {
+        try {
+          const response = await fetch(`/api/reviews/${chat.chat_id}`)
+          reviewStatuses[chat.chat_id] = response.ok
+        } catch (error) {
+          console.error(`Error checking review for chat ${chat.chat_id}:`, error)
+          reviewStatuses[chat.chat_id] = false
+        }
+      }
+      setChatReviews(reviewStatuses)
     } catch (error) {
       console.error('Erro ao carregar chats:', error)
     } finally {
@@ -96,9 +110,22 @@ export default function ChatsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {userChats.map((chat) => (
               <Link key={chat.chat_id} href={`/chat/${chat.chat_id}`}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full" data-testid={`card-chat-${chat.chat_id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full relative" data-testid={`card-chat-${chat.chat_id}`}>
+                  {/* Status Tag */}
+                  <div className="absolute top-2 right-2 z-10">
+                    {chatReviews[chat.chat_id] ? (
+                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium">
+                        FINALIZADO
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs font-medium">
+                        EM ANDAMENTO
+                      </Badge>
+                    )}
+                  </div>
+                  
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between pr-20">
                       <MessageSquare className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
                       <div className="flex flex-col space-y-2 ml-3 flex-1">
                         <Badge variant="secondary" className="w-fit">
