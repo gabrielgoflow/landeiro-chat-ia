@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { ChatService } from "@/services/chatService.js";
+import { supabaseService } from "@/services/supabaseService.js";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
 import { useAuth } from "@/hooks/useAuth.jsx";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +23,9 @@ export function ChatSidebar({
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
+  const [userChats, setUserChats] = useState([]);
+  const [chatReviews, setChatReviews] = useState({});
+  const [loadingChats, setLoadingChats] = useState(false);
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -37,6 +42,38 @@ export function ChatSidebar({
       });
     }
   };
+
+  // Load user chats from Supabase
+  useEffect(() => {
+    const loadUserChats = async () => {
+      if (!user) return;
+      
+      try {
+        setLoadingChats(true);
+        const chats = await supabaseService.getUserChats(user.id);
+        setUserChats(chats);
+        
+        // Check review status for each chat
+        const reviewStatuses = {};
+        for (const chat of chats) {
+          try {
+            const response = await fetch(`/api/reviews/${chat.chat_id}`);
+            reviewStatuses[chat.chat_id] = response.ok;
+          } catch (error) {
+            console.error(`Error checking review for chat ${chat.chat_id}:`, error);
+            reviewStatuses[chat.chat_id] = false;
+          }
+        }
+        setChatReviews(reviewStatuses);
+      } catch (error) {
+        console.error('Erro ao carregar chats:', error);
+      } finally {
+        setLoadingChats(false);
+      }
+    };
+    
+    loadUserChats();
+  }, [user]);
 
   const handleNewChatConfirm = (formData) => {
     // Chama a função original passando os dados do diagnóstico e protocolo
@@ -111,58 +148,77 @@ export function ChatSidebar({
           {/* Chat History */}
           <div className="flex-1 overflow-y-auto px-4 pb-4">
             <div className="space-y-2">
-              {threads.length > 0 && (
+              {userChats.length > 0 && (
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wider px-2 py-1">
-                  Conversas Recentes
+                  Todas as Conversas
                 </div>
               )}
               
-              {threads.map((thread) => {
-                const isActive = currentThread?.id === thread.id;
-                const lastMessage = getLastMessage(thread.id);
-                const formattedTime = getFormattedTime(thread);
-
-                return (
-                  <div
-                    key={thread.id}
-                    className={`
-                      group flex items-center px-3 py-2 rounded-lg cursor-pointer transition-colors duration-150
-                      ${isActive 
-                        ? 'bg-indigo-50 border border-indigo-100' 
-                        : 'hover:bg-gray-100'
-                      }
-                    `}
-                    onClick={() => onSelectThread(thread.id)}
-                    data-testid={`thread-${thread.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">
-                        {thread.title}
+              {loadingChats ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mx-auto"></div>
+                  <p className="text-xs text-gray-500 mt-2">Carregando...</p>
+                </div>
+              ) : (
+                userChats.map((chat) => {
+                  const isActive = currentThread?.id === chat.chat_id || currentThread?.openaiChatId === chat.chat_id;
+                  
+                  return (
+                    <div
+                      key={chat.chat_id}
+                      className={`
+                        group flex items-start px-3 py-3 rounded-lg cursor-pointer transition-colors duration-150 relative
+                        ${isActive 
+                          ? 'bg-indigo-50 border border-indigo-100' 
+                          : 'hover:bg-gray-100'
+                        }
+                      `}
+                      onClick={() => {
+                        // Navigate to the chat
+                        window.location.href = `/chat/${chat.chat_id}`;
+                      }}
+                      data-testid={`chat-${chat.chat_id}`}
+                    >
+                      {/* Status Tag */}
+                      <div className="absolute top-2 right-2">
+                        {chatReviews[chat.chat_id] ? (
+                          <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
+                            FINALIZADO
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs font-medium px-1.5 py-0.5">
+                            EM ANDAMENTO
+                          </Badge>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-500 truncate">
-                        {lastMessage}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        {formattedTime}
+                      
+                      <div className="flex-1 min-w-0 pr-20">
+                        <div className="flex flex-col space-y-1 mb-2">
+                          <Badge variant="secondary" className="w-fit text-xs">
+                            {(chat.diagnostico || 'Diagnóstico').toUpperCase()}
+                          </Badge>
+                          <Badge variant="outline" className="w-fit text-xs">
+                            {(chat.protocolo || 'Protocolo').toUpperCase()}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          ID: {chat.chat_id.substring(0, 8)}...
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {new Date(chat.created_at).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteThread(thread.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-400 hover:text-red-500 transition-opacity duration-150"
-                      data-testid={`delete-thread-${thread.id}`}
-                    >
-                      <i className="fas fa-trash text-xs"></i>
-                    </Button>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
 
-              {threads.length === 0 && (
+              {!loadingChats && userChats.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <i className="fas fa-comments text-3xl mb-3 text-gray-300"></i>
                   <p className="text-sm">Nenhuma conversa ainda</p>
