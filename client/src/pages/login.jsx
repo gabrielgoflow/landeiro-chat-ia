@@ -110,15 +110,6 @@ export default function Login() {
               )}
             </Button>
           </form>
-          
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Não tem uma conta?{' '}
-              <Link href="/register" className="font-medium text-primary hover:text-indigo-500">
-                Criar conta
-              </Link>
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
