@@ -98,46 +98,47 @@ export default function ChatsPage() {
                 <p className="text-gray-600">Gerencie suas conversas de terapia</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <Link href="/chat/new">
-                <Button className="bg-blue-600 hover:bg-blue-700" data-testid="button-new-chat">
-                  <Plus className="h-5 w-5 mr-2" />
-                  Nova Conversa
+            {/* User Profile Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-100" data-testid="user-profile-dropdown">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
+                      {user?.email?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm text-gray-700">{user?.email}</span>
+                  <i className="fas fa-chevron-down text-xs text-gray-400"></i>
                 </Button>
-              </Link>
-              
-              {/* User Profile Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-100" data-testid="user-profile-dropdown">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
-                        {user?.email?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm text-gray-700">{user?.email}</span>
-                    <i className="fas fa-chevron-down text-xs text-gray-400"></i>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium text-gray-900">Conta</p>
-                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600" data-testid="logout-option">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sair da conta
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium text-gray-900">Conta</p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600" data-testid="logout-option">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair da conta
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Header with New Chat Button */}
+        <div className="flex justify-end mb-6">
+          <Link href="/chat/new">
+            <Button className="bg-blue-600 hover:bg-blue-700" data-testid="button-new-chat">
+              <Plus className="h-5 w-5 mr-2" />
+              Nova Conversa
+            </Button>
+          </Link>
+        </div>
+        
         {userChats.length === 0 ? (
           <div className="text-center py-12">
             <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
