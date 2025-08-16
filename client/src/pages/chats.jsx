@@ -74,7 +74,7 @@ export default function ChatsPage() {
             <div className="flex items-center space-x-3">
               <User className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Seus Chats</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Seus Atendimentos</h1>
                 <p className="text-gray-600">Gerencie suas conversas de terapia</p>
               </div>
             </div>
