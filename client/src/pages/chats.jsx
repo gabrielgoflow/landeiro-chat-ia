@@ -155,7 +155,7 @@ export default function ChatsPage() {
                           className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           data-testid={`button-open-${chat.chat_id}`}
                         >
-                          Continuar Conversa
+                          {chatReviews[chat.chat_id] ? "Visualizar Supervisão" : "Continuar Conversa"}
                         </Button>
                       </div>
                     </div>
