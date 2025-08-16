@@ -255,7 +255,7 @@ export default function Chat() {
               </AvatarFallback>
             </Avatar>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Assistente IA</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Paciente IA</h2>
               <p className="text-sm text-gray-500">Online • Responde instantaneamente</p>
             </div>
           </div>
