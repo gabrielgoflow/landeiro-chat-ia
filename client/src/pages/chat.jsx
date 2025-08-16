@@ -388,6 +388,7 @@ export default function Chat() {
           isLoading={isLoading}
           error={error}
           onClearError={clearError}
+          isFinalized={hasReview}
         />
       </div>
       
