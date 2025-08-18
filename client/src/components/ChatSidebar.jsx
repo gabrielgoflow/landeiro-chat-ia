@@ -8,6 +8,7 @@ import { useIsMobile } from "@/hooks/use-mobile.jsx";
 import { useAuth } from "@/hooks/useAuth.jsx";
 import { useToast } from "@/hooks/use-toast";
 import { NewChatDialog } from "./NewChatDialog.jsx";
+import { Trash2 } from "lucide-react";
 
 export function ChatSidebar({
   threads,
@@ -80,8 +81,47 @@ export function ChatSidebar({
     onStartNewThread(formData);
     toast({
       title: 'Nova conversa iniciada',
-      description: `Diagnóstico: ${formData.diagnostico} | Protocolo: ${formData.protocolo}`
+      description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`
     });
+  };
+
+  const handleDeleteChat = async (chatId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm('Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      // Delete from Supabase
+      await supabaseService.deleteUserChat(user.id, chatId);
+      
+      // Update local state
+      setUserChats(prev => prev.filter(chat => chat.chat_id !== chatId));
+      setChatReviews(prev => {
+        const newReviews = { ...prev };
+        delete newReviews[chatId];
+        return newReviews;
+      });
+
+      // If this was the current chat, redirect to chats page
+      if (currentThread?.id === chatId || currentThread?.openaiChatId === chatId) {
+        window.location.href = '/chats';
+      }
+
+      toast({
+        title: 'Conversa excluída',
+        description: 'A conversa foi removida com sucesso'
+      });
+    } catch (error) {
+      console.error('Erro ao excluir chat:', error);
+      toast({
+        title: 'Erro ao excluir',
+        description: 'Não foi possível excluir a conversa',
+        variant: 'destructive'
+      });
+    }
   };
 
   const getLastMessage = (threadId) => {
@@ -179,8 +219,8 @@ export function ChatSidebar({
                       }}
                       data-testid={`chat-${chat.chat_id}`}
                     >
-                      {/* Status Tag */}
-                      <div className="absolute top-2 right-2">
+                      {/* Status Tag and Delete Button */}
+                      <div className="absolute top-2 right-2 flex items-center space-x-1">
                         {chatReviews[chat.chat_id] ? (
                           <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
                             FINALIZADO
@@ -190,9 +230,21 @@ export function ChatSidebar({
                             EM ANDAMENTO
                           </Badge>
                         )}
+                        
+                        {/* Delete Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => handleDeleteChat(chat.chat_id, e)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          data-testid={`delete-chat-${chat.chat_id}`}
+                          title="Excluir conversa"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                       
-                      <div className="flex-1 min-w-0 pr-20">
+                      <div className="flex-1 min-w-0 pr-24">
                         <div className="flex flex-col space-y-1 mb-2">
                           <Badge variant="secondary" className="w-fit text-xs">
                             {(chat.diagnostico || 'Diagnóstico').toUpperCase()}

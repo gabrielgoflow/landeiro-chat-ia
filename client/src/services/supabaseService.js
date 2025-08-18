@@ -137,6 +137,39 @@ export class SupabaseService {
     }
   }
 
+  // Deletar chat do usuário (e dados relacionados)
+  static async deleteUserChat(userId, chatId) {
+    try {
+      // First delete the review if it exists
+      await supabase
+        .from('chat_reviews')
+        .delete()
+        .eq('chat_id', chatId)
+
+      // Delete the user chat relationship
+      const { error: userChatError } = await supabase
+        .from('user_chats')
+        .delete()
+        .eq('user_id', userId)
+        .eq('chat_id', chatId)
+
+      if (userChatError) throw userChatError
+
+      // Delete the chat thread (CASCADE will handle related data)
+      const { error: chatThreadError } = await supabase
+        .from('chat_threads')
+        .delete()
+        .eq('chat_id', chatId)
+
+      if (chatThreadError) throw chatThreadError
+
+      return { error: null }
+    } catch (error) {
+      console.error('Error deleting user chat:', error)
+      throw error
+    }
+  }
+
   // Buscar chat_id do OpenAI por user_id
   static async getOpenAIChatByUser(userId) {
     try {
