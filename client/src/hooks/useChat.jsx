@@ -44,12 +44,12 @@ export function useChat() {
 
       const newThread = {
         id: chatData.chat_threads?.chat_id || chatData.id, // Use internal chat_id as local ID
-        title: `${chatData.diagnostico} - ${chatData.protocolo}`,
+        title: `${chatData.diagnostico} - TCC`,
         threadId: chatData.thread_id,
         openaiChatId: chatData.chat_id, // This is the OpenAI chat_id for webhook
         sessionData: {
           diagnostico: chatData.diagnostico,
-          protocolo: chatData.protocolo
+          protocolo: 'tcc' // Always TCC
         },
         createdAt: new Date(chatData.created_at),
         updatedAt: new Date(chatData.created_at)

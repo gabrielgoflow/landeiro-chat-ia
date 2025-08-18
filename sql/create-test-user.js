@@ -58,14 +58,14 @@ async function createTestData(userId) {
           chat_id: 'chat_002',
           thread_id: 'thread_openai_002',
           diagnostico: 'depressao',
-          protocolo: 'dbt'
+          protocolo: 'tcc'
         },
         {
           id: '550e8400-e29b-41d4-a716-446655440003',
           chat_id: 'chat_003',
           thread_id: 'thread_openai_003',
           diagnostico: 'estresse',
-          protocolo: 'mindfulness'
+          protocolo: 'tcc'
         }
       ])
       .select();

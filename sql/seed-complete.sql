@@ -1,11 +1,11 @@
 -- Query completa para criar usuário de teste
 -- Execute esta query no SQL Editor do Supabase
 
--- 1. Inserir chat_threads
+-- 1. Inserir chat_threads (sempre usando TCC)
 INSERT INTO chat_threads (id, chat_id, thread_id, diagnostico, protocolo) VALUES
     ('550e8400-e29b-41d4-a716-446655440001', 'chat_001', 'thread_openai_001', 'ansiedade', 'tcc'),
-    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressao', 'dbt'),
-    ('550e8400-e29b-41d4-a716-446655440003', 'chat_003', 'thread_openai_003', 'estresse', 'mindfulness');
+    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressao', 'tcc'),
+    ('550e8400-e29b-41d4-a716-446655440003', 'chat_003', 'thread_openai_003', 'estresse', 'tcc');
 
 -- 2. Inserir user_chats
 -- SUBSTITUA 'SEU_USER_ID_AQUI' pelo ID do usuário criado no Supabase Auth

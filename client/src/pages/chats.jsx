@@ -181,7 +181,7 @@ export default function ChatsPage() {
                           {(chat.diagnostico || 'Diagnóstico').toUpperCase()}
                         </Badge>
                         <Badge variant="outline" className="w-fit">
-                          {(chat.protocolo || 'Protocolo').toUpperCase()}
+                          TCC
                         </Badge>
                       </div>
                     </div>

@@ -7,23 +7,23 @@ import { Label } from '@/components/ui/label'
 export function NewChatDialog({ open, onOpenChange, onConfirm }) {
   const [formData, setFormData] = useState({
     diagnostico: '',
-    protocolo: ''
+    protocolo: 'tcc' // Always TCC
   })
 
   const handleSubmit = () => {
-    if (formData.diagnostico && formData.protocolo) {
+    if (formData.diagnostico) {
       onConfirm(formData)
-      setFormData({ diagnostico: '', protocolo: '' })
+      setFormData({ diagnostico: '', protocolo: 'tcc' })
       onOpenChange(false)
     }
   }
 
   const handleCancel = () => {
-    setFormData({ diagnostico: '', protocolo: '' })
+    setFormData({ diagnostico: '', protocolo: 'tcc' })
     onOpenChange(false)
   }
 
-  const isFormValid = formData.diagnostico && formData.protocolo
+  const isFormValid = formData.diagnostico
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -34,7 +34,7 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
             <span>Nova Conversa</span>
           </DialogTitle>
           <DialogDescription>
-            Selecione o diagnóstico e protocolo para iniciar uma nova sessão.
+            Selecione o diagnóstico para iniciar uma nova sessão.
           </DialogDescription>
         </DialogHeader>
         
@@ -56,17 +56,12 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
 
           <div className="grid gap-2">
             <Label htmlFor="protocolo">Protocolo</Label>
-            <Select 
-              value={formData.protocolo} 
-              onValueChange={(value) => setFormData({ ...formData, protocolo: value })}
-            >
-              <SelectTrigger id="protocolo" data-testid="protocolo-select">
-                <SelectValue placeholder="Selecione o protocolo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tcc">TCC (Terapia Cognitivo-Comportamental)</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="p-3 bg-muted rounded-md border">
+              <span className="text-sm font-medium">TCC (Terapia Cognitivo-Comportamental)</span>
+              <p className="text-xs text-muted-foreground mt-1">
+                Protocolo padrão para todos os atendimentos
+              </p>
+            </div>
           </div>
         </div>
 

@@ -37,7 +37,7 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
   - chat_id (VARCHAR): ID único do chat interno
   - thread_id (VARCHAR): ID do thread do OpenAI Assistant  
   - diagnostico (VARCHAR): Diagnóstico selecionado (ex: ansiedade)
-  - protocolo (VARCHAR): Protocolo selecionado (ex: tcc)
+  - protocolo (VARCHAR): Sempre "tcc" (TCC é o protocolo padrão fixo)
 - **user_chats**: Relaciona user_id com chat_id do OpenAI
   - user_id (UUID): Referência ao usuário autenticado
   - chat_id (VARCHAR): ID do chat do OpenAI

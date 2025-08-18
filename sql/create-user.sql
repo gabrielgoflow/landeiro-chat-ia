@@ -45,11 +45,11 @@ INSERT INTO auth.users (
 -- Agora execute esta query para criar os dados de teste
 -- SUBSTITUA 'USER_ID_COPIADO_ACIMA' pelo ID retornado da query anterior
 
--- 1. Inserir chat_threads
+-- 1. Inserir chat_threads (sempre usando TCC)
 INSERT INTO chat_threads (id, chat_id, thread_id, diagnostico, protocolo) VALUES
     ('550e8400-e29b-41d4-a716-446655440001', 'chat_001', 'thread_openai_001', 'ansiedade', 'tcc'),
-    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressao', 'dbt'),
-    ('550e8400-e29b-41d4-a716-446655440003', 'chat_003', 'thread_openai_003', 'estresse', 'mindfulness');
+    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressao', 'tcc'),
+    ('550e8400-e29b-41d4-a716-446655440003', 'chat_003', 'thread_openai_003', 'estresse', 'tcc');
 
 -- 2. Inserir user_chats (substitua USER_ID_COPIADO_ACIMA)
 INSERT INTO user_chats (user_id, chat_id, chat_threads_id) VALUES

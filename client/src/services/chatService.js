@@ -49,9 +49,9 @@ export class ChatService {
     if (sessionData) {
       thread.sessionData = {
         diagnostico: sessionData.diagnostico,
-        protocolo: sessionData.protocolo,
+        protocolo: 'tcc', // Always TCC
       };
-      thread.title = `${sessionData.diagnostico} - ${sessionData.protocolo}`;
+      thread.title = `${sessionData.diagnostico} - TCC`;
     }
 
     return thread;
