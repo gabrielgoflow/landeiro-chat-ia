@@ -34,7 +34,7 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
             <span>Nova Conversa</span>
           </DialogTitle>
           <DialogDescription>
-            Selecione o diagnóstico para iniciar uma nova sessão.
+            Selecione o diagnóstico para iniciar uma nova sessão com protocolo TCC.
           </DialogDescription>
         </DialogHeader>
         
@@ -54,15 +54,7 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
             </Select>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="protocolo">Protocolo</Label>
-            <div className="p-3 bg-muted rounded-md border">
-              <span className="text-sm font-medium">TCC (Terapia Cognitivo-Comportamental)</span>
-              <p className="text-xs text-muted-foreground mt-1">
-                Protocolo padrão para todos os atendimentos
-              </p>
-            </div>
-          </div>
+
         </div>
 
         <DialogFooter>
