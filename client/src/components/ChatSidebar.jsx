@@ -105,9 +105,9 @@ export function ChatSidebar({
         return newReviews;
       });
 
-      // If this was the current chat, redirect to chats page
+      // If this was the current chat, redirect to home page
       if (currentThread?.id === chatId || currentThread?.openaiChatId === chatId) {
-        window.location.href = '/chats';
+        window.location.href = '/';
       }
 
       toast({
