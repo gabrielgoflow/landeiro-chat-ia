@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { AudioRecorder } from "./AudioRecorder.jsx";
+import { Send } from "lucide-react";
 
 export function MessageInput({ onSendMessage, isLoading, error, onClearError, isFinalized = false }) {
   const [message, setMessage] = useState("");
@@ -45,6 +47,15 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
     }
   };
 
+  const handleAudioSent = async (audioMessage) => {
+    try {
+      await onSendMessage(audioMessage);
+    } catch (err) {
+      // Error handling is done in the parent component
+      console.error('Error sending audio:', err);
+    }
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -74,22 +85,19 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Digite sua mensagem..."
+                placeholder="Digite sua mensagem ou grave um áudio..."
                 className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent resize-none overflow-hidden min-h-[48px] max-h-[120px]"
                 data-testid="message-input"
                 disabled={isLoading || isFinalized}
               />
-              <button
-                type="button"
-                className="absolute right-2 bottom-2 p-2 text-gray-400 hover:text-gray-600 transition-colors duration-150"
-                title="Anexar arquivo"
-                data-testid="attach-file-button"
-                disabled={isFinalized}
-              >
-                <i className="fas fa-paperclip"></i>
-              </button>
             </div>
           </div>
+          
+          <AudioRecorder 
+            onAudioSent={handleAudioSent} 
+            disabled={isLoading || isFinalized}
+          />
+          
           <Button
             type="submit"
             disabled={!message.trim() || isLoading || isFinalized}
@@ -97,9 +105,9 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
             data-testid="send-button"
           >
             {isLoading ? (
-              <i className="fas fa-spinner fa-spin"></i>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             ) : (
-              <i className="fas fa-paper-plane"></i>
+              <Send className="h-4 w-4" />
             )}
           </Button>
         </form>

@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChatService } from "@/services/chatService.js";
+import { AudioMessage } from "./AudioMessage.jsx";
 
 export function ChatMessage({ message }) {
   const isUser = message.sender === "user";
@@ -9,9 +10,13 @@ export function ChatMessage({ message }) {
     return (
       <div className="flex items-start justify-end space-x-3" data-testid={`message-${message.id}`}>
         <div className="flex-1 flex justify-end">
-          <div className="bg-primary text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-md">
-            <p className="whitespace-pre-wrap">{message.text || message.content}</p>
-          </div>
+          {message.type === 'audio' ? (
+            <AudioMessage audioUrl={message.audioUrl} sender="user" />
+          ) : (
+            <div className="bg-primary text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-md">
+              <p className="whitespace-pre-wrap">{message.text || message.content}</p>
+            </div>
+          )}
         </div>
         <Avatar className="w-8 h-8 flex-shrink-0">
           <AvatarFallback className="bg-gray-300 text-gray-600">
@@ -30,10 +35,19 @@ export function ChatMessage({ message }) {
         </AvatarFallback>
       </Avatar>
       <div className="flex-1">
-        <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
-          <p className="text-gray-800 whitespace-pre-wrap">{message.text || message.content}</p>
-        </div>
-        <div className="text-xs text-gray-500 mt-1 ml-1">{timestamp}</div>
+        {message.type === 'audio' ? (
+          <div>
+            <AudioMessage audioUrl={message.audioUrl} sender="assistant" />
+            <div className="text-xs text-gray-500 mt-1 ml-1">{timestamp}</div>
+          </div>
+        ) : (
+          <div>
+            <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
+              <p className="text-gray-800 whitespace-pre-wrap">{message.text || message.content}</p>
+            </div>
+            <div className="text-xs text-gray-500 mt-1 ml-1">{timestamp}</div>
+          </div>
+        )}
       </div>
     </div>
   );
