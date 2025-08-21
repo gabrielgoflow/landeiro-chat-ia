@@ -201,7 +201,7 @@ export class ChatService {
     const request = {
       message: messageToSend,
       email: USER_EMAIL,
-      chat_id: chatId,
+      chatId: chatId, // Use chatId instead of chat_id for consistency
     };
 
     // Add session data if provided

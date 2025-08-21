@@ -91,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requestBody: any = {
         message,
         email: email || 'gabriel@goflow.digital',
-        chat_id: chatId,
+        chat_id: chatId || req.body.chatId, // Support both chatId and chat_id
       };
 
       // Add other fields from original request if they exist
