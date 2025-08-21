@@ -12,7 +12,7 @@ export function ChatMessage({ message }) {
         <div className="flex-1 flex justify-end">
           {message.type === 'audio' ? (
             <AudioMessage 
-              audioUrl={message.audioUrl} 
+              audioUrl={message.audioUrl || message.audioURL} 
               audioBase64={message.audioBase64}
               mimeType={message.mimeType}
               sender="user" 
@@ -43,7 +43,7 @@ export function ChatMessage({ message }) {
         {message.type === 'audio' ? (
           <div>
             <AudioMessage 
-              audioUrl={message.audioUrl} 
+              audioUrl={message.audioUrl || message.audioURL} 
               audioBase64={message.audioBase64}
               mimeType={message.mimeType}
               sender="assistant" 

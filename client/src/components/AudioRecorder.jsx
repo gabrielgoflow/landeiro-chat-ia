@@ -7,6 +7,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [recordingMimeType, setRecordingMimeType] = useState('audio/webm');
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const { toast } = useToast();
@@ -21,9 +22,20 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
         } 
       });
       
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Try MP3 first, fallback to webm
+      let mimeType = 'audio/webm;codecs=opus';
+      let fileExtension = 'webm';
+      
+      if (MediaRecorder.isTypeSupported('audio/mpeg')) {
+        mimeType = 'audio/mpeg';
+        fileExtension = 'mp3';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+        fileExtension = 'm4a';
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      setRecordingMimeType(mimeType);
       
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
@@ -35,7 +47,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
       };
       
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         setAudioBlob(blob);
         
         // Stop all tracks to release the microphone
@@ -47,7 +59,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
       
       toast({
         title: 'Gravação iniciada',
-        description: 'Fale sua mensagem...'
+        description: `Fale sua mensagem... (${fileExtension.toUpperCase()})`
       });
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -90,11 +102,49 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
       reader.readAsDataURL(audioBlob);
       const base64Audio = await base64Promise;
 
-      // Call the callback with the audio message including base64
+      // Also upload to get audioURL
+      let audioURL = null;
+      try {
+        // Get upload URL
+        const uploadResponse = await fetch('/api/objects/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (uploadResponse.ok) {
+          const { uploadURL } = await uploadResponse.json();
+
+          // Upload audio file
+          const uploadResult = await fetch(uploadURL, {
+            method: 'PUT',
+            body: audioBlob,
+            headers: { 'Content-Type': recordingMimeType }
+          });
+
+          if (uploadResult.ok) {
+            // Set ACL policy for the uploaded audio
+            const aclResponse = await fetch('/api/audio-messages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ audioURL: uploadURL })
+            });
+
+            if (aclResponse.ok) {
+              const { objectPath } = await aclResponse.json();
+              audioURL = `${window.location.origin}${objectPath}`;
+            }
+          }
+        }
+      } catch (uploadError) {
+        console.warn('Upload failed, sending base64 only:', uploadError);
+      }
+
+      // Call the callback with the audio message including base64 and URL
       onAudioSent({
         type: 'audio',
         audioBase64: base64Audio,
-        mimeType: 'audio/webm',
+        audioURL: audioURL,
+        mimeType: recordingMimeType,
         duration: 0 // We could calculate this if needed
       });
 

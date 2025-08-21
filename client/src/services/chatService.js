@@ -71,7 +71,8 @@ export class ChatService {
         ...baseMessage,
         type: 'audio',
         audioBase64: content.audioBase64,
-        audioUrl: content.audioUrl, // Keep URL if provided for compatibility
+        audioUrl: content.audioUrl || content.audioURL, // Support both formats
+        audioURL: content.audioURL, // Include audioURL for API requests
         mimeType: content.mimeType || 'audio/webm',
         duration: content.duration || 0,
       };
@@ -142,7 +143,8 @@ export class ChatService {
                 id: msg.id,
                 type: 'audio',
                 audioBase64: audioData.audioBase64,
-                audioUrl: audioData.audioUrl, // Keep URL if provided for compatibility
+                audioUrl: audioData.audioUrl || audioData.audioURL, // Support both formats
+                audioURL: audioData.audioURL, // Include audioURL for consistency
                 mimeType: audioData.mimeType || 'audio/webm',
                 duration: audioData.duration || 0,
                 sender: msg.role === "user" ? "user" : "assistant",
