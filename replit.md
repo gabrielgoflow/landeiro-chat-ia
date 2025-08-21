@@ -1,6 +1,6 @@
 # Overview
 
-A chat application built with React (frontend) and Express.js (backend) that provides an AI-powered conversational interface. The application features a modern UI with chat threads, real-time messaging, and persistent chat history stored in localStorage. It's designed to work with external AI services via webhooks while providing a clean, responsive user experience using shadcn/ui components and Tailwind CSS styling.
+A chat application built with React (frontend) and Express.js (backend) that provides an AI-powered conversational interface with audio messaging capabilities. The application features a modern UI with chat threads, real-time messaging, audio recording and playback, and persistent chat history stored in localStorage. It's designed to work with external AI services via webhooks while providing a clean, responsive user experience using shadcn/ui components and Tailwind CSS styling.
 
 # User Preferences
 
@@ -64,8 +64,15 @@ Currently implements a **basic user structure** with:
 **AI Service Integration**:
 - Webhook-based communication with external AI service (n8nflowhook.goflow.digital)
 - RESTful API pattern for sending user messages and receiving AI responses
+- Audio message support: sent as JSON strings to webhook, processed in message history
 - Hardcoded user email for service identification
 - Error handling for service unavailability
+
+**Object Storage Integration**:
+- Replit Object Storage for audio file management
+- Private object directory for user-uploaded audio files
+- Presigned URL upload system for secure file handling
+- ACL policies for access control on audio messages
 
 **Development Tools**:
 - **Neon Database** integration for PostgreSQL hosting

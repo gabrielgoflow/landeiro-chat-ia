@@ -128,12 +128,35 @@ export class ChatService {
         let firstUserMessageSkipped = false;
         
         for (const msg of sortedMessages) {
-          const transformedMsg = {
-            id: msg.id,
-            text: msg.content[0]?.text?.value || "",
-            sender: msg.role === "user" ? "user" : "assistant",
-            timestamp: new Date(msg.created_at * 1000), // Convert Unix timestamp to Date
-          };
+          const messageText = msg.content[0]?.text?.value || "";
+          
+          // Check if message is an audio message (JSON string)
+          let transformedMsg;
+          try {
+            const audioData = JSON.parse(messageText);
+            if (audioData.type === 'audio') {
+              // This is an audio message
+              transformedMsg = {
+                id: msg.id,
+                type: 'audio',
+                audioUrl: audioData.audioUrl,
+                duration: audioData.duration || 0,
+                sender: msg.role === "user" ? "user" : "assistant",
+                timestamp: new Date(msg.created_at * 1000),
+              };
+            } else {
+              throw new Error('Not audio message');
+            }
+          } catch {
+            // Regular text message
+            transformedMsg = {
+              id: msg.id,
+              text: messageText,
+              content: messageText, // Add content for compatibility
+              sender: msg.role === "user" ? "user" : "assistant",
+              timestamp: new Date(msg.created_at * 1000),
+            };
+          }
           
           // Skip the first user message (it's always duplicated)
           if (msg.role === "user" && !firstUserMessageSkipped) {
@@ -163,8 +186,14 @@ export class ChatService {
     sessionData = null,
     chatId = null,
   ) {
+    // Handle audio messages - send as JSON string
+    let messageToSend = message;
+    if (typeof message === 'object' && message.type === 'audio') {
+      messageToSend = JSON.stringify(message);
+    }
+    
     const request = {
-      message,
+      message: messageToSend,
       email: USER_EMAIL,
       chat_id: chatId,
     };
