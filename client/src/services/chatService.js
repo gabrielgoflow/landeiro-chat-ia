@@ -70,7 +70,9 @@ export class ChatService {
       return {
         ...baseMessage,
         type: 'audio',
-        audioUrl: content.audioUrl,
+        audioBase64: content.audioBase64,
+        audioUrl: content.audioUrl, // Keep URL if provided for compatibility
+        mimeType: content.mimeType || 'audio/webm',
         duration: content.duration || 0,
       };
     }
@@ -135,16 +137,13 @@ export class ChatService {
           try {
             const audioData = JSON.parse(messageText);
             if (audioData.type === 'audio') {
-              // This is an audio message - ensure URL is complete
-              let audioUrl = audioData.audioUrl;
-              if (audioUrl.startsWith('/objects/')) {
-                audioUrl = `${window.location.origin}${audioUrl}`;
-              }
-              
+              // This is an audio message
               transformedMsg = {
                 id: msg.id,
                 type: 'audio',
-                audioUrl: audioUrl,
+                audioBase64: audioData.audioBase64,
+                audioUrl: audioData.audioUrl, // Keep URL if provided for compatibility
+                mimeType: audioData.mimeType || 'audio/webm',
                 duration: audioData.duration || 0,
                 sender: msg.role === "user" ? "user" : "assistant",
                 timestamp: new Date(msg.created_at * 1000),

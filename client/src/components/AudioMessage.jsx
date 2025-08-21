@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Volume2 } from 'lucide-react';
 
-export function AudioMessage({ audioUrl, sender = 'user' }) {
+export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', sender = 'user' }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -77,7 +77,7 @@ export function AudioMessage({ audioUrl, sender = 'user' }) {
     `}>
       <audio 
         ref={audioRef} 
-        src={audioUrl}
+        src={audioBase64 || audioUrl}
         preload="metadata"
         className="hidden"
       />

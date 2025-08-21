@@ -11,7 +11,12 @@ export function ChatMessage({ message }) {
       <div className="flex items-start justify-end space-x-3" data-testid={`message-${message.id}`}>
         <div className="flex-1 flex justify-end">
           {message.type === 'audio' ? (
-            <AudioMessage audioUrl={message.audioUrl} sender="user" />
+            <AudioMessage 
+              audioUrl={message.audioUrl} 
+              audioBase64={message.audioBase64}
+              mimeType={message.mimeType}
+              sender="user" 
+            />
           ) : (
             <div className="bg-primary text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-md">
               <p className="whitespace-pre-wrap">{message.text || message.content}</p>
@@ -37,7 +42,12 @@ export function ChatMessage({ message }) {
       <div className="flex-1">
         {message.type === 'audio' ? (
           <div>
-            <AudioMessage audioUrl={message.audioUrl} sender="assistant" />
+            <AudioMessage 
+              audioUrl={message.audioUrl} 
+              audioBase64={message.audioBase64}
+              mimeType={message.mimeType}
+              sender="assistant" 
+            />
             <div className="text-xs text-gray-500 mt-1 ml-1">{timestamp}</div>
           </div>
         ) : (

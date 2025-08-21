@@ -77,57 +77,24 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
     try {
       setIsUploading(true);
 
-      // Get upload URL
-      const uploadResponse = await fetch('/api/objects/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+      // Convert audio blob to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise((resolve, reject) => {
+        reader.onloadend = () => {
+          const base64String = reader.result;
+          resolve(base64String);
+        };
+        reader.onerror = reject;
       });
+      
+      reader.readAsDataURL(audioBlob);
+      const base64Audio = await base64Promise;
 
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to get upload URL');
-      }
-
-      const { uploadURL } = await uploadResponse.json();
-
-      // Upload audio file
-      const uploadResult = await fetch(uploadURL, {
-        method: 'PUT',
-        body: audioBlob,
-        headers: {
-          'Content-Type': 'audio/webm'
-        }
-      });
-
-      if (!uploadResult.ok) {
-        throw new Error('Failed to upload audio');
-      }
-
-      // Set ACL policy for the uploaded audio
-      const aclResponse = await fetch('/api/audio-messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          audioURL: uploadURL
-        })
-      });
-
-      if (!aclResponse.ok) {
-        throw new Error('Failed to set audio permissions');
-      }
-
-      const { objectPath } = await aclResponse.json();
-
-      // Create full URL with current domain
-      const fullAudioUrl = `${window.location.origin}${objectPath}`;
-
-      // Call the callback with the audio message
+      // Call the callback with the audio message including base64
       onAudioSent({
         type: 'audio',
-        audioUrl: fullAudioUrl,
+        audioBase64: base64Audio,
+        mimeType: 'audio/webm',
         duration: 0 // We could calculate this if needed
       });
 
