@@ -62,11 +62,14 @@ Currently implements a **basic user structure** with:
 ## External Service Integrations
 
 **AI Service Integration**:
-- Webhook-based communication with external AI service (n8nflowhook.goflow.digital)
-- RESTful API pattern for sending user messages and receiving AI responses
-- Audio message support: sent as JSON strings to webhook, processed in message history
+- Dual endpoint system: `/api/landeiro-chat-ia` proxy to external webhook
+- External webhook: `https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz`
+- Support for both audio (base64) and text responses from AI
+- Audio message support: sent as JSON strings to webhook, received as base64
+- Automatic audio/text detection and rendering in chat interface
+- Session data integration: diagnostico and protocolo fields
 - Hardcoded user email for service identification
-- Error handling for service unavailability
+- Enhanced error handling with detailed logging
 
 **Object Storage Integration**:
 - Replit Object Storage for audio file management

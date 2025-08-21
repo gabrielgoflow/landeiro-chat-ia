@@ -87,24 +87,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { message, chatId, email } = req.body;
 
+      // Include all required fields for the external AI service
+      const requestBody = {
+        message,
+        email: email || 'user@example.com',
+        chat_id: chatId,
+      };
+
+      // Add other fields from original request if they exist
+      if (req.body.diagnostico) requestBody.diagnostico = req.body.diagnostico;
+      if (req.body.protocolo) requestBody.protocolo = req.body.protocolo;
+
+      console.log('Sending request to external AI service:', requestBody);
+
       // Make request to external AI service
       const aiResponse = await fetch('https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message,
-          email: email || 'user@example.com',
-          chat_id: chatId,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!aiResponse.ok) {
-        throw new Error(`AI service responded with ${aiResponse.status}`);
+        const errorText = await aiResponse.text();
+        console.error('AI service error:', aiResponse.status, errorText);
+        throw new Error(`AI service responded with ${aiResponse.status}: ${errorText}`);
       }
 
       const aiData = await aiResponse.json();
+      console.log('AI service response:', aiData);
 
       // Check if response contains base64 audio
       if (aiData.base64) {

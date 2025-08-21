@@ -204,19 +204,13 @@ export class ChatService {
       chat_id: chatId,
     };
 
-    // Add chat_id if provided
-    if (chatId) {
-      console.log("Sending message with chat_id:", chatId);
-      request.chat_id = chatId;
-    } else {
-      console.log("Sending message without chat_id");
-    }
-
     // Add session data if provided
     if (sessionData) {
       request.diagnostico = sessionData.diagnostico;
       request.protocolo = sessionData.protocolo;
     }
+
+    console.log("Sending request to landeiro-chat-ia:", request);
 
     try {
       // Use the new landeiro-chat-ia endpoint
