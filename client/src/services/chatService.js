@@ -219,7 +219,8 @@ export class ChatService {
     }
 
     try {
-      const response = await fetch(WEBHOOK_URL, {
+      // Use the new landeiro-chat-ia endpoint
+      const response = await fetch("/api/landeiro-chat-ia", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -232,9 +233,21 @@ export class ChatService {
       }
 
       const data = await response.json();
-      return data.output || "Desculpe, não consegui processar sua mensagem.";
+      console.log("Received response from landeiro-chat-ia:", data);
+
+      // Handle audio or text response
+      if (data.type === 'audio') {
+        return {
+          type: 'audio',
+          audioBase64: `data:${data.mimeType};base64,${data.base64}`,
+          mimeType: data.mimeType,
+          message: data.text || '', // Optional text with audio
+        };
+      } else {
+        return data.message || "Desculpe, não consegui processar sua mensagem.";
+      }
     } catch (error) {
-      console.error("Error sending message to webhook:", error);
+      console.error("Error sending message to landeiro-chat-ia:", error);
       throw new Error(
         "Falha ao enviar mensagem. Verifique sua conexão e tente novamente.",
       );

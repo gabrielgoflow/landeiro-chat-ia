@@ -260,14 +260,30 @@ export function useChat() {
       
       // Send to webhook and get AI response (using threadId as chat_id)
       const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, threadId);
-      const aiMessage = ChatService.createAiMessage(threadId, aiResponse);
+      
+      // Handle audio or text response from AI
+      let aiMessage;
+      if (typeof aiResponse === 'object' && aiResponse.type === 'audio') {
+        // Create audio message from AI response
+        aiMessage = ChatService.createUserMessage(threadId, {
+          type: 'audio',
+          audioBase64: aiResponse.audioBase64,
+          mimeType: aiResponse.mimeType,
+          duration: 0
+        });
+        aiMessage.sender = 'assistant'; // Override sender for AI audio messages
+      } else {
+        // Create text message
+        const messageText = typeof aiResponse === 'string' ? aiResponse : aiResponse.message;
+        aiMessage = ChatService.createAiMessage(threadId, messageText);
+      }
 
       setChatHistory(prev => ({
         threads: prev.threads.map(thread => 
           thread.id === threadId 
             ? { 
                 ...thread, 
-                threadId: aiResponse.thread_id || thread.threadId // Store OpenAI thread_id for history loading
+                threadId: aiResponse?.thread_id || thread.threadId // Store OpenAI thread_id for history loading
               }
             : thread
         ),

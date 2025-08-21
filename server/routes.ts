@@ -82,6 +82,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Landeiro Chat IA endpoint - handles both text and audio responses
+  app.post("/api/landeiro-chat-ia", async (req, res) => {
+    try {
+      const { message, chatId, email } = req.body;
+
+      // Make request to external AI service
+      const aiResponse = await fetch('https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message,
+          email: email || 'user@example.com',
+          chat_id: chatId,
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        throw new Error(`AI service responded with ${aiResponse.status}`);
+      }
+
+      const aiData = await aiResponse.json();
+
+      // Check if response contains base64 audio
+      if (aiData.base64) {
+        // Return audio response
+        res.json({
+          type: 'audio',
+          base64: aiData.base64,
+          mimeType: 'audio/mp3', // Assume MP3 for base64 responses
+          text: aiData.message || '', // Include text if available
+        });
+      } else {
+        // Return text response  
+        res.json({
+          type: 'text',
+          message: aiData.message || aiData.text || 'No response',
+        });
+      }
+
+    } catch (error: any) {
+      console.error('Error in landeiro-chat-ia:', error);
+      res.status(500).json({ 
+        error: 'Failed to get AI response',
+        type: 'text',
+        message: 'Desculpe, ocorreu um erro. Tente novamente.'
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
