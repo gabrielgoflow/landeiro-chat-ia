@@ -121,10 +121,13 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
 
       const { objectPath } = await aclResponse.json();
 
+      // Create full URL with current domain
+      const fullAudioUrl = `${window.location.origin}${objectPath}`;
+
       // Call the callback with the audio message
       onAudioSent({
         type: 'audio',
-        audioUrl: objectPath,
+        audioUrl: fullAudioUrl,
         duration: 0 // We could calculate this if needed
       });
 

@@ -135,11 +135,16 @@ export class ChatService {
           try {
             const audioData = JSON.parse(messageText);
             if (audioData.type === 'audio') {
-              // This is an audio message
+              // This is an audio message - ensure URL is complete
+              let audioUrl = audioData.audioUrl;
+              if (audioUrl.startsWith('/objects/')) {
+                audioUrl = `${window.location.origin}${audioUrl}`;
+              }
+              
               transformedMsg = {
                 id: msg.id,
                 type: 'audio',
-                audioUrl: audioData.audioUrl,
+                audioUrl: audioUrl,
                 duration: audioData.duration || 0,
                 sender: msg.role === "user" ? "user" : "assistant",
                 timestamp: new Date(msg.created_at * 1000),
