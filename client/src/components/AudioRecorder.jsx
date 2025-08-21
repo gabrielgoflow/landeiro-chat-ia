@@ -57,10 +57,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
       mediaRecorder.start();
       setIsRecording(true);
       
-      toast({
-        title: 'Gravação iniciada',
-        description: `Fale sua mensagem... (${fileExtension.toUpperCase()})`
-      });
+
     } catch (error) {
       console.error('Error starting recording:', error);
       toast({
@@ -151,10 +148,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
       // Reset state
       setAudioBlob(null);
       
-      toast({
-        title: 'Áudio enviado',
-        description: 'Sua mensagem de áudio foi enviada com sucesso'
-      });
+
 
     } catch (error) {
       console.error('Error sending audio:', error);
