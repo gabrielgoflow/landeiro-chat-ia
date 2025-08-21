@@ -58,12 +58,28 @@ export class ChatService {
   }
 
   static createUserMessage(threadId, content) {
-    return {
+    const baseMessage = {
       id: this.generateMessageId(),
       threadId,
-      content,
       sender: "user",
       timestamp: new Date(),
+    };
+
+    // Handle audio messages
+    if (typeof content === 'object' && content.type === 'audio') {
+      return {
+        ...baseMessage,
+        type: 'audio',
+        audioUrl: content.audioUrl,
+        duration: content.duration || 0,
+      };
+    }
+
+    // Handle text messages
+    return {
+      ...baseMessage,
+      content,
+      text: content, // Add text field for compatibility
     };
   }
 

@@ -200,7 +200,9 @@ export function useChat() {
   }, [currentThreadId, chatHistory.threads, startNewThread, user]);
 
   const sendMessage = useCallback(async (content) => {
-    if (!content.trim()) return;
+    // Handle both text messages and audio messages
+    if (typeof content === 'string' && !content.trim()) return;
+    if (typeof content === 'object' && !content.type) return;
     
     let threadId = currentThreadId;
     
@@ -224,9 +226,11 @@ export function useChat() {
       // Update thread title if it's still "Nova Conversa"
       const updatedThreads = prev.threads.map(thread => {
         if (thread.id === threadId && thread.title === "Nova Conversa") {
+          // Generate title from text content or use default for audio
+          const titleContent = typeof content === 'string' ? content : 'Mensagem de áudio';
           return {
             ...thread,
-            title: ChatService.generateThreadTitle(content),
+            title: ChatService.generateThreadTitle(titleContent),
             updatedAt: new Date()
           };
         } else if (thread.id === threadId) {
