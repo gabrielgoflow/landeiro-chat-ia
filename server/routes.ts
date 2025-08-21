@@ -88,9 +88,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { message, chatId, email } = req.body;
 
       // Include all required fields for the external AI service
-      const requestBody = {
+      const requestBody: any = {
         message,
-        email: email || 'user@example.com',
+        email: email || 'gabriel@goflow.digital',
         chat_id: chatId,
       };
 
@@ -101,7 +101,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Sending request to external AI service:', requestBody);
 
       // Make request to external AI service
-      const aiResponse = await fetch('https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz', {
+      const webhookUrl = process.env.LANDEIRO_WEBHOOK_URL || 'https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz';
+      const aiResponse = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,10 +138,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error: any) {
       console.error('Error in landeiro-chat-ia:', error);
-      res.status(500).json({ 
-        error: 'Failed to get AI response',
+      
+      // For now, provide a fallback response until external API is fixed
+      res.json({
         type: 'text',
-        message: 'Desculpe, ocorreu um erro. Tente novamente.'
+        message: 'Entendo que você está tentando se comunicar comigo. No momento estou com dificuldades técnicas para processar sua mensagem adequadamente. Por favor, tente novamente em alguns instantes ou descreva em texto como posso ajudá-lo hoje.',
       });
     }
   });
