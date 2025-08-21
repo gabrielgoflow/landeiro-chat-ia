@@ -129,10 +129,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           text: aiData.message || '', // Include text if available
         });
       } else {
-        // Return text response  
+        // Return text response - handle multiple possible response formats
+        const messageText = aiData.output || aiData.response || aiData.message || aiData.text || 'No response';
         res.json({
           type: 'text',
-          message: aiData.message || aiData.text || 'No response',
+          message: messageText,
         });
       }
 
