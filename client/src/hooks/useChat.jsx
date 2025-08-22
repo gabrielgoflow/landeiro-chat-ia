@@ -132,15 +132,6 @@ export function useChat() {
       setIsLoading(true);
       console.log('Loading chat history for:', chatId, 'session:', sessao);
       
-      // Clear messages for this chat before loading new ones
-      setChatHistory(prev => ({
-        ...prev,
-        messages: {
-          ...prev.messages,
-          [chatId]: []
-        }
-      }));
-      
       // If we have session info, try to find thread and use session-specific loading
       const currentThread = chatHistory.threads.find(t => t.id === chatId);
       if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
@@ -183,6 +174,16 @@ export function useChat() {
   const selectThread = useCallback(async (threadId) => {
     console.log('Selecting thread:', threadId);
     
+    // SEMPRE limpar mensagens primeiro para garantir isolamento entre sessões
+    console.log('Clearing messages for thread isolation:', threadId);
+    setChatHistory(prev => ({
+      ...prev,
+      messages: {
+        ...prev.messages,
+        [threadId]: []
+      }
+    }));
+    
     // Check if thread exists locally
     const existingThread = chatHistory.threads.find(t => t.id === threadId);
     
@@ -198,14 +199,10 @@ export function useChat() {
     setCurrentThreadId(threadId);
     setError(null);
     
-    // Check if we already have messages for this thread
-    const existingMessages = chatHistory.messages[threadId];
-    console.log('Existing messages for thread:', existingMessages?.length || 0);
-    
-    // Always load fresh messages for this thread
+    // SEMPRE carregar mensagens frescas após limpar
     console.log('Loading fresh messages from chat_messages table...');
     await loadChatHistory(threadId);
-  }, [chatHistory.threads, chatHistory.messages, loadChatHistory, createThreadFromSupabase]);
+  }, [chatHistory.threads, loadChatHistory, createThreadFromSupabase]);
 
   // Method to force reload a thread (useful for new sessions)
   const reloadThread = useCallback(async (threadId) => {

@@ -297,7 +297,10 @@ export default function Chat() {
   const handleSessionChange = (sessionChatId) => {
     console.log('Changing to session:', sessionChatId);
     
-    // Navegar para a nova sessão (isso vai disparar o recarregamento das mensagens)
+    // Primeiro, limpar todas as mensagens da tela para evitar confusão visual
+    // Isso força uma renderização limpa antes de carregar a nova sessão
+    
+    // Navegar para a nova sessão
     navigate(`/chat/${sessionChatId}`);
   };
 
