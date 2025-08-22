@@ -22,16 +22,7 @@ export function SessionTabs({
     }
   }, [threadId])
 
-  // Polling para atualizar sessões automaticamente (detectar reviews criados)
-  useEffect(() => {
-    if (!threadId) return;
 
-    const interval = setInterval(() => {
-      loadSessions();
-    }, 5000); // Verifica a cada 5 segundos
-
-    return () => clearInterval(interval);
-  }, [threadId]);
 
   const loadSessions = async () => {
     try {
