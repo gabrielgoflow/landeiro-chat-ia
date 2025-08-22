@@ -192,6 +192,14 @@ export default function Chat() {
         console.log('Sidebar refresh trigger updated from', prev, 'to', newValue);
         return newValue;
       });
+      
+      // Forçar atualização das abas de sessão também
+      setTimeout(() => {
+        setCurrentSessionData(prev => ({
+          ...prev,
+          refreshTrigger: Date.now()
+        }));
+      }, 500);
     };
     
     startNewThread(formData, onChatCreated);
