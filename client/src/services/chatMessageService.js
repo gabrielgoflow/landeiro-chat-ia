@@ -54,12 +54,12 @@ export class ChatMessageService {
       if (error) throw error
       return { data: data || [], error: null }
     } catch (error) {
-      console.error('Error fetching chat messages:', error)
+      console.error('Error getting chat messages:', error)
       return { data: [], error: error.message }
     }
   }
 
-  // Buscar mensagens específicas de uma sessão
+  // Buscar mensagens de uma sessão específica por thread_id + sessao
   static async getSessionMessages(threadId, sessao, limit = 100) {
     try {
       const { data, error } = await supabase
@@ -73,12 +73,12 @@ export class ChatMessageService {
       if (error) throw error
       return { data: data || [], error: null }
     } catch (error) {
-      console.error('Error fetching session messages:', error)
+      console.error('Error getting session messages:', error)
       return { data: [], error: error.message }
     }
   }
 
-  // Buscar mensagens por thread_id (útil para sessões contínuas)
+  // Buscar mensagens por thread_id (útil para visualizar todas as sessões)
   static async getThreadMessages(threadId, limit = 100) {
     try {
       const { data, error } = await supabase
@@ -91,71 +91,42 @@ export class ChatMessageService {
       if (error) throw error
       return { data: data || [], error: null }
     } catch (error) {
-      console.error('Error fetching thread messages:', error)
+      console.error('Error getting thread messages:', error)
       return { data: [], error: error.message }
     }
   }
 
-  // Estatísticas de um chat
-  static async getChatStats(chatId) {
+  // Deletar mensagens de um chat
+  static async deleteChatMessages(chatId) {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('chat_messages')
-        .select('sender, message_type, created_at')
+        .delete()
         .eq('chat_id', chatId)
 
       if (error) throw error
-
-      const stats = {
-        totalMessages: data.length,
-        userMessages: data.filter(m => m.sender === 'user').length,
-        assistantMessages: data.filter(m => m.sender === 'assistant').length,
-        audioMessages: data.filter(m => m.message_type === 'audio').length,
-        textMessages: data.filter(m => m.message_type === 'text').length,
-        firstMessage: data.length > 0 ? data[0].created_at : null,
-        lastMessage: data.length > 0 ? data[data.length - 1].created_at : null
-      }
-
-      return { data: stats, error: null }
+      return { error: null }
     } catch (error) {
-      console.error('Error getting chat stats:', error)
-      return { data: null, error: error.message }
+      console.error('Error deleting chat messages:', error)
+      return { error: error.message }
     }
   }
 
-  // Buscar overview completo usando a view
-  static async getChatOverview(chatId) {
+  // Atualizar mensagem
+  static async updateMessage(messageId, updateData) {
     try {
       const { data, error } = await supabase
-        .from('v_chat_overview')
-        .select('*')
-        .eq('chat_id', chatId)
+        .from('chat_messages')
+        .update(updateData)
+        .eq('message_id', messageId)
+        .select()
         .single()
 
       if (error) throw error
       return { data, error: null }
     } catch (error) {
-      console.error('Error getting chat overview:', error)
+      console.error('Error updating message:', error)
       return { data: null, error: error.message }
     }
   }
-
-  // Buscar sessões de um usuário usando a view
-  static async getUserSessions(userId) {
-    try {
-      const { data, error } = await supabase
-        .from('v_user_sessions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('session_started', { ascending: false })
-
-      if (error) throw error
-      return { data: data || [], error: null }
-    } catch (error) {
-      console.error('Error getting user sessions:', error)
-      return { data: [], error: error.message }
-    }
-  }
 }
-
-export { ChatMessageService as chatMessageService }

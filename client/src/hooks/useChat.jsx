@@ -132,26 +132,44 @@ export function useChat() {
       setIsLoading(true);
       console.log('Loading chat history for:', chatId, 'session:', sessao);
       
-      // Always use chat_messages table with session filtering
-      const historyMessages = await ChatService.getMessageHistory(chatId);
-      
-      // Update chat history with loaded messages
-      setChatHistory(prev => ({
-        ...prev,
-        messages: {
-          ...prev.messages,
-          [chatId]: historyMessages
-        }
-      }));
+      // If we have session info, try to find thread and use session-specific loading
+      const currentThread = chatHistory.threads.find(t => t.id === chatId);
+      if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
+        console.log(`Using session-specific loading for thread ${currentThread.threadId} session ${currentThread.sessionData.sessao}`);
+        const historyMessages = await ChatService.getSessionMessages(currentThread.threadId, currentThread.sessionData.sessao);
+        
+        // Update chat history with loaded messages
+        setChatHistory(prev => ({
+          ...prev,
+          messages: {
+            ...prev.messages,
+            [chatId]: historyMessages
+          }
+        }));
 
-      console.log(`Loaded ${historyMessages.length} messages for chat ${chatId}`);
+        console.log(`Loaded ${historyMessages.length} session-specific messages for chat ${chatId}`);
+      } else {
+        // Fallback to individual chat messages
+        const historyMessages = await ChatService.getMessageHistory(chatId);
+        
+        // Update chat history with loaded messages
+        setChatHistory(prev => ({
+          ...prev,
+          messages: {
+            ...prev.messages,
+            [chatId]: historyMessages
+          }
+        }));
+
+        console.log(`Loaded ${historyMessages.length} messages for chat ${chatId}`);
+      }
     } catch (error) {
       console.error('Error loading chat history:', error);
       setError('Erro ao carregar histórico da conversa');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [chatHistory.threads]);
 
   const selectThread = useCallback(async (threadId) => {
     console.log('Selecting thread:', threadId);

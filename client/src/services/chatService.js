@@ -1,7 +1,6 @@
-const WEBHOOK_URL =
-  "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia";
-const USER_EMAIL = "gabriel@goflow.digital";
-const STORAGE_KEY = "landeiro_chat_history";
+import { ChatMessageService } from './chatMessageService.js';
+
+const USER_EMAIL = "user@example.com";
 
 export class ChatService {
   static generateThreadId() {
@@ -12,27 +11,40 @@ export class ChatService {
     return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  static generateThreadTitle(message) {
-    return message.length > 50 ? message.substring(0, 50) + "..." : message;
-  }
-
-  static getStoredHistory() {
+  static saveChatHistory(chatHistory) {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (error) {
-      console.error("Error loading chat history:", error);
-    }
-    return { threads: [], messages: {} };
-  }
-
-  static saveHistory(history) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+      localStorage.setItem("chatHistory", JSON.stringify({
+        threads: chatHistory.threads || [],
+        messages: chatHistory.messages || {},
+        timestamp: Date.now()
+      }));
     } catch (error) {
       console.error("Error saving chat history:", error);
+    }
+  }
+
+  static loadChatHistory() {
+    try {
+      const stored = localStorage.getItem("chatHistory");
+      if (!stored) return { threads: [], messages: {} };
+      
+      const parsed = JSON.parse(stored);
+      return {
+        threads: Array.isArray(parsed.threads) ? parsed.threads : [],
+        messages: typeof parsed.messages === 'object' ? parsed.messages : {}
+      };
+    } catch (error) {
+      console.error("Error loading chat history:", error);
+      return { threads: [], messages: {} };
+    }
+  }
+
+  static clearChatHistory() {
+    try {
+      localStorage.removeItem("chatHistory");
+      console.log("Chat history cleared");
+    } catch (error) {
+      console.error("Error clearing chat history:", error);
     }
   }
 
@@ -113,33 +125,36 @@ export class ChatService {
       const messages = await response.json();
       console.log(`Loaded ${messages.length} messages from chat_messages table for session:`, chatId);
 
+      // Transform messages to expected format
       return this.transformMessages(messages, chatId);
     } catch (error) {
-      console.error("Error fetching message history:", error);
-      throw error;
+      console.error('Error loading message history:', error);
+      return [];
     }
   }
 
-  // Get messages for a specific session by thread_id and sessao
   static async getSessionMessages(threadId, sessao) {
     try {
+      // Use session-specific endpoint for thread+session filtering
       const response = await fetch(`/api/session-messages/${threadId}/${sessao}`);
 
       if (!response.ok) {
         if (response.status === 404 || response.status === 500) {
-          console.log(`No messages found for thread ${threadId} session ${sessao}`);
+          // No messages found for this session or error - return empty array
+          console.log(`No messages found for thread ${threadId} session ${sessao} or error occurred`);
           return [];
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const messages = await response.json();
-      console.log(`Loaded ${messages.length} messages for thread ${threadId} session ${sessao}`);
+      console.log(`Loaded ${messages.length} session-specific messages for thread ${threadId} session ${sessao}`);
 
+      // Transform messages to expected format
       return this.transformMessages(messages, `${threadId}_session_${sessao}`);
     } catch (error) {
-      console.error("Error fetching session messages:", error);
-      throw error;
+      console.error('Error loading session messages:', error);
+      return [];
     }
   }
 
@@ -158,17 +173,17 @@ export class ChatService {
           ...baseMessage,
           type: 'audio',
           audioUrl: msg.audioUrl || msg.audio_url,
-          audioURL: msg.audioUrl || msg.audio_url, // Include both for compatibility
-          mimeType: 'audio/mp3', // Default to mp3 for stored audio
-          duration: 0,
+          audioBase64: msg.audioBase64 || msg.audio_base64,
+          mimeType: msg.mimeType || msg.mime_type || 'audio/webm',
+          duration: msg.duration || 0,
         };
       }
 
       // Handle text messages
       return {
         ...baseMessage,
-        text: msg.content,
         content: msg.content,
+        text: msg.content,
       };
     });
 
@@ -176,89 +191,61 @@ export class ChatService {
     return transformedMessages;
   }
 
-  static async sendMessage(
-    message,
-    threadId,
-    sessionData = null,
-    chatId = null,
-  ) {
-    // Handle audio messages - send as JSON string
-    let messageToSend = message;
-    if (typeof message === 'object' && message.type === 'audio') {
-      messageToSend = JSON.stringify(message);
-    }
-    
-    const request = {
-      message: messageToSend,
-      email: USER_EMAIL,
-      chatId: chatId, // Use chatId instead of chat_id for consistency
-    };
-
-    // Add session data if provided
-    if (sessionData) {
-      request.diagnostico = sessionData.diagnostico;
-      request.protocolo = sessionData.protocolo;
-    }
-
-    console.log("Sending request to landeiro-chat-ia:", request);
-
+  static async sendMessage(content, chatId, sessionData = null, threadId = null) {
     try {
-      // Use the new landeiro-chat-ia endpoint
-      const response = await fetch("/api/landeiro-chat-ia", {
-        method: "POST",
+      const payload = {
+        user_email: USER_EMAIL,
+        chat_id: chatId,
+      };
+
+      // Add session data if available
+      if (sessionData) {
+        payload.diagnostico = sessionData.diagnostico;
+        payload.protocolo = sessionData.protocolo || 'tcc';
+        payload.sessao = sessionData.sessao;
+      }
+
+      // Handle audio content
+      if (typeof content === 'object' && content.type === 'audio') {
+        payload.message = JSON.stringify({
+          type: 'audio',
+          audioBase64: content.audioBase64,
+          audioURL: content.audioURL,
+          mimeType: content.mimeType || 'audio/webm',
+          duration: content.duration || 0,
+        });
+      } else {
+        // Handle text content
+        payload.message = content;
+      }
+
+      console.log('Sending to webhook with payload:', payload);
+
+      const response = await fetch('/api/landeiro-chat-ia', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      console.log("Received response from landeiro-chat-ia:", data);
+      const result = await response.json();
+      console.log('AI response received:', result);
 
-      // Handle audio or text response
-      if (data.type === 'audio') {
-        return {
-          type: 'audio',
-          audioBase64: `data:${data.mimeType};base64,${data.base64}`,
-          mimeType: data.mimeType,
-          message: data.text || '', // Optional text with audio
-        };
-      } else {
-        return data.message || "Desculpe, não consegui processar sua mensagem.";
-      }
+      return result;
     } catch (error) {
-      console.error("Error sending message to landeiro-chat-ia:", error);
-      throw new Error(
-        "Falha ao enviar mensagem. Verifique sua conexão e tente novamente.",
-      );
+      console.error('Error sending message to AI:', error);
+      throw error;
     }
   }
 
-  static formatTimestamp(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60);
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-    if (diffHours < 1) {
-      return "Agora mesmo";
-    } else if (diffHours < 24) {
-      const hours = Math.floor(diffHours);
-      return `há ${hours} ${hours === 1 ? "hora" : "horas"}`;
-    } else if (diffDays < 7) {
-      const days = Math.floor(diffDays);
-      return `há ${days} ${days === 1 ? "dia" : "dias"}`;
-    } else {
-      return date.toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
-    }
+  static generateThreadTitle(content) {
+    const maxLength = 50;
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength).trim() + "...";
   }
 }
