@@ -505,7 +505,6 @@ export default function Chat() {
         </div>
 
         {/* Session Tabs - only show if we have a threadId */}
-        {console.log('Rendering SessionTabs check - threadId:', threadId, 'currentThread:', currentThread?.id)}
         {threadId && (
           <SessionTabs
             threadId={threadId}

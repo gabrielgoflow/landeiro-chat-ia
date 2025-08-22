@@ -73,11 +73,35 @@ export function SessionTabs({
           
         } else {
           console.warn('Failed to load thread sessions')
-          setSessions([])
+          // Mesmo sem dados do banco, mostrar aba simbólica da sessão 1
+          const symbolicSession = {
+            chat_id: currentChatId || 'new',
+            thread_id: threadId,
+            diagnostico: 'Nova Sessão',
+            protocolo: 'tcc',
+            sessao: 1,
+            created_at: new Date(),
+            status: 'em_andamento',
+            chat_reviews: []
+          }
+          setSessions([symbolicSession])
+          setActiveSession('1')
         }
       } catch (apiError) {
         console.error('Error using thread sessions API:', apiError)
-        setSessions([])
+        // Mesmo com erro de API, mostrar aba simbólica da sessão 1
+        const symbolicSession = {
+          chat_id: currentChatId || 'new',
+          thread_id: threadId,
+          diagnostico: 'Nova Sessão',
+          protocolo: 'tcc',
+          sessao: 1,
+          created_at: new Date(),
+          status: 'em_andamento',
+          chat_reviews: []
+        }
+        setSessions([symbolicSession])
+        setActiveSession('1')
       }
       
     } catch (error) {
