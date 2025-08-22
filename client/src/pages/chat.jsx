@@ -65,6 +65,9 @@ export default function Chat() {
   // Initialize based on chatId parameter
   useEffect(() => {
     const initializeChat = async () => {
+      // Reset session finalized state when navigating
+      setIsCurrentSessionFinalized(false);
+      
       if (chatId && chatId !== 'new') {
         // Load specific chat by ID
         const existingThread = threads.find(t => t.id === chatId);

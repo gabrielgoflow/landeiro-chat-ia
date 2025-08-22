@@ -55,6 +55,13 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
   - `/api/thread-sessions/:threadId` - Retrieves all sessions for a thread
   - Enhanced session management in SupabaseService with `createNextSession()` method
 
+**Independent Message System (Fixed August 2025)**:
+- **Per-Session Messages**: Each session now loads only its own messages from `chat_messages` table
+- **Database Storage**: Messages saved to `chat_messages` table instead of shared OpenAI Assistant history
+- **ChatService Integration**: Modified `getMessageHistory()` to use `/api/chat-messages/:chatId` endpoint
+- **Message Persistence**: Both user and AI messages automatically saved to database during conversations
+- **Session Isolation**: Sessions no longer share message history, ensuring true session independence
+
 **Separated Concerns Tables**:
 - **chat_messages**: Histórico estruturado de mensagens (NOVA)
   - chat_id (VARCHAR): Referência ao chat
