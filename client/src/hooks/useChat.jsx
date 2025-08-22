@@ -127,24 +127,24 @@ export function useChat() {
     }
   }, [user]);
 
-  const loadChatHistory = useCallback(async (threadId) => {
+  const loadChatHistory = useCallback(async (chatId, sessao = null) => {
     try {
       setIsLoading(true);
-      console.log('Loading chat history for:', threadId);
+      console.log('Loading chat history for:', chatId, 'session:', sessao);
       
-      // Use the threadId (which is actually our chat_id) to load history
-      const historyMessages = await ChatService.getMessageHistory(threadId);
+      // Always use chat_messages table with session filtering
+      const historyMessages = await ChatService.getMessageHistory(chatId);
       
       // Update chat history with loaded messages
       setChatHistory(prev => ({
         ...prev,
         messages: {
           ...prev.messages,
-          [threadId]: historyMessages
+          [chatId]: historyMessages
         }
       }));
 
-      console.log(`Loaded ${historyMessages.length} messages for thread ${threadId}`);
+      console.log(`Loaded ${historyMessages.length} messages for chat ${chatId}`);
     } catch (error) {
       console.error('Error loading chat history:', error);
       setError('Erro ao carregar histórico da conversa');
@@ -175,13 +175,9 @@ export function useChat() {
     const existingMessages = chatHistory.messages[threadId];
     console.log('Existing messages for thread:', existingMessages?.length || 0);
     
-    if (!existingMessages || existingMessages.length === 0) {
-      console.log('No existing messages, loading history...');
-      // Load history from OpenAI if we don't have local messages
-      await loadChatHistory(threadId);
-    } else {
-      console.log('Using existing messages');
-    }
+    // Always load fresh messages from chat_messages table for the specific session
+    console.log('Loading fresh messages from chat_messages table...');
+    await loadChatHistory(threadId);
   }, [chatHistory.threads, chatHistory.messages, loadChatHistory, createThreadFromSupabase]);
 
   // Method to force reload a thread (useful for new sessions)

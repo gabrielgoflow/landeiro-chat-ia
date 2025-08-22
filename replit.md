@@ -67,7 +67,8 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 - **Session-Based Queries**: New `/api/session-messages/:threadId/:sessao` endpoint for thread+session filtering
 - **Enhanced ChatService**: Added `getSessionMessages()` method for retrieving messages by thread_id and session number
 - **Database Migration Applied**: Existing messages updated with corresponding session numbers
-- **Future-Ready Architecture**: System prepared for advanced session-based message filtering when needed
+- **Eliminated External History Dependency**: System now uses only `chat_messages` table, no longer relies on external webhook for history retrieval
+- **Session Isolation Completed**: Messages properly filtered by session number ensuring complete independence between sessions
 
 **Separated Concerns Tables**:
 - **chat_messages**: Histórico estruturado de mensagens (NOVA)
