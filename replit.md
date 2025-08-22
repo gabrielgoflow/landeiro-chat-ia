@@ -71,6 +71,12 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 - **Eliminated External History Dependency**: System now uses only `chat_messages` table, no longer relies on external webhook for history retrieval
 - **Session Isolation Completed**: Messages properly filtered by session number ensuring complete independence between sessions
 
+**Session Management Bug Fix (August 2025)**:
+- **Fixed Session Creation Logic**: Corrected `createNextSession()` to maintain same `chat_id` across sessions instead of creating new ones
+- **Proper Session Isolation**: Sessions now differentiated only by `sessao` column, maintaining proper thread continuity
+- **Message Preservation**: Implemented complete preservation of local message history during navigation between sessions
+- **Asynchronous Message Display**: Fixed bug where newly sent messages required page refresh to appear in chat interface
+
 **Separated Concerns Tables**:
 - **chat_messages**: Histórico estruturado de mensagens (NOVA)
   - chat_id (VARCHAR): Referência ao chat

@@ -34,27 +34,30 @@ export class SupabaseService {
   // Criar próxima sessão (novo chat_id com mesmo thread_id)
   static async createNextSession(threadId, diagnostico, protocolo) {
     try {
-      // Primeiro, buscar a última sessão deste thread
+      // Primeiro, buscar a última sessão deste thread para obter o chat_id e sessão
       const { data: lastSession, error: lastSessionError } = await supabase
         .from('chat_threads')
-        .select('sessao')
+        .select('chat_id, sessao')
         .eq('thread_id', threadId)
         .order('sessao', { ascending: false })
         .limit(1)
         .single()
 
-      if (lastSessionError && lastSessionError.code !== 'PGRST116') {
+      if (lastSessionError) {
         throw lastSessionError
       }
 
+      // MANTER o mesmo chat_id e apenas incrementar a sessão
+      const existingChatId = lastSession.chat_id
       const newSessionNumber = (lastSession?.sessao || 0) + 1
-      const newChatId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-      // Criar novo chat_thread
+      console.log(`Creating next session for chat_id: ${existingChatId}, session: ${newSessionNumber}`)
+
+      // Criar novo chat_thread com o MESMO chat_id
       const { data: newThread, error: threadError } = await supabase
         .from('chat_threads')
         .insert({
-          chat_id: newChatId,
+          chat_id: existingChatId, // MESMO chat_id da sessão anterior
           thread_id: threadId,
           diagnostico,
           protocolo,
@@ -65,24 +68,35 @@ export class SupabaseService {
 
       if (threadError) throw threadError
 
-      // Criar relação user_chat usando usuário padrão
+      // Criar relação user_chat usando usuário padrão (se necessário)
       const userId = await SupabaseService.getCurrentUserId()
       if (userId) {
-        const { error: userChatError } = await supabase
+        // Verificar se já existe uma relação user_chat para este chat_id
+        const { data: existingUserChat } = await supabase
           .from('user_chats')
-          .insert({
-            user_id: userId,
-            chat_id: newChatId,
-            chat_threads_id: newThread.id
-          })
+          .select('id')
+          .eq('user_id', userId)
+          .eq('chat_id', existingChatId)
+          .single()
 
-        if (userChatError) console.warn('Warning: Could not create user_chat relation:', userChatError)
+        // Só criar se não existir
+        if (!existingUserChat) {
+          const { error: userChatError } = await supabase
+            .from('user_chats')
+            .insert({
+              user_id: userId,
+              chat_id: existingChatId,
+              chat_threads_id: newThread.id
+            })
+
+          if (userChatError) console.warn('Warning: Could not create user_chat relation:', userChatError)
+        }
       }
 
       return { 
         data: newThread, 
         error: null, 
-        newChatId,
+        newChatId: existingChatId, // Retorna o mesmo chat_id
         newSession: newSessionNumber 
       }
     } catch (error) {
