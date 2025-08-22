@@ -219,43 +219,45 @@ export function ChatSidebar({
                       }}
                       data-testid={`chat-${chat.chat_id}`}
                     >
-                      {/* Status Tag and Delete Button */}
-                      <div className="absolute top-2 right-2 flex items-center space-x-1">
-                        {chatReviews[chat.chat_id] ? (
-                          <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
-                            FINALIZADO
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs font-medium px-1.5 py-0.5">
-                            EM ANDAMENTO
+                      {/* Status Tags and Delete Button */}
+                      <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
+                        <div className="flex items-center space-x-1">
+                          {chatReviews[chat.chat_id] ? (
+                            <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
+                              FINALIZADO
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs font-medium px-1.5 py-0.5">
+                              EM ANDAMENTO
+                            </Badge>
+                          )}
+                          
+                          {/* Delete Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleDeleteChat(chat.chat_id, e)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            data-testid={`delete-chat-${chat.chat_id}`}
+                            title="Excluir conversa"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        
+                        {/* Session Badge - below status */}
+                        {chat.sessao && (
+                          <Badge variant="default" className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5">
+                            SESSÃO {chat.sessao}
                           </Badge>
                         )}
-                        
-                        {/* Delete Button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleDeleteChat(chat.chat_id, e)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          data-testid={`delete-chat-${chat.chat_id}`}
-                          title="Excluir conversa"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
                       </div>
                       
                       <div className="flex-1 min-w-0 pr-24">
                         <div className="flex flex-col space-y-1 mb-2">
-                          <div className="flex items-center space-x-2">
-                            <Badge variant="secondary" className="w-fit text-xs">
-                              {(chat.diagnostico || 'Diagnóstico').toUpperCase()}
-                            </Badge>
-                            {chat.sessao && (
-                              <Badge variant="default" className="w-fit text-xs bg-indigo-600">
-                                SESSÃO {chat.sessao}
-                              </Badge>
-                            )}
-                          </div>
+                          <Badge variant="secondary" className="w-fit text-xs">
+                            {(chat.diagnostico || 'Diagnóstico').toUpperCase()}
+                          </Badge>
                           <Badge variant="outline" className="w-fit text-xs">
                             {(chat.protocolo || 'Protocolo').toUpperCase()}
                           </Badge>

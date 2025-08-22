@@ -1,6 +1,6 @@
 # Overview
 
-A chat application built with React (frontend) and Express.js (backend) that provides an AI-powered conversational interface with audio messaging capabilities. The application features a modern UI with chat threads, real-time messaging, audio recording and playback, and persistent chat history stored in localStorage. It's designed to work with external AI services via webhooks while providing a clean, responsive user experience using shadcn/ui components and Tailwind CSS styling.
+A comprehensive therapy chat application built with React (frontend) and Express.js (backend) that provides an AI-powered conversational interface with advanced session management. The application features a modern UI with tabbed session interface, real-time messaging, audio recording and playback, and comprehensive review/supervision system. Each therapy session maintains independent chat history and reviews, designed specifically for TCC (Cognitive Behavioral Therapy) protocol with external AI services integration.
 
 # User Preferences
 
@@ -31,18 +31,71 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 
 **Development Storage**: In-memory storage using Map data structures for users and chat data
 
-**Supabase Database Schema**:
+**Enhanced Database Architecture (Opção 1 + Melhorias)**:
 - **Authentication**: Supabase Auth for user management and security
-- **chat_threads**: Relaciona chat interno com thread_id do OpenAI Assistant
+
+**Core Tables**:
+- **chat_threads**: Controle de sessões e metadata
   - chat_id (VARCHAR): ID único do chat interno
   - thread_id (VARCHAR): ID do thread do OpenAI Assistant  
   - diagnostico (VARCHAR): Diagnóstico selecionado (ex: ansiedade)
   - protocolo (VARCHAR): Sempre "tcc" (TCC é o protocolo padrão fixo)
+  - sessao (SMALLINT): Número da sessão de terapia (auto-incrementado por usuário)
 - **user_chats**: Relaciona user_id com chat_id do OpenAI
   - user_id (UUID): Referência ao usuário autenticado
   - chat_id (VARCHAR): ID do chat do OpenAI
   - chat_threads_id (UUID): Referência à tabela chat_threads
-- **Row Level Security (RLS)**: Implementado para garantir isolamento de dados por usuário
+
+**Session Management Implementation (Implemented August 2025)**:
+- **SessionTabs Component**: Tabbed interface showing all sessions for a thread with status indicators
+- **Session Navigation**: Independent chat histories per session while maintaining same thread_id
+- **Status Management**: Sessions automatically marked as "finalizado" when reviews exist, "em_andamento" otherwise
+- **Session Creation**: "Iniciar Próxima Sessão" button creates new sessions with unique chat_ids
+- **API Endpoints**: 
+  - `/api/thread-sessions/:threadId` - Retrieves all sessions for a thread
+  - Enhanced session management in SupabaseService with `createNextSession()` method
+
+**Independent Message System (Fixed August 2025)**:
+- **Per-Session Messages**: Each session now loads only its own messages from `chat_messages` table
+- **Database Storage**: Messages saved to `chat_messages` table instead of shared OpenAI Assistant history
+- **ChatService Integration**: Modified `getMessageHistory()` to use `/api/chat-messages/:chatId` endpoint
+- **Message Persistence**: Both user and AI messages automatically saved to database during conversations
+- **Session Isolation**: Sessions no longer share message history, ensuring true session independence
+
+**Enhanced Session Message Filtering (Implemented August 2025)**:
+- **Added `sessao` Column**: chat_messages table now includes `sessao` INTEGER field for precise session filtering
+- **Session-Based Queries**: New `/api/session-messages/:threadId/:sessao` endpoint for thread+session filtering
+- **Enhanced ChatService**: Added `getSessionMessages()` method for retrieving messages by thread_id and session number
+- **Database Migration Applied**: Existing messages updated with corresponding session numbers
+- **Eliminated External History Dependency**: System now uses only `chat_messages` table, no longer relies on external webhook for history retrieval
+- **Session Isolation Completed**: Messages properly filtered by session number ensuring complete independence between sessions
+
+**Separated Concerns Tables**:
+- **chat_messages**: Histórico estruturado de mensagens (NOVA)
+  - chat_id (VARCHAR): Referência ao chat
+  - thread_id (VARCHAR): Referência ao thread
+  - message_id (VARCHAR): ID único da mensagem
+  - sender (VARCHAR): 'user' ou 'assistant'
+  - content (TEXT): Conteúdo da mensagem
+  - message_type (VARCHAR): 'text' ou 'audio'
+  - audio_url (VARCHAR): URL do áudio (se aplicável)
+  - metadata (JSONB): Metadados da mensagem
+- **chat_reviews**: Reviews de supervisão (separados do histórico)
+  - chat_id (VARCHAR): Referência ao chat
+  - resumo_atendimento (TEXT): Resumo da sessão
+  - feedback_direto (TEXT): Feedback direto para o terapeuta
+  - sinais_paciente (ARRAY): Sinais observados no paciente
+  - pontos_positivos (ARRAY): Aspectos positivos da sessão
+  - pontos_negativos (ARRAY): Aspectos a melhorar
+  - sessao (SMALLINT): Número da sessão correspondente
+
+**Optimized Views**:
+- **v_chat_overview**: Overview completo de chats com status e estatísticas
+- **v_user_sessions**: Histórico de sessões por usuário
+
+**Performance Indexes**: Índices otimizados para chat_id, thread_id, created_at, sender
+
+**Benefits**: Separação clara review vs histórico, queries otimizadas, escalabilidade melhorada, manutenção simplificada
 
 **Database Schema** (configured but not actively used):
 - **PostgreSQL** with Drizzle ORM for type-safe database operations

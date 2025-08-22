@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, uuid, smallint } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, uuid, smallint, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -28,6 +28,21 @@ export const messages = pgTable("messages", {
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
+export const chatMessages = pgTable("chat_messages", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: varchar("chat_id").notNull(),
+  threadId: varchar("thread_id"),
+  sessao: integer("sessao").notNull(),
+  messageId: varchar("message_id").notNull(),
+  sender: varchar("sender", { enum: ["user", "assistant"] }).notNull(),
+  content: text("content").notNull(),
+  messageType: varchar("message_type").default("text"),
+  audioUrl: varchar("audio_url"),
+  metadata: jsonb("metadata").default(sql`'{}'`),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const chatReviews = pgTable("chat_reviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   chatId: varchar("chat_id").notNull().unique(),
@@ -36,6 +51,7 @@ export const chatReviews = pgTable("chat_reviews", {
   sinaisPaciente: text("sinais_paciente").array().notNull(),
   pontosPositivos: text("pontos_positivos").array().notNull(),
   pontosNegativos: text("pontos_negativos").array().notNull(),
+  sessao: smallint("sessao"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -58,6 +74,18 @@ export const insertMessageSchema = createInsertSchema(messages).pick({
   sender: true,
 });
 
+export const insertChatMessageSchema = createInsertSchema(chatMessages).pick({
+  chatId: true,
+  threadId: true,
+  sessao: true,
+  messageId: true,
+  sender: true,
+  content: true,
+  messageType: true,
+  audioUrl: true,
+  metadata: true,
+});
+
 export const insertChatReviewSchema = createInsertSchema(chatReviews).pick({
   chatId: true,
   resumoAtendimento: true,
@@ -65,6 +93,7 @@ export const insertChatReviewSchema = createInsertSchema(chatReviews).pick({
   sinaisPaciente: true,
   pontosPositivos: true,
   pontosNegativos: true,
+  sessao: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -73,6 +102,10 @@ export type ChatThread = typeof chatThreads.$inferSelect;
 export type InsertChatThread = z.infer<typeof insertChatThreadSchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatReview = typeof chatReviews.$inferSelect;
+export type InsertChatReview = z.infer<typeof insertChatReviewSchema>;
 export type ChatReview = typeof chatReviews.$inferSelect;
 export type InsertChatReview = z.infer<typeof insertChatReviewSchema>;
 
