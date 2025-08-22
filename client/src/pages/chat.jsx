@@ -48,7 +48,8 @@ export default function Chat() {
     createThreadFromSupabase,
     reloadThread,
     clearError,
-    clearMessages
+    clearMessages,
+    setMessages
   } = useChat();
 
   // Auto-scroll to bottom when new messages are added

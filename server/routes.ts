@@ -159,6 +159,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para buscar mensagens por chat_id e sessao
+  app.get("/api/messages/:chatId/:sessao", async (req, res) => {
+    try {
+      const { chatId, sessao } = req.params;
+      const sessionNumber = parseInt(sessao);
+      console.log(`Getting messages for chat_id: ${chatId}, sessao: ${sessionNumber}`);
+      const messages = await storage.getChatMessagesBySession(chatId, sessionNumber);
+      res.json(messages);
+    } catch (error: any) {
+      console.error('Error getting session messages:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/chat-messages/:chatId", async (req, res) => {
     try {
       const { chatId } = req.params;

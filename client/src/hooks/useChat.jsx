@@ -431,6 +431,16 @@ export function useChat() {
           [chatId]: []
         }
       }));
+    },
+    setMessages: (chatId, messages) => {
+      console.log('Setting messages for chat:', chatId, 'count:', messages.length);
+      setChatHistory(prev => ({
+        ...prev,
+        messages: {
+          ...prev.messages,
+          [chatId]: messages
+        }
+      }));
     }
   };
 }

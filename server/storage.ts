@@ -222,6 +222,18 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getChatMessagesBySession(chatId: string, sessao: number, limit = 100): Promise<ChatMessage[]> {
+    if (!db) throw new Error("Database not connected");
+    const result = await db.select().from(chatMessages)
+      .where(and(
+        eq(chatMessages.chatId, chatId),
+        eq(chatMessages.sessao, sessao)
+      ))
+      .orderBy(chatMessages.createdAt)
+      .limit(limit);
+    return result;
+  }
+
   async getChatStats(chatId: string): Promise<any> {
     if (!db) throw new Error("Database not connected");
     
