@@ -187,20 +187,25 @@ export default function Chat() {
     // Callback para atualizar sidebar quando novo chat é criado
     const onChatCreated = (newThreadData) => {
       console.log('Chat created callback triggered - updating sidebar refresh trigger');
+      console.log('New thread data received:', newThreadData);
+      
+      // Atualizar threadId imediatamente para mostrar SessionTabs
+      // Usar o chat_id como threadId temporário até o OpenAI retornar o thread_id real
+      const tempThreadId = newThreadData?.id || newThreadData?.threadId;
+      if (tempThreadId) {
+        console.log('Setting threadId immediately for SessionTabs:', tempThreadId);
+        setThreadId(tempThreadId);
+        setCurrentSessionData(newThreadData.sessionData);
+      }
+      
+      // Atualizar sidebar
       setSidebarRefreshTrigger(prev => {
         const newValue = prev + 1;
         console.log('Sidebar refresh trigger updated from', prev, 'to', newValue);
         return newValue;
       });
       
-      // Atualizar threadId imediatamente para mostrar SessionTabs
-      if (newThreadData?.threadId) {
-        console.log('Setting threadId immediately for SessionTabs:', newThreadData.threadId);
-        setThreadId(newThreadData.threadId);
-        setCurrentSessionData(newThreadData.sessionData);
-      }
-      
-      // Forçar atualização das abas de sessão após um pequeno delay para sincronização
+      // Forçar atualização das abas de sessão após pequeno delay
       setTimeout(() => {
         setSidebarRefreshTrigger(prev => prev + 1);
       }, 100);
@@ -500,6 +505,7 @@ export default function Chat() {
         </div>
 
         {/* Session Tabs - only show if we have a threadId */}
+        {console.log('Rendering SessionTabs check - threadId:', threadId, 'currentThread:', currentThread?.id)}
         {threadId && (
           <SessionTabs
             threadId={threadId}
