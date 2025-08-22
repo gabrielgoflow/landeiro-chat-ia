@@ -45,6 +45,7 @@ export default function Chat() {
     deleteThread,
     sendMessage,
     createThreadFromSupabase,
+    reloadThread,
     clearError
   } = useChat();
 
@@ -264,15 +265,18 @@ export default function Chat() {
           updatedAt: new Date(),
         };
         
-        // Atualizar o estado local
-        setCurrentThread(newThread);
-        setCurrentMessages([]); // Limpar mensagens
+        // Limpar estado local primeiro
         setHasReview(false);
         setCurrentReview(null);
         setShowReviewSidebar(false);
         
         // Navegar para o novo chat
         navigate(`/chat/${newChatId}`);
+        
+        // Forçar reload do thread para garantir sincronização
+        setTimeout(() => {
+          reloadThread(newChatId);
+        }, 100);
         
       } else {
         console.error('Error starting next session:', error);

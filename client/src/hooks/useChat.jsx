@@ -183,6 +183,26 @@ export function useChat() {
     }
   }, [chatHistory.threads, chatHistory.messages, loadChatHistory, createThreadFromSupabase]);
 
+  // Method to force reload a thread (useful for new sessions)
+  const reloadThread = useCallback(async (threadId) => {
+    console.log('Force reloading thread:', threadId);
+    
+    // Clear existing messages for this thread
+    setChatHistory(prev => ({
+      ...prev,
+      messages: { ...prev.messages, [threadId]: [] }
+    }));
+    
+    // Remove thread from local storage to force recreation
+    setChatHistory(prev => ({
+      threads: prev.threads.filter(t => t.id !== threadId),
+      messages: prev.messages
+    }));
+    
+    // Recreate thread and load history
+    await selectThread(threadId);
+  }, [selectThread]);
+
   const deleteThread = useCallback(async (threadId) => {
     setChatHistory(prev => {
       const newMessages = { ...prev.messages };
@@ -340,6 +360,7 @@ export function useChat() {
     deleteThread,
     sendMessage,
     createThreadFromSupabase,
+    reloadThread,
     clearError: () => setError(null)
   };
 }
