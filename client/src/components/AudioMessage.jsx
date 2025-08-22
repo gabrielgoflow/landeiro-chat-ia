@@ -7,59 +7,16 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [audioSrc, setAudioSrc] = useState(null);
   const audioRef = useRef(null);
-
-  // Debug props
-  console.log('AudioMessage props:', { 
-    hasAudioUrl: !!audioUrl, 
-    hasAudioBase64: !!audioBase64, 
-    audioBase64Length: audioBase64?.length,
-    audioBase64Preview: audioBase64?.substring(0, 50),
-    mimeType, 
-    sender 
-  });
 
   // Debug props only when missing data
   if (!audioUrl && !audioBase64) {
     console.warn('AudioMessage missing audio source:', { audioUrl, audioBase64, sender });
   }
 
-  // Create blob URL from base64 when component mounts
-  useEffect(() => {
-    if (audioBase64) {
-      try {
-        // Handle base64 with or without data URL prefix
-        let base64Data = audioBase64;
-        if (base64Data.startsWith('data:')) {
-          base64Data = base64Data.split(',')[1];
-        }
-        
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: mimeType });
-        const blobUrl = URL.createObjectURL(blob);
-        setAudioSrc(blobUrl);
-        
-        return () => {
-          URL.revokeObjectURL(blobUrl);
-        };
-      } catch (error) {
-        console.error('Error creating audio blob:', error);
-        setIsLoading(false);
-      }
-    } else if (audioUrl) {
-      setAudioSrc(audioUrl);
-    }
-  }, [audioBase64, audioUrl, mimeType]);
-
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !audioSrc) return;
+    if (!audio) return;
 
     const handleLoadedData = () => {
       setDuration(audio.duration || 0);
@@ -91,7 +48,7 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
     };
-  }, [audioSrc]);
+  }, [audioUrl]);
 
   const togglePlayback = () => {
     const audio = audioRef.current;
@@ -125,7 +82,7 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
     `}>
       <audio 
         ref={audioRef} 
-        src={audioSrc}
+        src={audioBase64 || audioUrl}
         preload="metadata"
         className="hidden"
       />

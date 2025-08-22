@@ -51,7 +51,6 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 - **Session Navigation**: Independent chat histories per session while maintaining same thread_id
 - **Status Management**: Sessions automatically marked as "finalizado" when reviews exist, "em_andamento" otherwise
 - **Session Creation**: "Iniciar Próxima Sessão" button creates new sessions with unique chat_ids
-- **Session Stability (Fixed August 2025)**: Removed automatic polling that caused unwanted session switching - sessions now only load on navigation
 - **API Endpoints**: 
   - `/api/thread-sessions/:threadId` - Retrieves all sessions for a thread
   - Enhanced session management in SupabaseService with `createNextSession()` method
@@ -70,28 +69,6 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 - **Database Migration Applied**: Existing messages updated with corresponding session numbers
 - **Eliminated External History Dependency**: System now uses only `chat_messages` table, no longer relies on external webhook for history retrieval
 - **Session Isolation Completed**: Messages properly filtered by session number ensuring complete independence between sessions
-
-**Audio Message Bug Fix (August 2025)**:
-- **Fixed Audio Message Storage**: Corrected audio message saving to store complete JSON data with base64 in the `content` field instead of just "Mensagem de áudio"
-- **Webhook Response Integration**: Updated code to use correct `base64` field from AI webhook response instead of `audioBase64`  
-- **Audio Message Recovery**: Fixed audio message loading from database by properly parsing JSON content with audioBase64 data
-- **Session Independence**: Audio messages now properly isolated per session with complete playback functionality
-- **System Validation**: Confirmed new audio messages are saved correctly with full base64 data and can be retrieved from database
-
-**Session Management Bug Fix (August 2025)**:
-- **Fixed Session Creation Logic**: Corrected `createNextSession()` to maintain same `chat_id` across sessions instead of creating new ones
-- **Proper Session Isolation**: Sessions now differentiated only by `sessao` column, maintaining proper thread continuity
-- **Message Preservation**: Implemented complete preservation of local message history during navigation between sessions
-- **Asynchronous Message Display**: Fixed bug where newly sent messages required page refresh to appear in chat interface
-
-**Immediate UI Updates Implementation (August 2025)**:
-- **Instant Session Badges**: ChatSidebar now shows "SESSÃO 1" badge immediately when new chat is created, with fallback logic for all edge cases
-- **Always-Visible Session Tabs**: SessionTabs component always displays at least one session tab, even for new chats without database entries
-- **Removed Loading Dependencies**: Eliminated loading states that blocked UI rendering, ensuring immediate visual feedback
-- **Review-Based Input Disable**: MessageInput automatically becomes read-only when chat has review in chat_reviews table, showing "Atendimento finalizado" overlay
-- **Session Column in Reviews**: Reviews now include `sessao` column to track which session number the review corresponds to
-- **Page Refresh on New Session**: "Iniciar Próxima Sessão" button now refreshes the page after creating new session to ensure clean state
-- **Session-Based Message Loading**: Tab navigation now loads messages from `chat_messages` table filtered by `chat_id` and `sessao` for proper session isolation
 
 **Separated Concerns Tables**:
 - **chat_messages**: Histórico estruturado de mensagens (NOVA)

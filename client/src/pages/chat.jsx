@@ -29,8 +29,6 @@ export default function Chat() {
   const [currentSessionData, setCurrentSessionData] = useState(null);
   const [threadId, setThreadId] = useState(null);
   const [isCurrentSessionFinalized, setIsCurrentSessionFinalized] = useState(false);
-  const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
-  const [sessions, setSessions] = useState([]);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -50,8 +48,7 @@ export default function Chat() {
     createThreadFromSupabase,
     reloadThread,
     clearError,
-    clearMessages,
-    loadChatHistory
+    clearMessages
   } = useChat();
 
   // Auto-scroll to bottom when new messages are added
@@ -106,31 +103,14 @@ export default function Chat() {
     }
   }, [chatId, threads, selectThread, startNewThread, createThreadFromSupabase]);
 
-  // Extract threadId from current thread and load sessions
+  // Extract threadId from current thread
   useEffect(() => {
     if (currentThread?.threadId) {
       setThreadId(currentThread.threadId);
       setCurrentSessionData(currentThread.sessionData);
-      
-      // Load sessions for this thread
-      const loadSessions = async () => {
-        try {
-          const response = await fetch(`/api/thread-sessions/${currentThread.threadId}`);
-          if (response.ok) {
-            const sessionsData = await response.json();
-            console.log('Loaded sessions for thread:', sessionsData);
-            setSessions(sessionsData);
-          }
-        } catch (error) {
-          console.error('Error loading sessions:', error);
-        }
-      };
-      
-      loadSessions();
     } else {
       setThreadId(null);
       setCurrentSessionData(null);
-      setSessions([]);
     }
   }, [currentThread]);
 
@@ -202,35 +182,8 @@ export default function Chat() {
     await sendMessage(message);
   };
 
-  const handleNewChatConfirm = async (formData) => {
-    // Callback para atualizar sidebar quando novo chat é criado
-    const onChatCreated = (newThreadData) => {
-      console.log('Chat created callback triggered - updating sidebar refresh trigger');
-      console.log('New thread data received:', newThreadData);
-      
-      // Atualizar threadId imediatamente para mostrar SessionTabs
-      // Usar o chat_id como threadId temporário até o OpenAI retornar o thread_id real
-      const tempThreadId = newThreadData?.id || newThreadData?.threadId;
-      if (tempThreadId) {
-        console.log('Setting threadId immediately for SessionTabs:', tempThreadId);
-        setThreadId(tempThreadId);
-        setCurrentSessionData(newThreadData.sessionData);
-      }
-      
-      // Atualizar sidebar
-      setSidebarRefreshTrigger(prev => {
-        const newValue = prev + 1;
-        console.log('Sidebar refresh trigger updated from', prev, 'to', newValue);
-        return newValue;
-      });
-      
-      // Forçar atualização das abas de sessão após pequeno delay
-      setTimeout(() => {
-        setSidebarRefreshTrigger(prev => prev + 1);
-      }, 100);
-    };
-    
-    await startNewThread(formData, onChatCreated);
+  const handleNewChatConfirm = (formData) => {
+    startNewThread(formData);
     setShowNewChatDialog(false);
   };
 
@@ -262,8 +215,7 @@ export default function Chat() {
           feedbackDireto: reviewOutput.feedbackDireto,
           sinaisPaciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
           pontosPositivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
-          pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item),
-          sessao: currentThread.sessionData?.sessao || 1
+          pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item)
         };
         
         // Save review to our database
@@ -336,11 +288,6 @@ export default function Chat() {
           reloadThread(newChatId);
         }, 100);
         
-        // Refresh da página para garantir estado limpo
-        setTimeout(() => {
-          window.location.reload();
-        }, 200);
-        
       } else {
         console.error('Error starting next session:', error);
       }
@@ -368,29 +315,7 @@ export default function Chat() {
       clearMessages(sessionChatId);
     }
     
-    // Se é a mesma thread (mesmo thread_id), apenas trocar a sessão localmente
-    if (currentThread && currentThread.threadId) {
-      // Encontrar a sessão correspondente
-      const selectedSession = sessions?.find(s => s.chat_id === sessionChatId);
-      if (selectedSession) {
-        console.log(`Loading session ${selectedSession.sessao} messages for thread ${currentThread.threadId}`);
-        
-        // Carregar mensagens específicas da sessão usando chat_id e sessao
-        loadChatHistory(sessionChatId, selectedSession.sessao);
-        
-        // Atualizar dados da sessão local
-        setCurrentSessionData({
-          ...currentThread.sessionData,
-          sessao: selectedSession.sessao
-        });
-        
-        // Navegar para nova URL sem reload completo
-        navigate(`/chat/${sessionChatId}`, { replace: true });
-        return;
-      }
-    }
-    
-    // Fallback: navegação completa para nova sessão
+    // Navegar para a nova sessão - isso vai disparar o carregamento das mensagens corretas
     navigate(`/chat/${sessionChatId}`);
   };
 
@@ -443,7 +368,6 @@ export default function Chat() {
         onStartNewThread={() => setShowNewChatDialog(true)}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        refreshTrigger={sidebarRefreshTrigger}
       />
 
       {/* Main Chat Area */}
@@ -551,15 +475,16 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Session Tabs - always show, even for new chats */}
-        <SessionTabs
-          threadId={threadId || currentThread?.id || 'new'}
-          currentChatId={currentThread?.id}
-          onSessionChange={handleSessionChange}
-          onNewSession={handleNewSessionFromTabs}
-          refreshTrigger={sidebarRefreshTrigger}
-          className="border-b"
-        />
+        {/* Session Tabs - only show if we have a threadId */}
+        {threadId && (
+          <SessionTabs
+            threadId={threadId}
+            currentChatId={currentThread?.id}
+            onSessionChange={handleSessionChange}
+            onNewSession={handleNewSessionFromTabs}
+            className="border-b"
+          />
+        )}
 
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0" data-testid="messages-container">
@@ -616,7 +541,7 @@ export default function Chat() {
 
         {/* Debug Info (Admin only) */}
         {user?.email === 'admin@goflow.digital' && (
-          <div className="px-4 pb-2 space-x-2">
+          <div className="px-4 pb-2">
             <Button
               variant="ghost"
               size="sm"
@@ -625,20 +550,6 @@ export default function Chat() {
             >
               <i className="fas fa-bug mr-1"></i>
               {showDebug ? 'Ocultar Debug' : 'Mostrar Debug'}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                clearMessages();
-                if (currentThread?.id) {
-                  reloadThread(currentThread.id);
-                }
-              }}
-              className="text-xs text-red-500 hover:text-red-700"
-            >
-              <i className="fas fa-refresh mr-1"></i>
-              Recarregar Mensagens
             </Button>
           </div>
         )}
@@ -655,7 +566,7 @@ export default function Chat() {
           isLoading={isLoading}
           error={error}
           onClearError={clearError}
-          isFinalized={hasReview || isCurrentSessionFinalized}
+          isFinalized={isCurrentSessionFinalized}
         />
       </div>
       

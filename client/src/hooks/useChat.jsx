@@ -10,7 +10,6 @@ export function useChat() {
   const [currentThreadId, setCurrentThreadId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [skipNextReload, setSkipNextReload] = useState(false);
 
   // Load chat history from localStorage on mount
   useEffect(() => {
@@ -114,7 +113,7 @@ export function useChat() {
     }
   }, [user]);
 
-  const startNewThread = useCallback(async (sessionData = null, onChatCreated = null) => {
+  const startNewThread = useCallback(async (sessionData = null) => {
     const newThread = ChatService.createNewThread(sessionData);
     
     // Save to local storage first
@@ -160,18 +159,6 @@ export function useChat() {
           }));
           
           console.log(`Thread saved to Supabase successfully - Session ${sessionNumber}`);
-          
-          // Create updated thread data with complete info for callback
-          const updatedThreadData = {
-            ...newThread,
-            sessionData: { ...newThread.sessionData, sessao: sessionNumber }
-          };
-          
-          // Notify that a new chat was created (for sidebar refresh)
-          if (onChatCreated) {
-            console.log('Calling onChatCreated callback to refresh sidebar');
-            onChatCreated(updatedThreadData);
-          }
         } else {
           console.error('Error saving to Supabase:', chatThreadError);
         }
@@ -210,25 +197,14 @@ export function useChat() {
       console.log('Using fallback individual chat messages loading for:', chatId);
       const historyMessages = await ChatService.getMessageHistory(chatId);
       
-      // Only update if there are no existing messages or if loaded messages are newer
-      setChatHistory(prev => {
-        const existingMessages = prev.messages[chatId] || [];
-        const loadedMessages = historyMessages || [];
-        
-        // If we have more messages locally than from DB, preserve local messages
-        if (existingMessages.length > loadedMessages.length) {
-          console.log(`Preserving local messages (${existingMessages.length}) over DB messages (${loadedMessages.length})`);
-          return prev;
+      // Update chat history with loaded messages (even if empty array)
+      setChatHistory(prev => ({
+        ...prev,
+        messages: {
+          ...prev.messages,
+          [chatId]: historyMessages || []
         }
-        
-        return {
-          ...prev,
-          messages: {
-            ...prev.messages,
-            [chatId]: loadedMessages
-          }
-        };
-      });
+      }));
 
       console.log(`Loaded ${historyMessages.length} messages from chat_messages table for session:`, chatId);
     } catch (error) {
@@ -242,8 +218,15 @@ export function useChat() {
   const selectThread = useCallback(async (threadId) => {
     console.log('Selecting thread:', threadId);
     
-    // NUNCA limpar mensagens - sempre preservar o histórico local
-    console.log('Preserving all existing messages during navigation');
+    // SEMPRE limpar mensagens primeiro para garantir isolamento entre sessões
+    console.log('Clearing messages for thread isolation:', threadId);
+    setChatHistory(prev => ({
+      ...prev,
+      messages: {
+        ...prev.messages,
+        [threadId]: []
+      }
+    }));
     
     // Check if thread exists locally
     const existingThread = chatHistory.threads.find(t => t.id === threadId);
@@ -260,14 +243,9 @@ export function useChat() {
     setCurrentThreadId(threadId);
     setError(null);
     
-    // Sempre carregar mensagens da base se não temos mensagens locais
-    const existingMessages = chatHistory.messages[threadId] || [];
-    if (existingMessages.length === 0) {
-      console.log('Loading fresh messages from database...');
-      await loadChatHistory(threadId);
-    } else {
-      console.log('Using existing local messages, skipping database load');
-    }
+    // SEMPRE carregar mensagens frescas após limpar - usando apenas um método
+    console.log('Loading fresh messages from database...');
+    await loadChatHistory(threadId);
   }, [chatHistory.threads, loadChatHistory, createThreadFromSupabase]);
 
   // Method to force reload a thread (useful for new sessions)
@@ -374,7 +352,6 @@ export function useChat() {
 
     setIsLoading(true);
     setError(null);
-    setSkipNextReload(true); // Evita reload automático durante envio
 
     try {
       // Get current thread to access session data
@@ -405,8 +382,8 @@ export function useChat() {
         // Create audio message from AI response
         aiMessage = ChatService.createUserMessage(threadId, {
           type: 'audio',
-          audioBase64: aiResponse.base64, // Use 'base64' from webhook response
-          mimeType: aiResponse.mimeType || 'audio/mp3',
+          audioBase64: aiResponse.audioBase64,
+          mimeType: aiResponse.mimeType,
           duration: 0
         });
         aiMessage.sender = 'assistant'; // Override sender for AI audio messages
@@ -418,15 +395,10 @@ export function useChat() {
           sessao: sessionData?.sessao || 1,
           messageId: aiMessage.id,
           sender: 'assistant',
-          content: JSON.stringify({
-            type: 'audio',
-            audioBase64: aiResponse.base64, // Use 'base64' from webhook response
-            mimeType: aiResponse.mimeType || 'audio/mp3',
-            duration: 0
-          }),
+          content: aiResponse.message || 'Mensagem de áudio',
           messageType: 'audio',
-          audioUrl: null,
-          metadata: { mimeType: aiResponse.mimeType || 'audio/mp3' }
+          audioUrl: null, // We store base64 in content for audio messages
+          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.audioBase64 }
         });
       } else {
         // Create text message
@@ -447,7 +419,6 @@ export function useChat() {
         });
       }
 
-      // Update state immediately for real-time UI
       setChatHistory(prev => ({
         threads: prev.threads.map(thread => 
           thread.id === threadId 
@@ -463,23 +434,11 @@ export function useChat() {
         }
       }));
 
-      // Force a UI update to ensure messages are visible immediately
-      setTimeout(() => {
-        setChatHistory(prev => ({
-          ...prev,
-          messages: {
-            ...prev.messages,
-            [threadId]: [...prev.messages[threadId]]
-          }
-        }));
-      }, 100);
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
       setError(errorMessage);
     } finally {
       setIsLoading(false);
-      setSkipNextReload(false); // Reset flag após envio completo
     }
   }, [currentThreadId, chatHistory]);
 
@@ -506,7 +465,6 @@ export function useChat() {
     sendMessage,
     createThreadFromSupabase,
     reloadThread,
-    loadChatHistory,
     clearError: () => setError(null),
     clearMessages: (chatId) => {
       console.log('Clearing messages for chat:', chatId);

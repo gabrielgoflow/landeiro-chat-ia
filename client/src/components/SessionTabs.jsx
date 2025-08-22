@@ -10,64 +10,33 @@ export function SessionTabs({
   currentChatId, 
   onSessionChange, 
   onNewSession,
-  className = "",
-  refreshTrigger // Novo prop para forçar atualização quando necessário
+  className = "" 
 }) {
-  // Inicializar com sessão padrão para mostrar imediatamente
-  const [sessions, setSessions] = useState([{
-    chat_id: 'new',
-    thread_id: 'new',
-    diagnostico: 'Nova Sessão',
-    protocolo: 'tcc',
-    sessao: 1,
-    created_at: new Date(),
-    status: 'em_andamento',
-    chat_reviews: []
-  }])
-  const [loading, setLoading] = useState(false)
-  const [activeSession, setActiveSession] = useState('1')
+  const [sessions, setSessions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [activeSession, setActiveSession] = useState(null)
 
   useEffect(() => {
-    if (threadId && threadId !== 'new') {
+    if (threadId) {
       loadSessions()
-    } else {
-      // Para novos chats, mostrar sessão simbólica imediatamente
-      const symbolicSession = {
-        chat_id: currentChatId || threadId || 'new',
-        thread_id: threadId || 'new',
-        diagnostico: 'Nova Sessão',
-        protocolo: 'tcc',
-        sessao: 1,
-        created_at: new Date(),
-        status: 'em_andamento',
-        chat_reviews: []
-      }
-      setSessions([symbolicSession])
-      setActiveSession('1')
     }
-  }, [threadId, refreshTrigger, currentChatId]) // Recarrega quando threadId ou refreshTrigger mudam
+  }, [threadId])
 
-  // Removido polling automático - carrega apenas quando há navegação real
-  // Isso evita mudanças indesejadas de sessão durante o uso
+  // Polling para atualizar sessões automaticamente (detectar reviews criados)
+  useEffect(() => {
+    if (!threadId) return;
+
+    const interval = setInterval(() => {
+      loadSessions();
+    }, 30000); // Verifica a cada 30 segundos (menos agressivo)
+
+    return () => clearInterval(interval);
+  }, [threadId]);
 
   const loadSessions = async () => {
     try {
       setLoading(true)
       console.log('Loading sessions for threadId:', threadId)
-      
-      // Primeiro, criar sessão simbólica imediatamente para UI responsiva
-      const symbolicSession = {
-        chat_id: currentChatId || threadId,
-        thread_id: threadId,
-        diagnostico: 'Nova Sessão',
-        protocolo: 'tcc',
-        sessao: 1,
-        created_at: new Date(),
-        status: 'em_andamento',
-        chat_reviews: []
-      }
-      setSessions([symbolicSession])
-      setActiveSession('1')
       
       // Usar a nova API para buscar todas as sessões do thread
       try {
@@ -99,47 +68,19 @@ export function SessionTabs({
           
           // Encontrar a sessão atual baseada no currentChatId
           const currentSession = formattedSessions.find(s => s.chat_id === currentChatId)
-          
           if (currentSession) {
             setActiveSession(currentSession.sessao.toString())
-          } else if (formattedSessions.length > 0 && !activeSession) {
-            // Só definir a primeira sessão se ainda não temos uma sessão ativa
-            // Isso evita que o polling resete a sessão ativa
+          } else if (formattedSessions.length > 0) {
             setActiveSession(formattedSessions[0].sessao.toString())
           }
-          // Se não encontrar a sessão atual mas já temos uma ativa, preserva a ativa
           
         } else {
           console.warn('Failed to load thread sessions')
-          // Mesmo sem dados do banco, mostrar aba simbólica da sessão 1
-          const symbolicSession = {
-            chat_id: currentChatId || 'new',
-            thread_id: threadId,
-            diagnostico: 'Nova Sessão',
-            protocolo: 'tcc',
-            sessao: 1,
-            created_at: new Date(),
-            status: 'em_andamento',
-            chat_reviews: []
-          }
-          setSessions([symbolicSession])
-          setActiveSession('1')
+          setSessions([])
         }
       } catch (apiError) {
         console.error('Error using thread sessions API:', apiError)
-        // Mesmo com erro de API, mostrar aba simbólica da sessão 1
-        const symbolicSession = {
-          chat_id: currentChatId || 'new',
-          thread_id: threadId,
-          diagnostico: 'Nova Sessão',
-          protocolo: 'tcc',
-          sessao: 1,
-          created_at: new Date(),
-          status: 'em_andamento',
-          chat_reviews: []
-        }
-        setSessions([symbolicSession])
-        setActiveSession('1')
+        setSessions([])
       }
       
     } catch (error) {
@@ -161,27 +102,28 @@ export function SessionTabs({
     onNewSession?.()
   }
 
-  // Sempre mostrar pelo menos uma sessão simbólica - não retornar loading vazio
-  const displaySessions = sessions.length > 0 ? sessions : [{
-    chat_id: currentChatId || threadId,
-    thread_id: threadId,
-    diagnostico: 'Nova Sessão',
-    protocolo: 'tcc',
-    sessao: 1,
-    created_at: new Date(),
-    status: 'em_andamento',
-    chat_reviews: []
-  }]
-  
-  // Garantir que activeSession sempre tenha um valor válido
-  const effectiveActiveSession = activeSession || '1'
+  if (loading) {
+    return (
+      <div className={`flex items-center justify-center p-4 ${className}`}>
+        <div className="text-sm text-gray-500">Carregando sessões...</div>
+      </div>
+    )
+  }
+
+  if (!sessions.length) {
+    return (
+      <div className={`flex items-center justify-center p-4 ${className}`}>
+        <div className="text-sm text-gray-500">Nenhuma sessão encontrada</div>
+      </div>
+    )
+  }
 
   return (
     <div className={`border-b bg-white ${className}`}>
-      <Tabs value={effectiveActiveSession} onValueChange={handleSessionSelect} className="w-full">
+      <Tabs value={activeSession} onValueChange={handleSessionSelect} className="w-full">
         <div className="flex items-center justify-between px-4 py-2">
           <TabsList className="flex-1 justify-start bg-gray-50">
-            {displaySessions.map((session) => (
+            {sessions.map((session) => (
               <TabsTrigger 
                 key={session.sessao} 
                 value={session.sessao.toString()}

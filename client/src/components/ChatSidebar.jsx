@@ -18,8 +18,7 @@ export function ChatSidebar({
   onDeleteThread,
   onStartNewThread,
   isOpen,
-  onClose,
-  refreshTrigger
+  onClose
 }) {
   const isMobile = useIsMobile();
   const { user, signOut } = useAuth();
@@ -67,41 +66,21 @@ export function ChatSidebar({
             reviewStatuses[chat.chat_id] = response.ok;
             
             // Load thread sessions to get latest session info
-            // For new chats without thread_id, use chat_id as fallback
-            const threadIdToUse = chat.thread_id || chat.chat_id;
-            if (threadIdToUse) {
-              try {
-                const sessionsResponse = await fetch(`/api/thread-sessions/${threadIdToUse}`);
-                if (sessionsResponse.ok) {
-                  const sessions = await sessionsResponse.json();
-                  if (sessions.length > 0) {
-                    // Find latest session (highest session number)
-                    const latestSession = sessions.reduce((latest, session) => 
-                      session.sessao > latest.sessao ? session : latest
-                    );
-                    sessionsData[threadIdToUse] = {
-                      latestSession: latestSession.sessao,
-                      status: latestSession.status || (latestSession.review_id ? 'finalizado' : 'em_andamento'),
-                      totalSessions: sessions.length
-                    };
-                  }
-                } else {
-                  console.log(`No sessions found for thread ${threadIdToUse}`);
-                  // Para novos chats sem sessões no banco, mostrar SESSÃO 1 como padrão
-                  sessionsData[threadIdToUse] = {
-                    latestSession: 1,
-                    status: 'em_andamento',
-                    totalSessions: 1
+            if (chat.thread_id) {
+              const sessionsResponse = await fetch(`/api/thread-sessions/${chat.thread_id}`);
+              if (sessionsResponse.ok) {
+                const sessions = await sessionsResponse.json();
+                if (sessions.length > 0) {
+                  // Find latest session (highest session number)
+                  const latestSession = sessions.reduce((latest, session) => 
+                    session.sessao > latest.sessao ? session : latest
+                  );
+                  sessionsData[chat.thread_id] = {
+                    latestSession: latestSession.sessao,
+                    status: latestSession.status || (latestSession.review_id ? 'finalizado' : 'em_andamento'),
+                    totalSessions: sessions.length
                   };
                 }
-              } catch (sessionError) {
-                console.error(`Error loading sessions for thread ${threadIdToUse}:`, sessionError);
-                // Mesmo com erro, mostrar SESSÃO 1 como padrão para novos chats
-                sessionsData[threadIdToUse] = {
-                  latestSession: 1,
-                  status: 'em_andamento',
-                  totalSessions: 1
-                };
               }
             }
           } catch (error) {
@@ -119,11 +98,8 @@ export function ChatSidebar({
       }
     };
     
-    if (refreshTrigger > 0) {
-      console.log('ChatSidebar: refreshTrigger changed to:', refreshTrigger, '- reloading chats');
-    }
     loadUserChats();
-  }, [user, refreshTrigger]);
+  }, [user]);
 
   const handleNewChatConfirm = (formData) => {
     // Chama a função original passando os dados do diagnóstico e protocolo
@@ -271,13 +247,13 @@ export function ChatSidebar({
                       {/* Status Tags and Delete Button */}
                       <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
                         <div className="flex items-center space-x-1">
-                          {threadSessions[chat.thread_id || chat.chat_id] ? (
+                          {threadSessions[chat.thread_id] ? (
                             <Badge className={`text-xs font-medium px-1.5 py-0.5 ${
-                              threadSessions[chat.thread_id || chat.chat_id].status === 'finalizado'
+                              threadSessions[chat.thread_id].status === 'finalizado'
                                 ? 'bg-green-100 text-green-800 border-green-200'
                                 : 'bg-blue-100 text-blue-800 border-blue-200'
                             }`}>
-                              {threadSessions[chat.thread_id || chat.chat_id].status === 'finalizado' ? 'FINALIZADO' : 'EM ANDAMENTO'}
+                              {threadSessions[chat.thread_id].status === 'finalizado' ? 'FINALIZADO' : 'EM ANDAMENTO'}
                             </Badge>
                           ) : chatReviews[chat.chat_id] ? (
                             <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
@@ -303,13 +279,9 @@ export function ChatSidebar({
                         </div>
                         
                         {/* Session Badge - below status */}
-                        {threadSessions[chat.thread_id || chat.chat_id] ? (
+                        {threadSessions[chat.thread_id] && (
                           <Badge variant="default" className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5">
-                            SESSÃO {threadSessions[chat.thread_id || chat.chat_id].latestSession}
-                          </Badge>
-                        ) : (
-                          <Badge variant="default" className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5">
-                            SESSÃO 1
+                            SESSÃO {threadSessions[chat.thread_id].latestSession}
                           </Badge>
                         )}
                       </div>
@@ -335,9 +307,9 @@ export function ChatSidebar({
                               minute: '2-digit'
                             })}
                           </span>
-                          {threadSessions[chat.thread_id || chat.chat_id] && threadSessions[chat.thread_id || chat.chat_id].totalSessions > 1 && (
+                          {threadSessions[chat.thread_id] && threadSessions[chat.thread_id].totalSessions > 1 && (
                             <span className="text-indigo-600 font-medium">
-                              {threadSessions[chat.thread_id || chat.chat_id].totalSessions} sessões
+                              {threadSessions[chat.thread_id].totalSessions} sessões
                             </span>
                           )}
                         </div>
