@@ -1,6 +1,31 @@
 import { supabase } from '@/lib/supabase.js'
 
 export class SupabaseService {
+  // Buscar próximo número de sessão para um usuário
+  static async getNextSessionNumber(userId) {
+    try {
+      const { data, error } = await supabase
+        .from('user_chats')
+        .select(`
+          chat_threads!inner (
+            sessao
+          )
+        `)
+        .eq('user_id', userId)
+        .not('chat_threads.sessao', 'is', null)
+        .order('chat_threads.sessao', { ascending: false })
+        .limit(1)
+
+      if (error) throw error
+      
+      const lastSession = data?.[0]?.chat_threads?.sessao || 0
+      return lastSession + 1
+    } catch (error) {
+      console.error('Error getting next session number:', error)
+      return 1 // Se houver erro, começa com sessão 1
+    }
+  }
+
   // Criar relação entre chat interno e thread_id do OpenAI
   static async createChatThread(chatId, threadId, diagnostico, protocolo, sessao = null) {
     try {

@@ -85,11 +85,16 @@ export function useChat() {
     // Save to Supabase if user is authenticated and session data exists
     if (user && sessionData) {
       try {
+        // Get next session number for this user
+        const nextSessionNumber = await SupabaseService.getNextSessionNumber(user.id);
+        console.log('Next session number for user:', nextSessionNumber);
+
         const { data: chatThreadData, error: chatThreadError } = await SupabaseService.createChatThread(
           newThread.id, // chat_id (internal thread ID)
           '', // thread_id will be empty initially - filled later by OpenAI
           sessionData.diagnostico,
-          sessionData.protocolo
+          sessionData.protocolo,
+          nextSessionNumber // automatic session number
         );
 
         if (!chatThreadError && chatThreadData) {
@@ -99,7 +104,18 @@ export function useChat() {
             newThread.id, // using internal chat ID as OpenAI chat_id for now
             chatThreadData.id
           );
-          console.log('Thread saved to Supabase successfully');
+          
+          // Update local thread with session number
+          setChatHistory(prev => ({
+            ...prev,
+            threads: prev.threads.map(t => 
+              t.id === newThread.id 
+                ? { ...t, sessionData: { ...t.sessionData, sessao: nextSessionNumber } }
+                : t
+            )
+          }));
+          
+          console.log(`Thread saved to Supabase successfully - Session ${nextSessionNumber}`);
         } else {
           console.error('Error saving to Supabase:', chatThreadError);
         }
