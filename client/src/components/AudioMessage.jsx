@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Volume2 } from 'lucide-react';
+import { Play, Pause, Volume2, Download } from 'lucide-react';
 
 export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', sender = 'user' }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState(null);
   const audioRef = useRef(null);
 
   // Debug: log audio props
@@ -64,12 +66,16 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
             // Test if base64 is valid
             atob(base64Part.substring(0, 100)); // Test first 100 chars
             console.error('Base64 appears valid, might be format/codec issue');
+            
+            // Create download URL for user as fallback
+            setDownloadUrl(audio.src);
           }
         } catch (decodeError) {
           console.error('Base64 decode error:', decodeError);
         }
       }
       
+      setHasError(true);
       setIsLoading(false);
     };
 
@@ -113,20 +119,26 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
           fallbackAudio.play().catch(fallbackError => {
             console.error('Fallback audio play error:', fallbackError);
             
-            // Last resort: try downloading and playing
-            try {
-              const link = document.createElement('a');
-              link.href = audioBase64;
-              link.download = `audio-${Date.now()}.mp3`;
-              console.log('Audio download link created - user can right-click to save');
-            } catch (downloadError) {
-              console.error('Download fallback failed:', downloadError);
-            }
+            // Set download URL as fallback
+            setDownloadUrl(audioBase64);
+            setHasError(true);
+            console.log('Audio playback failed - download option available');
           });
         }
       });
     }
     setIsPlaying(!isPlaying);
+  };
+
+  const handleDownload = () => {
+    if (downloadUrl) {
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `audio-${sender}-${Date.now()}.mp3`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const formatTime = (time) => {
@@ -152,33 +164,56 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
         className="hidden"
       />
       
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={togglePlayback}
-        disabled={isLoading}
-        className={`
-          p-2 rounded-full
-          ${sender === 'user' 
-            ? 'hover:bg-blue-400 text-white' 
-            : 'hover:bg-gray-200 text-gray-900'
-          }
-        `}
-        data-testid="play-audio-button"
-      >
-        {isLoading ? (
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-        ) : isPlaying ? (
-          <Pause className="h-4 w-4" />
-        ) : (
-          <Play className="h-4 w-4" />
+      <div className="flex space-x-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={togglePlayback}
+          disabled={isLoading || hasError}
+          className={`
+            p-2 rounded-full
+            ${sender === 'user' 
+              ? 'hover:bg-blue-400 text-white' 
+              : 'hover:bg-gray-200 text-gray-900'
+            }
+          `}
+          data-testid="play-audio-button"
+        >
+          {isLoading ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+          ) : isPlaying ? (
+            <Pause className="h-4 w-4" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
+        </Button>
+        
+        {(hasError && downloadUrl) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDownload}
+            className={`
+              p-2 rounded-full
+              ${sender === 'user' 
+                ? 'hover:bg-blue-400 text-white' 
+                : 'hover:bg-gray-200 text-gray-900'
+              }
+            `}
+            data-testid="download-audio-button"
+            title="Download audio file"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
         )}
-      </Button>
+      </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center space-x-2 mb-1">
           <Volume2 className="h-3 w-3" />
-          <span className="text-xs font-medium">Áudio</span>
+          <span className="text-xs font-medium">
+            Áudio {hasError && '(Download)'}
+          </span>
         </div>
         
         {/* Progress bar */}
