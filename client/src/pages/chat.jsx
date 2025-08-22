@@ -30,6 +30,7 @@ export default function Chat() {
   const [threadId, setThreadId] = useState(null);
   const [isCurrentSessionFinalized, setIsCurrentSessionFinalized] = useState(false);
   const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
+  const [sessions, setSessions] = useState([]);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -49,7 +50,8 @@ export default function Chat() {
     createThreadFromSupabase,
     reloadThread,
     clearError,
-    clearMessages
+    clearMessages,
+    loadChatHistory
   } = useChat();
 
   // Auto-scroll to bottom when new messages are added
@@ -104,14 +106,31 @@ export default function Chat() {
     }
   }, [chatId, threads, selectThread, startNewThread, createThreadFromSupabase]);
 
-  // Extract threadId from current thread
+  // Extract threadId from current thread and load sessions
   useEffect(() => {
     if (currentThread?.threadId) {
       setThreadId(currentThread.threadId);
       setCurrentSessionData(currentThread.sessionData);
+      
+      // Load sessions for this thread
+      const loadSessions = async () => {
+        try {
+          const response = await fetch(`/api/thread-sessions/${currentThread.threadId}`);
+          if (response.ok) {
+            const sessionsData = await response.json();
+            console.log('Loaded sessions for thread:', sessionsData);
+            setSessions(sessionsData);
+          }
+        } catch (error) {
+          console.error('Error loading sessions:', error);
+        }
+      };
+      
+      loadSessions();
     } else {
       setThreadId(null);
       setCurrentSessionData(null);
+      setSessions([]);
     }
   }, [currentThread]);
 
@@ -349,7 +368,38 @@ export default function Chat() {
       clearMessages(sessionChatId);
     }
     
-    // Navegar para a nova sessão - isso vai disparar o carregamento das mensagens corretas
+    // Se é a mesma thread (mesmo thread_id), apenas trocar a sessão localmente
+    if (currentThread && currentThread.threadId) {
+      // Encontrar a sessão correspondente
+      const selectedSession = sessions?.find(s => s.chat_id === sessionChatId);
+      if (selectedSession) {
+        console.log(`Loading session ${selectedSession.sessao} messages for thread ${currentThread.threadId}`);
+        
+        // Carregar mensagens específicas da sessão usando chat_id e sessao
+        loadChatHistory(sessionChatId, selectedSession.sessao);
+        
+        // Atualizar thread atual com dados da nova sessão
+        const updatedThread = {
+          ...currentThread,
+          id: sessionChatId,
+          openaiChatId: sessionChatId,
+          sessionData: {
+            ...currentThread.sessionData,
+            sessao: selectedSession.sessao
+          }
+        };
+        
+        // Atualizar estado local
+        setCurrentThread(updatedThread);
+        setCurrentSessionData(updatedThread.sessionData);
+        
+        // Navegar para nova URL sem reload completo
+        navigate(`/chat/${sessionChatId}`, { replace: true });
+        return;
+      }
+    }
+    
+    // Fallback: navegação completa para nova sessão
     navigate(`/chat/${sessionChatId}`);
   };
 
