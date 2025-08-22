@@ -243,7 +243,8 @@ export default function Chat() {
           feedbackDireto: reviewOutput.feedbackDireto,
           sinaisPaciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
           pontosPositivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
-          pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item)
+          pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item),
+          sessao: currentThread.sessionData?.sessao || 1
         };
         
         // Save review to our database

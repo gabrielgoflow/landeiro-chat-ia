@@ -89,6 +89,7 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 - **Always-Visible Session Tabs**: SessionTabs component always displays at least one session tab, even for new chats without database entries
 - **Removed Loading Dependencies**: Eliminated loading states that blocked UI rendering, ensuring immediate visual feedback
 - **Review-Based Input Disable**: MessageInput automatically becomes read-only when chat has review in chat_reviews table, showing "Atendimento finalizado" overlay
+- **Session Column in Reviews**: Reviews now include `sessao` column to track which session number the review corresponds to
 
 **Separated Concerns Tables**:
 - **chat_messages**: Histórico estruturado de mensagens (NOVA)
