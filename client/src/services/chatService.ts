@@ -72,18 +72,19 @@ export class ChatService {
     sessionData: { diagnostico?: string; protocolo?: string } | null = null,
     chatId: string | null = null,
   ): Promise<WebhookResponse> {
-    const request: WebhookRequest = {
+    const request: any = {
       message,
       email: USER_EMAIL,
-      chat_id: chatId || undefined,
+      chatId: chatId || threadId, // Use chatId if provided, fallback to threadId
     };
 
     // Add chat_id if provided
     if (chatId) {
       console.log("Sending message with chat_id:", chatId);
-      request.chat_id = chatId;
+      request.chatId = chatId;
     } else {
-      console.log("Sending message without chat_id");
+      console.log("Sending message without chat_id, using threadId:", threadId);
+      request.chatId = threadId;
     }
 
     // Add session data if provided
@@ -91,6 +92,8 @@ export class ChatService {
       request.diagnostico = sessionData.diagnostico;
       request.protocolo = sessionData.protocolo;
     }
+
+    console.log("Sending to webhook with payload:", request);
 
     try {
       const response = await fetch(WEBHOOK_URL, {
