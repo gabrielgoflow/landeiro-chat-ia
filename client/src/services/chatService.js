@@ -177,13 +177,18 @@ export class ChatService {
 
       // Handle audio messages
       if (msg.messageType === 'audio' || msg.message_type === 'audio') {
+        // For audio messages, the base64 is stored in content field
+        const base64Data = msg.content;
+        const metadata = msg.metadata || {};
+        
         return {
           ...baseMessage,
           type: 'audio',
           audioUrl: msg.audioUrl || msg.audio_url,
-          audioBase64: msg.audioBase64 || msg.audio_base64,
-          mimeType: msg.mimeType || msg.mime_type || 'audio/webm',
+          audioBase64: base64Data ? `data:audio/mp3;base64,${base64Data}` : null, // Format as data URI
+          mimeType: metadata.mimeType || msg.mimeType || msg.mime_type || 'audio/mp3',
           duration: msg.duration || 0,
+          content: metadata.text || 'Mensagem de áudio', // Use text from metadata for display
         };
       }
 

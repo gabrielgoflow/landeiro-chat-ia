@@ -349,10 +349,10 @@ export function useChat() {
           sessao: sessionData?.sessao || 1,
           messageId: aiMessage.id,
           sender: 'assistant',
-          content: aiResponse.text || 'Mensagem de áudio',
+          content: aiResponse.base64, // Save the base64 directly in content for audio messages
           messageType: 'audio',
-          audioUrl: null, // We store base64 in metadata for audio messages
-          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.base64 }
+          audioUrl: null,
+          metadata: { mimeType: aiResponse.mimeType, text: aiResponse.text || 'Mensagem de áudio' }
         });
       } else {
         // Create text message
