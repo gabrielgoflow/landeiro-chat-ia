@@ -93,6 +93,10 @@ export default function Chat() {
       }
     };
 
+    // SEMPRE reinicializar quando o chatId muda (para navegação entre sessões)
+    console.log('ChatId changed, reinitializing:', chatId);
+    initializedRef.current = false;
+    
     if (!initializedRef.current) {
       initializedRef.current = true;
       initializeChat();
