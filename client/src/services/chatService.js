@@ -39,6 +39,14 @@ export class ChatService {
     }
   }
 
+  static getStoredHistory() {
+    return this.loadChatHistory();
+  }
+
+  static saveHistory(chatHistory) {
+    return this.saveChatHistory(chatHistory);
+  }
+
   static clearChatHistory() {
     try {
       localStorage.removeItem("chatHistory");
