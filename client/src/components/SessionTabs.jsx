@@ -14,8 +14,8 @@ export function SessionTabs({
   refreshTrigger // Novo prop para forçar atualização quando necessário
 }) {
   const [sessions, setSessions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [activeSession, setActiveSession] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [activeSession, setActiveSession] = useState('1')
 
   useEffect(() => {
     if (threadId) {
