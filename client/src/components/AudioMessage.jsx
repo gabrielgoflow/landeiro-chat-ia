@@ -69,6 +69,7 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
             
             // Create download URL for user as fallback
             setDownloadUrl(audio.src);
+            console.log('Download URL set for audio fallback');
           }
         } catch (decodeError) {
           console.error('Base64 decode error:', decodeError);
