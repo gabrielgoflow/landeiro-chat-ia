@@ -554,7 +554,7 @@ export default function Chat() {
 
         {/* Debug Info (Admin only) */}
         {user?.email === 'admin@goflow.digital' && (
-          <div className="px-4 pb-2">
+          <div className="px-4 pb-2 space-x-2">
             <Button
               variant="ghost"
               size="sm"
@@ -563,6 +563,20 @@ export default function Chat() {
             >
               <i className="fas fa-bug mr-1"></i>
               {showDebug ? 'Ocultar Debug' : 'Mostrar Debug'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                clearMessages();
+                if (currentThread?.id) {
+                  reloadThread(currentThread.id);
+                }
+              }}
+              className="text-xs text-red-500 hover:text-red-700"
+            >
+              <i className="fas fa-refresh mr-1"></i>
+              Recarregar Mensagens
             </Button>
           </div>
         )}
