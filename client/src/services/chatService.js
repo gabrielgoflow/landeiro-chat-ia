@@ -193,6 +193,8 @@ export class ChatService {
 
   // Helper method to transform database messages to frontend format
   static transformMessages(messages, identifier) {
+    console.log(`🔄 TRANSFORMING ${messages.length} messages for ${identifier}`);
+    
     const transformedMessages = messages.map(msg => {
       const baseMessage = {
         id: msg.messageId || msg.message_id,
@@ -200,9 +202,20 @@ export class ChatService {
         timestamp: new Date(msg.createdAt || msg.created_at),
       };
 
-      // Handle audio messages
-      if (msg.messageType === 'audio' || msg.message_type === 'audio') {
-        console.log('Transforming audio message:', msg);
+      // Handle audio messages - check for explicit audio type OR content containing base64 audio
+      const isExplicitAudio = msg.messageType === 'audio' || msg.message_type === 'audio';
+      const hasAudioContent = msg.content && typeof msg.content === 'string' && 
+        (msg.content.includes('base64,') || msg.content.startsWith('data:audio'));
+      
+      if (isExplicitAudio || hasAudioContent) {
+        console.log('🎵 TRANSFORMING AUDIO MESSAGE:', {
+          id: msg.message_id,
+          sender: msg.sender,
+          type: msg.message_type,
+          isExplicitAudio,
+          hasAudioContent,
+          contentPreview: msg.content ? msg.content.substring(0, 50) : 'null'
+        });
         console.log('Message content type:', typeof msg.content);
         console.log('Content preview:', msg.content ? msg.content.substring(0, 100) : 'null');
         
@@ -210,8 +223,21 @@ export class ChatService {
         let audioBase64 = msg.audioBase64 || msg.audio_base64;
         let mimeType = msg.mimeType || msg.mime_type || 'audio/webm';
         
+        // If content contains base64 audio data directly (assistant messages)
+        if (msg.content && typeof msg.content === 'string' && msg.content.includes('base64,')) {
+          // Extract base64 audio from content - could be direct base64 or data URL
+          if (msg.content.startsWith('data:audio')) {
+            audioBase64 = msg.content;
+            const mimeMatch = msg.content.match(/data:audio\/([^;]+)/);
+            mimeType = mimeMatch ? `audio/${mimeMatch[1]}` : 'audio/mp3';
+          } else if (msg.content.includes('base64,')) {
+            const base64Part = msg.content.split('base64,')[1];
+            audioBase64 = `data:audio/mp3;base64,${base64Part}`;
+            mimeType = 'audio/mp3';
+          }
+        }
         // If content is a JSON string (user messages), parse it to extract audio data
-        if (msg.content && typeof msg.content === 'string' && msg.content.startsWith('{')) {
+        else if (msg.content && typeof msg.content === 'string' && msg.content.startsWith('{')) {
           try {
             const contentData = JSON.parse(msg.content);
             if (contentData.type === 'audio') {
