@@ -256,4 +256,26 @@ export class ChatService {
     if (content.length <= maxLength) return content;
     return content.substring(0, maxLength).trim() + "...";
   }
+
+  static formatTimestamp(timestamp) {
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        return new Date().toLocaleTimeString('pt-BR', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
+      }
+      return date.toLocaleTimeString('pt-BR', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    } catch (error) {
+      console.error('Error formatting timestamp:', error);
+      return new Date().toLocaleTimeString('pt-BR', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    }
+  }
 }
