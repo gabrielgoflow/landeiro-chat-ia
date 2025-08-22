@@ -98,7 +98,14 @@ export default function Chat() {
         try {
           const response = await fetch(`/api/reviews/${chatId}`);
           console.log('Review check response:', response.status);
-          setHasReview(response.ok);
+          const reviewExists = response.ok;
+          setHasReview(reviewExists);
+          
+          // Se há review, garante que os estados estão corretos
+          if (reviewExists) {
+            console.log('Review found - setting chat as finalized');
+            setIsFinalizingChat(false); // Garantir que não está em processo de finalização
+          }
         } catch (error) {
           console.error('Error checking review:', error);
           setHasReview(false);
@@ -199,6 +206,7 @@ export default function Chat() {
           console.log('Review saved successfully');
           setCurrentReview(transformedReview);
           setShowReviewSidebar(true);
+          setHasReview(true); // Atualizar estado para indicar que tem review
         } else {
           console.error('Error saving review:', saveResponse.status);
         }
