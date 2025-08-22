@@ -168,7 +168,7 @@ export class ChatService {
 
   // Helper method to transform database messages to frontend format
   static transformMessages(messages, identifier) {
-    const transformedMessages = messages.map(msg => {
+    const transformedMessages = messages.map((msg, index) => {
       const baseMessage = {
         id: msg.messageId || msg.message_id || msg.id,
         sender: msg.sender,
@@ -177,10 +177,11 @@ export class ChatService {
 
       // Handle audio messages - check both camelCase and snake_case
       if (msg.messageType === 'audio' || msg.message_type === 'audio') {
-        console.log('Processing audio message:', {
+        console.log(`Processing audio message [${index}] from ${msg.sender}:`, {
           messageType: msg.messageType || msg.message_type,
           audioUrl: msg.audioUrl || msg.audio_url,
-          content: msg.content
+          content: msg.content?.substring(0, 100) + '...',
+          sender: msg.sender
         });
         
         // If content is a JSON string (as stored in DB), parse it
@@ -188,13 +189,17 @@ export class ChatService {
         if (typeof msg.content === 'string') {
           try {
             audioData = JSON.parse(msg.content);
-            console.log('Parsed audio data from content:', audioData);
+            console.log(`Parsed audio data from content for ${msg.sender}:`, {
+              hasAudioBase64: !!audioData.audioBase64,
+              hasAudioURL: !!audioData.audioURL,
+              mimeType: audioData.mimeType
+            });
           } catch (e) {
-            console.warn('Failed to parse audio content as JSON:', msg.content);
+            console.warn('Failed to parse audio content as JSON:', msg.content?.substring(0, 50));
           }
         }
         
-        return {
+        const audioMessage = {
           ...baseMessage,
           type: 'audio',
           audioUrl: msg.audioUrl || msg.audio_url || audioData.audioURL,
@@ -202,18 +207,35 @@ export class ChatService {
           mimeType: msg.mimeType || msg.mime_type || audioData.mimeType || 'audio/webm',
           duration: msg.duration || audioData.duration || 0,
         };
+        
+        console.log(`Final audio message for ${msg.sender}:`, {
+          hasAudioUrl: !!audioMessage.audioUrl,
+          hasAudioBase64: !!audioMessage.audioBase64,
+          mimeType: audioMessage.mimeType
+        });
+        
+        return audioMessage;
       }
 
       // Handle text messages
-      return {
+      const textMessage = {
         ...baseMessage,
         content: msg.content,
         text: msg.content,
       };
+      
+      console.log(`Text message from ${msg.sender}:`, textMessage.content?.substring(0, 50) + '...');
+      
+      return textMessage;
     });
 
     console.log(`Transformed ${transformedMessages.length} messages for ${identifier}`);
-    console.log('Sample transformed message:', transformedMessages[0]);
+    console.log('Message breakdown by sender:', {
+      user: transformedMessages.filter(m => m.sender === 'user').length,
+      assistant: transformedMessages.filter(m => m.sender === 'assistant').length,
+      total: transformedMessages.length
+    });
+    
     return transformedMessages;
   }
 
