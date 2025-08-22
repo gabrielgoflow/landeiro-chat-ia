@@ -378,19 +378,19 @@ export function useChat() {
       
       // Handle audio or text response from AI
       let aiMessage;
-      if (typeof aiResponse === 'object' && aiResponse.type === 'audio') {
-        // Create audio message from AI response
-        aiMessage = ChatService.createUserMessage(threadId, {
+      if (typeof aiResponse === 'object' && aiResponse.type === 'audio' && aiResponse.base64) {
+        // Create audio message from AI response - format to match transform expectations
+        aiMessage = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          sender: 'assistant',
           type: 'audio',
-          audioBase64: aiResponse.audioBase64,
-          mimeType: aiResponse.mimeType,
-          duration: 0
-        });
-        aiMessage.sender = 'assistant'; // Override sender for AI audio messages
+          audioBase64: `data:audio/mp3;base64,${aiResponse.base64}`,
+          mimeType: 'audio/mp3',
+          duration: 0,
+          timestamp: new Date()
+        };
         
-        // AI audio messages are already saved by the server endpoint
-        // No need to save again here as it would create duplicates
-        console.log('AI audio message already saved by server endpoint');
+        console.log('AI audio message saved by server endpoint:', aiMessage.id);
       } else {
         // Create text message
         const messageText = typeof aiResponse === 'string' ? aiResponse : aiResponse.message;
