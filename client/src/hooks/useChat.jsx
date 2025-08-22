@@ -197,14 +197,25 @@ export function useChat() {
       console.log('Using fallback individual chat messages loading for:', chatId);
       const historyMessages = await ChatService.getMessageHistory(chatId);
       
-      // Update chat history with loaded messages (even if empty array)
-      setChatHistory(prev => ({
-        ...prev,
-        messages: {
-          ...prev.messages,
-          [chatId]: historyMessages || []
+      // Only update if there are no existing messages or if loaded messages are newer
+      setChatHistory(prev => {
+        const existingMessages = prev.messages[chatId] || [];
+        const loadedMessages = historyMessages || [];
+        
+        // If we have more messages locally than from DB, preserve local messages
+        if (existingMessages.length > loadedMessages.length) {
+          console.log(`Preserving local messages (${existingMessages.length}) over DB messages (${loadedMessages.length})`);
+          return prev;
         }
-      }));
+        
+        return {
+          ...prev,
+          messages: {
+            ...prev.messages,
+            [chatId]: loadedMessages
+          }
+        };
+      });
 
       console.log(`Loaded ${historyMessages.length} messages from chat_messages table for session:`, chatId);
     } catch (error) {
@@ -218,15 +229,19 @@ export function useChat() {
   const selectThread = useCallback(async (threadId) => {
     console.log('Selecting thread:', threadId);
     
-    // SEMPRE limpar mensagens primeiro para garantir isolamento entre sessões
-    console.log('Clearing messages for thread isolation:', threadId);
-    setChatHistory(prev => ({
-      ...prev,
-      messages: {
-        ...prev.messages,
-        [threadId]: []
-      }
-    }));
+    // Preservar mensagens existentes - só limpar se for uma navegação entre threads diferentes
+    if (currentThreadId && currentThreadId !== threadId) {
+      console.log('Clearing messages for thread isolation:', threadId);
+      setChatHistory(prev => ({
+        ...prev,
+        messages: {
+          ...prev.messages,
+          [threadId]: []
+        }
+      }));
+    } else {
+      console.log('Preserving existing messages for same thread:', threadId);
+    }
     
     // Check if thread exists locally
     const existingThread = chatHistory.threads.find(t => t.id === threadId);
@@ -419,6 +434,7 @@ export function useChat() {
         });
       }
 
+      // Update state immediately for real-time UI
       setChatHistory(prev => ({
         threads: prev.threads.map(thread => 
           thread.id === threadId 
@@ -433,6 +449,17 @@ export function useChat() {
           [threadId]: [...prev.messages[threadId], aiMessage]
         }
       }));
+
+      // Force a UI update to ensure messages are visible immediately
+      setTimeout(() => {
+        setChatHistory(prev => ({
+          ...prev,
+          messages: {
+            ...prev.messages,
+            [threadId]: [...prev.messages[threadId]]
+          }
+        }));
+      }, 100);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
