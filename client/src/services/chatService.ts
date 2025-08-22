@@ -40,7 +40,6 @@ export class ChatService {
   static createNewThread(): ChatThreadExtended {
     return {
       id: this.generateThreadId(),
-      title: "Nova Conversa",
       email: USER_EMAIL,
       createdAt: new Date(),
       updatedAt: new Date(),

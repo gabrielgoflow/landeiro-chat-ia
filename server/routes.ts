@@ -101,7 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Sending request to external AI service:', requestBody);
 
       // Make request to external AI service
-      const webhookUrl = process.env.LANDEIRO_WEBHOOK_URL || 'https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz';
+      const webhookUrl = process.env.LANDEIRO_WEBHOOK_URL || 'https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia';
       const aiResponse = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
