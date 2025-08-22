@@ -160,19 +160,31 @@ export class ChatService {
       
       // Log detailed info about each message
       messages.forEach((msg, index) => {
-        if (msg.sender === 'assistant') {
-          console.log(`Message ${index} (${msg.sender}):`, {
-            id: msg.message_id,
-            type: msg.message_type,
-            hasContent: !!msg.content,
-            contentLength: msg.content ? msg.content.length : 0,
-            contentPreview: msg.content ? msg.content.substring(0, 50) : 'null'
-          });
-        }
+        console.log(`Message ${index} (${msg.sender}):`, {
+          id: msg.message_id,
+          type: msg.message_type,
+          hasContent: !!msg.content,
+          contentLength: msg.content ? msg.content.length : 0,
+          contentPreview: msg.content ? msg.content.substring(0, 50) : 'null',
+          isAssistant: msg.sender === 'assistant'
+        });
       });
 
       // Transform messages to expected format
-      return this.transformMessages(messages, `${threadId}_session_${sessao}`);
+      const transformedMessages = this.transformMessages(messages, `${threadId}_session_${sessao}`);
+      
+      // Log assistant messages after transformation
+      const assistantMessages = transformedMessages.filter(msg => msg.sender === 'assistant');
+      console.log(`After transformation - found ${assistantMessages.length} assistant messages:`, 
+        assistantMessages.map(msg => ({
+          id: msg.id,
+          type: msg.type,
+          hasAudioBase64: !!msg.audioBase64,
+          hasAudioUrl: !!msg.audioUrl
+        }))
+      );
+      
+      return transformedMessages;
     } catch (error) {
       console.error('Error loading session messages:', error);
       return [];
