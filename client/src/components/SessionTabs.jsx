@@ -31,6 +31,20 @@ export function SessionTabs({
       setLoading(true)
       console.log('Loading sessions for threadId:', threadId)
       
+      // Primeiro, criar sessão simbólica imediatamente para UI responsiva
+      const symbolicSession = {
+        chat_id: currentChatId || threadId,
+        thread_id: threadId,
+        diagnostico: 'Nova Sessão',
+        protocolo: 'tcc',
+        sessao: 1,
+        created_at: new Date(),
+        status: 'em_andamento',
+        chat_reviews: []
+      }
+      setSessions([symbolicSession])
+      setActiveSession('1')
+      
       // Usar a nova API para buscar todas as sessões do thread
       try {
         console.log('Fetching thread sessions for threadId:', threadId)
@@ -123,28 +137,27 @@ export function SessionTabs({
     onNewSession?.()
   }
 
-  if (loading) {
-    return (
-      <div className={`flex items-center justify-center p-4 ${className}`}>
-        <div className="text-sm text-gray-500">Carregando sessões...</div>
-      </div>
-    )
-  }
-
-  if (!sessions.length) {
-    return (
-      <div className={`flex items-center justify-center p-4 ${className}`}>
-        <div className="text-sm text-gray-500">Nenhuma sessão encontrada</div>
-      </div>
-    )
-  }
+  // Sempre mostrar pelo menos uma sessão simbólica - não retornar loading vazio
+  const displaySessions = sessions.length > 0 ? sessions : [{
+    chat_id: currentChatId || threadId,
+    thread_id: threadId,
+    diagnostico: 'Nova Sessão',
+    protocolo: 'tcc',
+    sessao: 1,
+    created_at: new Date(),
+    status: 'em_andamento',
+    chat_reviews: []
+  }]
+  
+  // Garantir que activeSession sempre tenha um valor válido
+  const effectiveActiveSession = activeSession || '1'
 
   return (
     <div className={`border-b bg-white ${className}`}>
-      <Tabs value={activeSession} onValueChange={handleSessionSelect} className="w-full">
+      <Tabs value={effectiveActiveSession} onValueChange={handleSessionSelect} className="w-full">
         <div className="flex items-center justify-between px-4 py-2">
           <TabsList className="flex-1 justify-start bg-gray-50">
-            {sessions.map((session) => (
+            {displaySessions.map((session) => (
               <TabsTrigger 
                 key={session.sessao} 
                 value={session.sessao.toString()}
