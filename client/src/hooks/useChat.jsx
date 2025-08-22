@@ -35,36 +35,8 @@ export function useChat() {
       if (!user) return null;
       
       console.log('Creating thread from Supabase data for:', chatId);
-      let chatData = null;
-      
-      // First try getUserChats method
-      try {
-        const userChats = await SupabaseService.getUserChats(user.id);
-        chatData = userChats.find(chat => chat.chat_id === chatId);
-      } catch (userChatsError) {
-        console.log('getUserChats failed, trying alternative search:', userChatsError);
-      }
-      
-      // If not found in user chats, search in thread sessions
-      if (!chatData) {
-        console.log('Chat not found in user chats, searching in thread sessions for:', chatId);
-        
-        try {
-          // Search in the known main thread
-          const knownThreadId = 'thread_MhnbDaLNDSujRvcmDTQXJMZe';
-          const sessionsResponse = await fetch(`/api/thread-sessions/${knownThreadId}`);
-          if (sessionsResponse.ok) {
-            const sessions = await sessionsResponse.json();
-            chatData = sessions.find(session => session.chat_id === chatId);
-            
-            if (chatData) {
-              console.log('Found session in thread:', chatData);
-            }
-          }
-        } catch (sessionSearchError) {
-          console.log('Thread session search failed:', sessionSearchError);
-        }
-      }
+      const userChats = await SupabaseService.getUserChats(user.id);
+      const chatData = userChats.find(chat => chat.chat_id === chatId);
       
       if (!chatData) {
         console.warn('Chat not found in Supabase:', chatId);
@@ -72,17 +44,17 @@ export function useChat() {
       }
 
       const newThread = {
-        id: chatData.chat_id,
+        id: chatData.chat_threads?.chat_id || chatData.id, // Use internal chat_id as local ID
         title: `${chatData.diagnostico} - TCC`,
         threadId: chatData.thread_id,
-        openaiChatId: chatData.chat_id,
+        openaiChatId: chatData.chat_id, // This is the OpenAI chat_id for webhook
         sessionData: {
           diagnostico: chatData.diagnostico,
-          protocolo: chatData.protocolo || 'tcc',
+          protocolo: 'tcc', // Always TCC
           sessao: chatData.sessao
         },
         createdAt: new Date(chatData.created_at),
-        updatedAt: new Date(chatData.updated_at || chatData.created_at)
+        updatedAt: new Date(chatData.created_at)
       };
 
       // Add thread to local storage
@@ -159,26 +131,12 @@ export function useChat() {
     try {
       setIsLoading(true);
       console.log('Loading chat history for:', chatId, 'session:', sessao);
-      console.log('Current chat history state:', Object.keys(chatHistory.messages));
       
       // If we have session info, try to find thread and use session-specific loading
       const currentThread = chatHistory.threads.find(t => t.id === chatId);
-      console.log('Found thread for loading:', currentThread);
-      
       if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
         console.log(`Using session-specific loading for thread ${currentThread.threadId} session ${currentThread.sessionData.sessao}`);
         const historyMessages = await ChatService.getSessionMessages(currentThread.threadId, currentThread.sessionData.sessao);
-        
-        console.log(`Received ${historyMessages.length} messages from ChatService.getSessionMessages`);
-        historyMessages.forEach((msg, idx) => {
-          if (msg.sender === 'assistant' && msg.type === 'audio') {
-            console.log(`Assistant audio message ${idx}:`, {
-              id: msg.id,
-              hasAudioBase64: !!msg.audioBase64,
-              hasAudioUrl: !!msg.audioUrl
-            });
-          }
-        });
         
         // Update chat history with loaded messages (even if empty array)
         setChatHistory(prev => ({
@@ -241,11 +199,9 @@ export function useChat() {
     setCurrentThreadId(threadId);
     setError(null);
     
-    // SEMPRE carregar mensagens frescas após limpar com um pequeno delay
+    // SEMPRE carregar mensagens frescas após limpar
     console.log('Loading fresh messages from chat_messages table...');
-    setTimeout(async () => {
-      await loadChatHistory(threadId);
-    }, 100);
+    await loadChatHistory(threadId);
   }, [chatHistory.threads, loadChatHistory, createThreadFromSupabase]);
 
   // Method to force reload a thread (useful for new sessions)
@@ -378,19 +334,28 @@ export function useChat() {
       
       // Handle audio or text response from AI
       let aiMessage;
-      if (typeof aiResponse === 'object' && aiResponse.type === 'audio' && aiResponse.base64) {
-        // Create audio message from AI response - format to match transform expectations
-        aiMessage = {
-          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          sender: 'assistant',
+      if (typeof aiResponse === 'object' && aiResponse.type === 'audio') {
+        // Create audio message from AI response
+        aiMessage = ChatService.createUserMessage(threadId, {
           type: 'audio',
-          audioBase64: `data:audio/mp3;base64,${aiResponse.base64}`,
-          mimeType: 'audio/mp3',
-          duration: 0,
-          timestamp: new Date()
-        };
+          audioBase64: aiResponse.audioBase64,
+          mimeType: aiResponse.mimeType,
+          duration: 0
+        });
+        aiMessage.sender = 'assistant'; // Override sender for AI audio messages
         
-        console.log('AI audio message saved by server endpoint:', aiMessage.id);
+        // Save AI audio message to chat_messages table
+        await ChatMessageService.saveMessage({
+          chatId: threadId,
+          threadId: currentThread?.threadId || '',
+          sessao: sessionData?.sessao || 1,
+          messageId: aiMessage.id,
+          sender: 'assistant',
+          content: aiResponse.message || 'Mensagem de áudio',
+          messageType: 'audio',
+          audioUrl: null, // We store base64 in content for audio messages
+          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.audioBase64 }
+        });
       } else {
         // Create text message
         const messageText = typeof aiResponse === 'string' ? aiResponse : aiResponse.message;
