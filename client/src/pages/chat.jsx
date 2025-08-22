@@ -317,6 +317,11 @@ export default function Chat() {
           reloadThread(newChatId);
         }, 100);
         
+        // Refresh da página para garantir estado limpo
+        setTimeout(() => {
+          window.location.reload();
+        }, 200);
+        
       } else {
         console.error('Error starting next session:', error);
       }
