@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase.js'
 
 export class SupabaseService {
   // Criar relação entre chat interno e thread_id do OpenAI
-  static async createChatThread(chatId, threadId, diagnostico, protocolo) {
+  static async createChatThread(chatId, threadId, diagnostico, protocolo, sessao = null) {
     try {
       const { data, error } = await supabase
         .from('chat_threads')
@@ -11,7 +11,8 @@ export class SupabaseService {
             chat_id: chatId,
             thread_id: threadId,
             diagnostico,
-            protocolo
+            protocolo,
+            sessao
           }
         ])
         .select()
@@ -30,7 +31,7 @@ export class SupabaseService {
     try {
       const { data, error } = await supabase
         .from('chat_threads')
-        .select('thread_id, diagnostico, protocolo')
+        .select('thread_id, diagnostico, protocolo, sessao')
         .eq('chat_id', chatId)
         .single()
 
@@ -77,6 +78,7 @@ export class SupabaseService {
             thread_id,
             diagnostico,
             protocolo,
+            sessao,
             created_at,
             updated_at
           )
@@ -93,6 +95,7 @@ export class SupabaseService {
         thread_id: userChat.chat_threads?.thread_id,
         diagnostico: userChat.chat_threads?.diagnostico,
         protocolo: userChat.chat_threads?.protocolo,
+        sessao: userChat.chat_threads?.sessao,
         created_at: userChat.chat_threads?.created_at || userChat.created_at
       })) || []
       

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -10,11 +10,14 @@ export const users = pgTable("users", {
 });
 
 export const chatThreads = pgTable("chat_threads", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  title: text("title").notNull(),
-  email: text("email").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: varchar("chat_id").notNull(),
+  threadId: varchar("thread_id").notNull(),
+  diagnostico: varchar("diagnostico"),
+  protocolo: varchar("protocolo"),
+  sessao: varchar("sessao"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const messages = pgTable("messages", {
@@ -42,8 +45,11 @@ export const insertUserSchema = createInsertSchema(users).pick({
 });
 
 export const insertChatThreadSchema = createInsertSchema(chatThreads).pick({
-  title: true,
-  email: true,
+  chatId: true,
+  threadId: true,
+  diagnostico: true,
+  protocolo: true,
+  sessao: true,
 });
 
 export const insertMessageSchema = createInsertSchema(messages).pick({
@@ -76,6 +82,7 @@ export type ChatThreadExtended = ChatThread & {
   sessionData?: {
     diagnostico?: string;
     protocolo?: string;
+    sessao?: string;
   };
 };
 

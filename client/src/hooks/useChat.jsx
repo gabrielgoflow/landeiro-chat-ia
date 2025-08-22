@@ -49,7 +49,8 @@ export function useChat() {
         openaiChatId: chatData.chat_id, // This is the OpenAI chat_id for webhook
         sessionData: {
           diagnostico: chatData.diagnostico,
-          protocolo: 'tcc' // Always TCC
+          protocolo: 'tcc', // Always TCC
+          sessao: chatData.sessao
         },
         createdAt: new Date(chatData.created_at),
         updatedAt: new Date(chatData.created_at)
