@@ -330,13 +330,17 @@ export function useChat() {
       let aiMessage;
       if (typeof aiResponse === 'object' && aiResponse.type === 'audio') {
         // Create audio message from AI response
-        aiMessage = ChatService.createUserMessage(threadId, {
+        aiMessage = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          sender: 'assistant',
           type: 'audio',
-          audioBase64: aiResponse.audioBase64,
-          mimeType: aiResponse.mimeType,
-          duration: 0
-        });
-        aiMessage.sender = 'assistant'; // Override sender for AI audio messages
+          audioBase64: `data:audio/mp3;base64,${aiResponse.base64}`, // Add proper data URI format
+          audioUrl: null,
+          mimeType: aiResponse.mimeType || 'audio/mp3',
+          duration: 0,
+          timestamp: new Date(),
+          content: aiResponse.text || 'Mensagem de áudio'
+        };
         
         // Save AI audio message to chat_messages table
         await ChatMessageService.saveMessage({
@@ -345,10 +349,10 @@ export function useChat() {
           sessao: sessionData?.sessao || 1,
           messageId: aiMessage.id,
           sender: 'assistant',
-          content: aiResponse.message || 'Mensagem de áudio',
+          content: aiResponse.text || 'Mensagem de áudio',
           messageType: 'audio',
-          audioUrl: null, // We store base64 in content for audio messages
-          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.audioBase64 }
+          audioUrl: null, // We store base64 in metadata for audio messages
+          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.base64 }
         });
       } else {
         // Create text message
