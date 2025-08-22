@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
@@ -16,6 +16,7 @@ import { SessionTabs } from "@/components/SessionTabs.jsx";
 
 export default function Chat() {
   const { chatId } = useParams();
+  const [location, navigate] = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
@@ -239,19 +240,40 @@ export default function Chat() {
     
     setIsStartingNextSession(true);
     try {
-      // Incrementar sessão no Supabase
-      const { data, error, newSession } = await supabaseService.incrementChatSession(currentThread.id);
+      // Criar uma nova sessão com um novo chat_id
+      const { data, error, newChatId, newSession } = await supabaseService.createNextSession(
+        currentThread.threadId, // thread_id do OpenAI
+        currentThread.sessionData.diagnostico,
+        currentThread.sessionData.protocolo
+      );
       
-      if (!error && newSession) {
-        console.log(`Chat reactivated for Session ${newSession}`);
+      if (!error && newChatId && newSession) {
+        console.log(`New session ${newSession} created with chat_id: ${newChatId}`);
         
-        // Reset review state to reactivate chat
+        // Criar novo thread local
+        const newThread = {
+          id: newChatId,
+          title: `${currentThread.sessionData.diagnostico} - ${currentThread.sessionData.protocolo.toUpperCase()}`,
+          threadId: currentThread.threadId, // Mesmo thread_id do OpenAI
+          openaiChatId: newChatId,
+          sessionData: {
+            ...currentThread.sessionData,
+            sessao: newSession
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        
+        // Atualizar o estado local
+        setCurrentThread(newThread);
+        setCurrentMessages([]); // Limpar mensagens
         setHasReview(false);
         setCurrentReview(null);
         setShowReviewSidebar(false);
         
-        // Refresh the page to reload the chat in active state
-        window.location.reload();
+        // Navegar para o novo chat
+        navigate(`/chat/${newChatId}`);
+        
       } else {
         console.error('Error starting next session:', error);
       }
@@ -260,23 +282,17 @@ export default function Chat() {
     } finally {
       setIsStartingNextSession(false);
     }
+  }
+
+  // Handler para trocar de sessão nas abas
+  const handleSessionChange = (sessionChatId) => {
+    console.log('Switching to session with chatId:', sessionChatId);
+    navigate(`/chat/${sessionChatId}`);
   };
 
-  // Handler para mudança de sessão via tabs
-  const handleSessionChange = (sessionData) => {
-    console.log('Changing to session:', sessionData);
-    // Navegar para o chat da sessão selecionada
-    if (sessionData.chat_id !== currentThread?.id) {
-      window.location.href = `/chat/${sessionData.chat_id}`;
-    }
-  };
-
-  // Handler para criar nova sessão via tabs
-  const handleNewSessionFromTabs = async () => {
-    if (!currentThread) return;
-    
-    // Usar a mesma lógica do botão "Iniciar Próxima Sessão"
-    await handleStartNextSession();
+  // Handler para criar nova sessão das abas
+  const handleNewSessionFromTabs = () => {
+    handleStartNextSession();
   };
 
   return (

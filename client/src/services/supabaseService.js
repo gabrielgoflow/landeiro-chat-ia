@@ -31,6 +31,71 @@ export class SupabaseService {
     }
   }
 
+  // Criar próxima sessão (novo chat_id com mesmo thread_id)
+  static async createNextSession(threadId, diagnostico, protocolo) {
+    try {
+      // Primeiro, buscar a última sessão deste thread
+      const { data: lastSession, error: lastSessionError } = await supabase
+        .from('chat_threads')
+        .select('sessao')
+        .eq('thread_id', threadId)
+        .order('sessao', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (lastSessionError && lastSessionError.code !== 'PGRST116') {
+        throw lastSessionError
+      }
+
+      const newSessionNumber = (lastSession?.sessao || 0) + 1
+      const newChatId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      // Criar novo chat_thread
+      const { data: newThread, error: threadError } = await supabase
+        .from('chat_threads')
+        .insert({
+          chat_id: newChatId,
+          thread_id: threadId,
+          diagnostico,
+          protocolo,
+          sessao: newSessionNumber
+        })
+        .select()
+        .single()
+
+      if (threadError) throw threadError
+
+      // Criar relação user_chat (assumindo que existe um usuário)
+      const userId = await SupabaseService.getCurrentUserId()
+      if (userId) {
+        const { error: userChatError } = await supabase
+          .from('user_chats')
+          .insert({
+            user_id: userId,
+            chat_id: newChatId,
+            chat_threads_id: newThread.id
+          })
+
+        if (userChatError) throw userChatError
+      }
+
+      return { 
+        data: newThread, 
+        error: null, 
+        newChatId,
+        newSession: newSessionNumber 
+      }
+    } catch (error) {
+      console.error('Error creating next session:', error)
+      return { 
+        data: null, 
+        error: error.message, 
+        newChatId: null,
+        newSession: null 
+      }
+    }
+  }
+
   // Criar relação entre chat interno e thread_id do OpenAI
   static async createChatThread(chatId, threadId, diagnostico, protocolo, sessao = 1) {
     try {
