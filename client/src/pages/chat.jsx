@@ -378,20 +378,11 @@ export default function Chat() {
         // Carregar mensagens específicas da sessão usando chat_id e sessao
         loadChatHistory(sessionChatId, selectedSession.sessao);
         
-        // Atualizar thread atual com dados da nova sessão
-        const updatedThread = {
-          ...currentThread,
-          id: sessionChatId,
-          openaiChatId: sessionChatId,
-          sessionData: {
-            ...currentThread.sessionData,
-            sessao: selectedSession.sessao
-          }
-        };
-        
-        // Atualizar estado local
-        setCurrentThread(updatedThread);
-        setCurrentSessionData(updatedThread.sessionData);
+        // Atualizar dados da sessão local
+        setCurrentSessionData({
+          ...currentThread.sessionData,
+          sessao: selectedSession.sessao
+        });
         
         // Navegar para nova URL sem reload completo
         navigate(`/chat/${sessionChatId}`, { replace: true });
