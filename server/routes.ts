@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertChatReviewSchema, insertChatMessageSchema } from "@shared/schema";
+import { insertChatReviewSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage.js";
 import { ObjectPermission } from "./objectAcl.js";
 
@@ -85,13 +85,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Landeiro Chat IA endpoint - handles both text and audio responses
   app.post("/api/landeiro-chat-ia", async (req, res) => {
     try {
-      const { message, chatId, email, chat_id } = req.body;
+      const { message, chatId, email } = req.body;
 
       // Include all required fields for the external AI service
       const requestBody: any = {
         message,
         email: email || 'gabriel@goflow.digital',
-        chat_id: chatId || chat_id || req.body.chatId, // Support multiple naming variations
+        chat_id: chatId || req.body.chatId, // Support both chatId and chat_id
       };
 
       // Add other fields from original request if they exist
@@ -101,7 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Sending request to external AI service:', requestBody);
 
       // Make request to external AI service
-      const webhookUrl = process.env.LANDEIRO_WEBHOOK_URL || 'https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia';
+      const webhookUrl = process.env.LANDEIRO_WEBHOOK_URL || 'https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz';
       const aiResponse = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
@@ -145,98 +145,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: 'text',
         message: 'Entendo que você está tentando se comunicar comigo. No momento estou com dificuldades técnicas para processar sua mensagem adequadamente. Por favor, tente novamente em alguns instantes ou descreva em texto como posso ajudá-lo hoje.',
       });
-    }
-  });
-
-  // Chat Messages Endpoints - for structured message history
-  app.post("/api/chat-messages", async (req, res) => {
-    try {
-      const messageData = insertChatMessageSchema.parse(req.body);
-      const message = await storage.createChatMessage(messageData);
-      res.status(201).json(message);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
-
-  // Endpoint para buscar mensagens por chat_id e sessao
-  app.get("/api/messages/:chatId/:sessao", async (req, res) => {
-    try {
-      const { chatId, sessao } = req.params;
-      const sessionNumber = parseInt(sessao);
-      console.log(`Getting messages for chat_id: ${chatId}, sessao: ${sessionNumber}`);
-      const messages = await storage.getChatMessagesBySession(chatId, sessionNumber);
-      res.json(messages);
-    } catch (error: any) {
-      console.error('Error getting session messages:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/chat-messages/:chatId", async (req, res) => {
-    try {
-      const { chatId } = req.params;
-      const limit = parseInt(req.query.limit as string) || 100;
-      const messages = await storage.getChatMessages(chatId, limit);
-      res.json(messages);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Get messages for a specific session by thread_id and sessao
-  app.get("/api/session-messages/:threadId/:sessao", async (req, res) => {
-    try {
-      const { threadId, sessao } = req.params;
-      const limit = parseInt(req.query.limit as string) || 100;
-      const messages = await storage.getSessionMessages(threadId, parseInt(sessao), limit);
-      res.json(messages);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/thread-messages/:threadId", async (req, res) => {
-    try {
-      const { threadId } = req.params;
-      const limit = parseInt(req.query.limit as string) || 100;
-      const messages = await storage.getThreadMessages(threadId, limit);
-      res.json(messages);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/chat-stats/:chatId", async (req, res) => {
-    try {
-      const { chatId } = req.params;
-      const stats = await storage.getChatStats(chatId);
-      res.json(stats);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/chat-overview/:chatId", async (req, res) => {
-    try {
-      const { chatId } = req.params;
-      const overview = await storage.getChatOverview(chatId);
-      if (!overview) {
-        return res.status(404).json({ error: "Chat not found" });
-      }
-      res.json(overview);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/thread-sessions/:threadId", async (req, res) => {
-    try {
-      const { threadId } = req.params;
-      const sessions = await storage.getThreadSessions(threadId);
-      res.json(sessions);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
     }
   });
 

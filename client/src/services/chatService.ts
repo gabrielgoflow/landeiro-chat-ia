@@ -40,6 +40,7 @@ export class ChatService {
   static createNewThread(): ChatThreadExtended {
     return {
       id: this.generateThreadId(),
+      title: "Nova Conversa",
       email: USER_EMAIL,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -72,19 +73,18 @@ export class ChatService {
     sessionData: { diagnostico?: string; protocolo?: string } | null = null,
     chatId: string | null = null,
   ): Promise<WebhookResponse> {
-    const request: any = {
+    const request: WebhookRequest = {
       message,
       email: USER_EMAIL,
-      chatId: chatId || threadId, // Use chatId if provided, fallback to threadId
+      chat_id: chatId || undefined,
     };
 
     // Add chat_id if provided
     if (chatId) {
       console.log("Sending message with chat_id:", chatId);
-      request.chatId = chatId;
+      request.chat_id = chatId;
     } else {
-      console.log("Sending message without chat_id, using threadId:", threadId);
-      request.chatId = threadId;
+      console.log("Sending message without chat_id");
     }
 
     // Add session data if provided
@@ -92,8 +92,6 @@ export class ChatService {
       request.diagnostico = sessionData.diagnostico;
       request.protocolo = sessionData.protocolo;
     }
-
-    console.log("Sending to webhook with payload:", request);
 
     try {
       const response = await fetch(WEBHOOK_URL, {
