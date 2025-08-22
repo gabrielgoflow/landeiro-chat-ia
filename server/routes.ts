@@ -147,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           threadId: sessionData.thread_id || requestBody.chat_id,
           sessao: sessionData.sessao,
           messageId: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          sender: 'assistant',
+          sender: 'assistant' as 'assistant',
           content: audioContent, // Store the audio data in content as JSON
           messageType: 'audio',
           audioUrl: null,
