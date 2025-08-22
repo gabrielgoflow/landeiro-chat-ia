@@ -1,8 +1,103 @@
 import { supabase } from '@/lib/supabase.js'
 
 export class SupabaseService {
+  // Incrementar sessão de um chat existente (para "Iniciar Próxima Sessão")
+  static async incrementChatSession(chatId) {
+    try {
+      // Buscar sessão atual do chat
+      const { data: currentData, error: selectError } = await supabase
+        .from('chat_threads')
+        .select('sessao')
+        .eq('chat_id', chatId)
+        .single()
+
+      if (selectError) throw selectError
+
+      const nextSession = (currentData.sessao || 1) + 1
+
+      // Atualizar para próxima sessão
+      const { data, error } = await supabase
+        .from('chat_threads')
+        .update({ sessao: nextSession })
+        .eq('chat_id', chatId)
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data, error: null, newSession: nextSession }
+    } catch (error) {
+      console.error('Error incrementing chat session:', error)
+      return { data: null, error: error.message, newSession: null }
+    }
+  }
+
+  // Criar próxima sessão (novo chat_id com mesmo thread_id)
+  static async createNextSession(threadId, diagnostico, protocolo) {
+    try {
+      // Primeiro, buscar a última sessão deste thread
+      const { data: lastSession, error: lastSessionError } = await supabase
+        .from('chat_threads')
+        .select('sessao')
+        .eq('thread_id', threadId)
+        .order('sessao', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (lastSessionError && lastSessionError.code !== 'PGRST116') {
+        throw lastSessionError
+      }
+
+      const newSessionNumber = (lastSession?.sessao || 0) + 1
+      const newChatId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      // Criar novo chat_thread
+      const { data: newThread, error: threadError } = await supabase
+        .from('chat_threads')
+        .insert({
+          chat_id: newChatId,
+          thread_id: threadId,
+          diagnostico,
+          protocolo,
+          sessao: newSessionNumber
+        })
+        .select()
+        .single()
+
+      if (threadError) throw threadError
+
+      // Criar relação user_chat usando usuário padrão
+      const userId = await SupabaseService.getCurrentUserId()
+      if (userId) {
+        const { error: userChatError } = await supabase
+          .from('user_chats')
+          .insert({
+            user_id: userId,
+            chat_id: newChatId,
+            chat_threads_id: newThread.id
+          })
+
+        if (userChatError) console.warn('Warning: Could not create user_chat relation:', userChatError)
+      }
+
+      return { 
+        data: newThread, 
+        error: null, 
+        newChatId,
+        newSession: newSessionNumber 
+      }
+    } catch (error) {
+      console.error('Error creating next session:', error)
+      return { 
+        data: null, 
+        error: error.message, 
+        newChatId: null,
+        newSession: null 
+      }
+    }
+  }
+
   // Criar relação entre chat interno e thread_id do OpenAI
-  static async createChatThread(chatId, threadId, diagnostico, protocolo, sessao = null) {
+  static async createChatThread(chatId, threadId, diagnostico, protocolo, sessao = 1) {
     try {
       const { data, error } = await supabase
         .from('chat_threads')
@@ -12,7 +107,7 @@ export class SupabaseService {
             thread_id: threadId,
             diagnostico,
             protocolo,
-            sessao
+            sessao: sessao // Sempre começa com sessão 1 para novos chats
           }
         ])
         .select()
@@ -189,6 +284,28 @@ export class SupabaseService {
     } catch (error) {
       console.error('Error getting OpenAI chat:', error)
       return { data: null, error: error.message }
+    }
+  }
+
+  // Obter ID do usuário atual (usando usuário padrão)
+  static async getCurrentUserId() {
+    try {
+      // Por simplicidade, usar o primeiro usuário encontrado ou um padrão
+      const { data, error } = await supabase
+        .from('user_chats')
+        .select('user_id')
+        .limit(1)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        // Se não houver usuários, retornar um UUID padrão
+        return '2e8960cd-5745-4d81-8971-eecd7fc46510'
+      }
+
+      return data?.user_id || '2e8960cd-5745-4d81-8971-eecd7fc46510'
+    } catch (error) {
+      console.warn('Using default user ID:', error)
+      return '2e8960cd-5745-4d81-8971-eecd7fc46510'
     }
   }
 

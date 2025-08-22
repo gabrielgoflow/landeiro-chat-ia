@@ -10,6 +10,8 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
   const textareaRef = useRef(null);
   const { toast } = useToast();
 
+
+
   // Auto-resize textarea
   useEffect(() => {
     const textarea = textareaRef.current;
