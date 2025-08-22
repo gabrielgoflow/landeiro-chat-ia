@@ -308,12 +308,14 @@ export default function Chat() {
         const response = await fetch(`/api/reviews/${currentThread.id}`);
         if (response.ok) {
           const reviewData = await response.json();
+          console.log('Session status check - Review found:', !!reviewData, 'for chat:', currentThread.id);
           setIsCurrentSessionFinalized(!!reviewData);
           setHasReview(!!reviewData);
           if (reviewData) {
             setCurrentReview(reviewData);
           }
         } else if (response.status === 404) {
+          console.log('Session status check - No review found (404) for chat:', currentThread.id);
           setIsCurrentSessionFinalized(false);
           setHasReview(false);
           setCurrentReview(null);
