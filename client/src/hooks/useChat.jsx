@@ -161,10 +161,16 @@ export function useChat() {
           
           console.log(`Thread saved to Supabase successfully - Session ${sessionNumber}`);
           
+          // Create updated thread data with complete info for callback
+          const updatedThreadData = {
+            ...newThread,
+            sessionData: { ...newThread.sessionData, sessao: sessionNumber }
+          };
+          
           // Notify that a new chat was created (for sidebar refresh)
           if (onChatCreated) {
             console.log('Calling onChatCreated callback to refresh sidebar');
-            onChatCreated(newThread);
+            onChatCreated(updatedThreadData);
           }
         } else {
           console.error('Error saving to Supabase:', chatThreadError);

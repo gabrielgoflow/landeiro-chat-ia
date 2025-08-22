@@ -183,9 +183,9 @@ export default function Chat() {
     await sendMessage(message);
   };
 
-  const handleNewChatConfirm = (formData) => {
+  const handleNewChatConfirm = async (formData) => {
     // Callback para atualizar sidebar quando novo chat é criado
-    const onChatCreated = () => {
+    const onChatCreated = (newThreadData) => {
       console.log('Chat created callback triggered - updating sidebar refresh trigger');
       setSidebarRefreshTrigger(prev => {
         const newValue = prev + 1;
@@ -193,16 +193,20 @@ export default function Chat() {
         return newValue;
       });
       
-      // Forçar atualização das abas de sessão também
+      // Atualizar threadId imediatamente para mostrar SessionTabs
+      if (newThreadData?.threadId) {
+        console.log('Setting threadId immediately for SessionTabs:', newThreadData.threadId);
+        setThreadId(newThreadData.threadId);
+        setCurrentSessionData(newThreadData.sessionData);
+      }
+      
+      // Forçar atualização das abas de sessão após um pequeno delay para sincronização
       setTimeout(() => {
-        setCurrentSessionData(prev => ({
-          ...prev,
-          refreshTrigger: Date.now()
-        }));
-      }, 500);
+        setSidebarRefreshTrigger(prev => prev + 1);
+      }, 100);
     };
     
-    startNewThread(formData, onChatCreated);
+    await startNewThread(formData, onChatCreated);
     setShowNewChatDialog(false);
   };
 
