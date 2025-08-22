@@ -243,11 +243,9 @@ export function useChat() {
     setCurrentThreadId(threadId);
     setError(null);
     
-    // SEMPRE carregar mensagens frescas após limpar com um pequeno delay
-    console.log('Loading fresh messages from chat_messages table...');
-    setTimeout(async () => {
-      await loadChatHistory(threadId);
-    }, 100);
+    // SEMPRE carregar mensagens frescas após limpar - usando apenas um método
+    console.log('Loading fresh messages from database...');
+    await loadChatHistory(threadId);
   }, [chatHistory.threads, loadChatHistory, createThreadFromSupabase]);
 
   // Method to force reload a thread (useful for new sessions)

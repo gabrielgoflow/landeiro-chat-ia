@@ -9,15 +9,10 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
   const [isLoading, setIsLoading] = useState(true);
   const audioRef = useRef(null);
 
-  // Debug props
-  console.log('AudioMessage received props:', {
-    hasAudioUrl: !!audioUrl,
-    hasAudioBase64: !!audioBase64,
-    audioUrlPreview: audioUrl?.substring(0, 50),
-    audioBase64Preview: audioBase64?.substring(0, 50),
-    mimeType,
-    sender
-  });
+  // Debug props only when missing data
+  if (!audioUrl && !audioBase64) {
+    console.warn('AudioMessage missing audio source:', { audioUrl, audioBase64, sender });
+  }
 
   useEffect(() => {
     const audio = audioRef.current;
