@@ -87,9 +87,21 @@ export function ChatSidebar({
                   }
                 } else {
                   console.log(`No sessions found for thread ${threadIdToUse}`);
+                  // Para novos chats sem sessões no banco, mostrar SESSÃO 1 como padrão
+                  sessionsData[threadIdToUse] = {
+                    latestSession: 1,
+                    status: 'em_andamento',
+                    totalSessions: 1
+                  };
                 }
               } catch (sessionError) {
                 console.error(`Error loading sessions for thread ${threadIdToUse}:`, sessionError);
+                // Mesmo com erro, mostrar SESSÃO 1 como padrão para novos chats
+                sessionsData[threadIdToUse] = {
+                  latestSession: 1,
+                  status: 'em_andamento',
+                  totalSessions: 1
+                };
               }
             }
           } catch (error) {
