@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChatService } from "@/services/chatService.js";
 import { SupabaseService } from "@/services/supabaseService.js";
-import { ChatMessageService } from "@/services/chatMessageService.js";
 import { useAuth } from "@/hooks/useAuth.jsx";
 
 export function useChat() {
@@ -86,16 +85,11 @@ export function useChat() {
     // Save to Supabase if user is authenticated and session data exists
     if (user && sessionData) {
       try {
-        // Novos chats sempre começam com sessão = 1
-        const sessionNumber = 1;
-        console.log('Creating new chat with session:', sessionNumber);
-
         const { data: chatThreadData, error: chatThreadError } = await SupabaseService.createChatThread(
           newThread.id, // chat_id (internal thread ID)
           '', // thread_id will be empty initially - filled later by OpenAI
           sessionData.diagnostico,
-          sessionData.protocolo,
-          sessionNumber // sempre começa com sessão 1
+          sessionData.protocolo
         );
 
         if (!chatThreadError && chatThreadData) {
@@ -105,18 +99,7 @@ export function useChat() {
             newThread.id, // using internal chat ID as OpenAI chat_id for now
             chatThreadData.id
           );
-          
-          // Update local thread with session number
-          setChatHistory(prev => ({
-            ...prev,
-            threads: prev.threads.map(t => 
-              t.id === newThread.id 
-                ? { ...t, sessionData: { ...t.sessionData, sessao: sessionNumber } }
-                : t
-            )
-          }));
-          
-          console.log(`Thread saved to Supabase successfully - Session ${sessionNumber}`);
+          console.log('Thread saved to Supabase successfully');
         } else {
           console.error('Error saving to Supabase:', chatThreadError);
         }
@@ -127,49 +110,31 @@ export function useChat() {
     }
   }, [user]);
 
-  const loadChatHistory = useCallback(async (chatId, sessao = null) => {
+  const loadChatHistory = useCallback(async (threadId) => {
     try {
       setIsLoading(true);
-      console.log('Loading chat history for:', chatId, 'session:', sessao);
+      console.log('Loading chat history for:', threadId);
       
-      // If we have session info, try to find thread and use session-specific loading
-      const currentThread = chatHistory.threads.find(t => t.id === chatId);
-      if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
-        console.log(`Using session-specific loading for thread ${currentThread.threadId} session ${currentThread.sessionData.sessao}`);
-        const historyMessages = await ChatService.getSessionMessages(currentThread.threadId, currentThread.sessionData.sessao);
-        
-        // Update chat history with loaded messages (even if empty array)
-        setChatHistory(prev => ({
-          ...prev,
-          messages: {
-            ...prev.messages,
-            [chatId]: historyMessages || []
-          }
-        }));
+      // Use the threadId (which is actually our chat_id) to load history
+      const historyMessages = await ChatService.getMessageHistory(threadId);
+      
+      // Update chat history with loaded messages
+      setChatHistory(prev => ({
+        ...prev,
+        messages: {
+          ...prev.messages,
+          [threadId]: historyMessages
+        }
+      }));
 
-        console.log(`Loaded ${historyMessages.length} session-specific messages for chat ${chatId}`);
-      } else {
-        // Fallback to individual chat messages
-        const historyMessages = await ChatService.getMessageHistory(chatId);
-        
-        // Update chat history with loaded messages (even if empty array)
-        setChatHistory(prev => ({
-          ...prev,
-          messages: {
-            ...prev.messages,
-            [chatId]: historyMessages || []
-          }
-        }));
-
-        console.log(`Loaded ${historyMessages.length} messages for chat ${chatId}`);
-      }
+      console.log(`Loaded ${historyMessages.length} messages for thread ${threadId}`);
     } catch (error) {
       console.error('Error loading chat history:', error);
       setError('Erro ao carregar histórico da conversa');
     } finally {
       setIsLoading(false);
     }
-  }, [chatHistory.threads]);
+  }, []);
 
   const selectThread = useCallback(async (threadId) => {
     console.log('Selecting thread:', threadId);
@@ -193,30 +158,14 @@ export function useChat() {
     const existingMessages = chatHistory.messages[threadId];
     console.log('Existing messages for thread:', existingMessages?.length || 0);
     
-    // Always load fresh messages from chat_messages table for the specific session
-    console.log('Loading fresh messages from chat_messages table...');
-    await loadChatHistory(threadId);
+    if (!existingMessages || existingMessages.length === 0) {
+      console.log('No existing messages, loading history...');
+      // Load history from OpenAI if we don't have local messages
+      await loadChatHistory(threadId);
+    } else {
+      console.log('Using existing messages');
+    }
   }, [chatHistory.threads, chatHistory.messages, loadChatHistory, createThreadFromSupabase]);
-
-  // Method to force reload a thread (useful for new sessions)
-  const reloadThread = useCallback(async (threadId) => {
-    console.log('Force reloading thread:', threadId);
-    
-    // Clear existing messages for this thread
-    setChatHistory(prev => ({
-      ...prev,
-      messages: { ...prev.messages, [threadId]: [] }
-    }));
-    
-    // Remove thread from local storage to force recreation
-    setChatHistory(prev => ({
-      threads: prev.threads.filter(t => t.id !== threadId),
-      messages: prev.messages
-    }));
-    
-    // Recreate thread and load history
-    await selectThread(threadId);
-  }, [selectThread]);
 
   const deleteThread = useCallback(async (threadId) => {
     setChatHistory(prev => {
@@ -310,19 +259,6 @@ export function useChat() {
       
       console.log('Current thread for message:', { threadId, sessionData });
       
-      // Save user message to chat_messages table
-      await ChatMessageService.saveMessage({
-        chatId: threadId,
-        threadId: currentThread?.threadId || '',
-        sessao: sessionData?.sessao || 1,
-        messageId: userMessage.id,
-        sender: 'user',
-        content: typeof content === 'string' ? content : JSON.stringify(content),
-        messageType: typeof content === 'object' && content.type === 'audio' ? 'audio' : 'text',
-        audioUrl: typeof content === 'object' && content.audioUrl ? content.audioUrl : null,
-        metadata: {}
-      });
-      
       // Send to webhook and get AI response (using threadId as chat_id)
       const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, threadId);
       
@@ -337,36 +273,10 @@ export function useChat() {
           duration: 0
         });
         aiMessage.sender = 'assistant'; // Override sender for AI audio messages
-        
-        // Save AI audio message to chat_messages table
-        await ChatMessageService.saveMessage({
-          chatId: threadId,
-          threadId: currentThread?.threadId || '',
-          sessao: sessionData?.sessao || 1,
-          messageId: aiMessage.id,
-          sender: 'assistant',
-          content: aiResponse.message || 'Mensagem de áudio',
-          messageType: 'audio',
-          audioUrl: null, // We store base64 in content for audio messages
-          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.audioBase64 }
-        });
       } else {
         // Create text message
         const messageText = typeof aiResponse === 'string' ? aiResponse : aiResponse.message;
         aiMessage = ChatService.createAiMessage(threadId, messageText);
-        
-        // Save AI text message to chat_messages table
-        await ChatMessageService.saveMessage({
-          chatId: threadId,
-          threadId: currentThread?.threadId || '',
-          sessao: sessionData?.sessao || 1,
-          messageId: aiMessage.id,
-          sender: 'assistant',
-          content: messageText,
-          messageType: 'text',
-          audioUrl: null,
-          metadata: {}
-        });
       }
 
       setChatHistory(prev => ({
@@ -414,7 +324,6 @@ export function useChat() {
     deleteThread,
     sendMessage,
     createThreadFromSupabase,
-    reloadThread,
     clearError: () => setError(null)
   };
 }

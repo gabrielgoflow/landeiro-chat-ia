@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link, useLocation } from "wouter";
+import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
@@ -12,11 +12,9 @@ import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
 import { MessageInput } from "@/components/MessageInput.jsx";
 import { NewChatDialog } from "@/components/NewChatDialog.jsx";
 import { ReviewSidebar } from "@/components/ReviewSidebar";
-import { SessionTabs } from "@/components/SessionTabs.jsx";
 
 export default function Chat() {
   const { chatId } = useParams();
-  const [location, navigate] = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
@@ -25,10 +23,6 @@ export default function Chat() {
   const [currentReview, setCurrentReview] = useState(null);
   const [isLoadingReview, setIsLoadingReview] = useState(false);
   const [hasReview, setHasReview] = useState(false);
-  const [isStartingNextSession, setIsStartingNextSession] = useState(false);
-  const [currentSessionData, setCurrentSessionData] = useState(null);
-  const [threadId, setThreadId] = useState(null);
-  const [isCurrentSessionFinalized, setIsCurrentSessionFinalized] = useState(false);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -46,7 +40,6 @@ export default function Chat() {
     deleteThread,
     sendMessage,
     createThreadFromSupabase,
-    reloadThread,
     clearError
   } = useChat();
 
@@ -65,9 +58,6 @@ export default function Chat() {
   // Initialize based on chatId parameter
   useEffect(() => {
     const initializeChat = async () => {
-      // Reset session finalized state when navigating
-      setIsCurrentSessionFinalized(false);
-      
       if (chatId && chatId !== 'new') {
         // Load specific chat by ID
         const existingThread = threads.find(t => t.id === chatId);
@@ -98,17 +88,6 @@ export default function Chat() {
     }
   }, [chatId, threads, selectThread, startNewThread, createThreadFromSupabase]);
 
-  // Extract threadId from current thread
-  useEffect(() => {
-    if (currentThread?.threadId) {
-      setThreadId(currentThread.threadId);
-      setCurrentSessionData(currentThread.sessionData);
-    } else {
-      setThreadId(null);
-      setCurrentSessionData(null);
-    }
-  }, [currentThread]);
-
   // Check if current chat has a review
   useEffect(() => {
     const checkForReview = async () => {
@@ -118,14 +97,7 @@ export default function Chat() {
         try {
           const response = await fetch(`/api/reviews/${chatId}`);
           console.log('Review check response:', response.status);
-          const reviewExists = response.ok;
-          setHasReview(reviewExists);
-          
-          // Se há review, garante que os estados estão corretos
-          if (reviewExists) {
-            console.log('Review found - setting chat as finalized');
-            setIsFinalizingChat(false); // Garantir que não está em processo de finalização
-          }
+          setHasReview(response.ok);
         } catch (error) {
           console.error('Error checking review:', error);
           setHasReview(false);
@@ -226,7 +198,6 @@ export default function Chat() {
           console.log('Review saved successfully');
           setCurrentReview(transformedReview);
           setShowReviewSidebar(true);
-          setHasReview(true); // Atualizar estado para indicar que tem review
         } else {
           console.error('Error saving review:', saveResponse.status);
         }
@@ -238,103 +209,6 @@ export default function Chat() {
     } finally {
       setIsFinalizingChat(false);
     }
-  };
-
-  const handleStartNextSession = async () => {
-    if (!currentThread) return;
-    
-    setIsStartingNextSession(true);
-    try {
-      // Criar uma nova sessão com um novo chat_id
-      const { data, error, newChatId, newSession } = await supabaseService.createNextSession(
-        currentThread.threadId, // thread_id do OpenAI
-        currentThread.sessionData.diagnostico,
-        currentThread.sessionData.protocolo
-      );
-      
-      if (!error && newChatId && newSession) {
-        console.log(`New session ${newSession} created with chat_id: ${newChatId}`);
-        
-        // Criar novo thread local
-        const newThread = {
-          id: newChatId,
-          title: `${currentThread.sessionData.diagnostico} - ${currentThread.sessionData.protocolo.toUpperCase()}`,
-          threadId: currentThread.threadId, // Mesmo thread_id do OpenAI
-          openaiChatId: newChatId,
-          sessionData: {
-            ...currentThread.sessionData,
-            sessao: newSession
-          },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        
-        // Limpar estado local primeiro
-        setHasReview(false);
-        setCurrentReview(null);
-        setShowReviewSidebar(false);
-        setIsCurrentSessionFinalized(false); // Nova sessão não está finalizada
-        
-        // Navegar para o novo chat
-        navigate(`/chat/${newChatId}`);
-        
-        // Forçar reload do thread para garantir sincronização
-        setTimeout(() => {
-          reloadThread(newChatId);
-        }, 100);
-        
-      } else {
-        console.error('Error starting next session:', error);
-      }
-    } catch (error) {
-      console.error('Error starting next session:', error);
-    } finally {
-      setIsStartingNextSession(false);
-    }
-  }
-
-  // Handler para trocar de sessão nas abas
-  const handleSessionChange = (sessionChatId) => {
-    console.log('Changing to session:', sessionChatId);
-    navigate(`/chat/${sessionChatId}`);
-  };
-
-  // Detect if current session is finalized based on review (one-time check only)
-  useEffect(() => {
-    const checkSessionStatus = async () => {
-      if (!chatId || chatId === 'new') {
-        setIsCurrentSessionFinalized(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/reviews/${chatId}`);
-        if (response.ok) {
-          const reviewData = await response.json();
-          console.log('Review found - setting chat as finalized');
-          setIsCurrentSessionFinalized(!!reviewData);
-          setHasReview(!!reviewData);
-          if (reviewData) {
-            setCurrentReview(reviewData);
-          }
-        } else if (response.status === 404) {
-          setIsCurrentSessionFinalized(false);
-          setHasReview(false);
-          setCurrentReview(null);
-        }
-      } catch (error) {
-        console.error('Error checking session status:', error);
-        setIsCurrentSessionFinalized(false);
-      }
-    };
-
-    // Only check once when chatId changes
-    checkSessionStatus();
-  }, [chatId]);
-
-  // Handler para criar nova sessão das abas
-  const handleNewSessionFromTabs = () => {
-    handleStartNextSession();
   };
 
   return (
@@ -388,40 +262,19 @@ export default function Chat() {
           <div className="flex items-center space-x-2">
             {/* Conditional review button - only shows when review exists */}
             {hasReview && (
-              <>
-                <Button
-                  onClick={loadReview}
-                  disabled={isLoadingReview}
-                  className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                  data-testid="view-review-button"
-                >
-                  {isLoadingReview ? (
-                    <i className="fas fa-spinner fa-spin mr-2"></i>
-                  ) : (
-                    <i className="fas fa-file-alt mr-2"></i>
-                  )}
-                  Ver Review
-                </Button>
-                
-                <Button
-                  onClick={handleStartNextSession}
-                  disabled={isStartingNextSession}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                  data-testid="start-next-session-button"
-                >
-                  {isStartingNextSession ? (
-                    <>
-                      <i className="fas fa-spinner fa-spin mr-2"></i>
-                      Iniciando...
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-play mr-2"></i>
-                      Iniciar Próxima Sessão
-                    </>
-                  )}
-                </Button>
-              </>
+              <Button
+                onClick={loadReview}
+                disabled={isLoadingReview}
+                className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                data-testid="view-review-button"
+              >
+                {isLoadingReview ? (
+                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                ) : (
+                  <i className="fas fa-file-alt mr-2"></i>
+                )}
+                Ver Review
+              </Button>
             )}
             
             {currentThread && !hasReview && (
@@ -454,17 +307,6 @@ export default function Chat() {
             </Button>
           </div>
         </div>
-
-        {/* Session Tabs - only show if we have a threadId */}
-        {threadId && (
-          <SessionTabs
-            threadId={threadId}
-            currentChatId={currentThread?.id}
-            onSessionChange={handleSessionChange}
-            onNewSession={handleNewSessionFromTabs}
-            className="border-b"
-          />
-        )}
 
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0" data-testid="messages-container">
@@ -546,7 +388,7 @@ export default function Chat() {
           isLoading={isLoading}
           error={error}
           onClearError={clearError}
-          isFinalized={isCurrentSessionFinalized}
+          isFinalized={hasReview}
         />
       </div>
       
