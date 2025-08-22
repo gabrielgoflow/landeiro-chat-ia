@@ -71,6 +71,12 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 - **Eliminated External History Dependency**: System now uses only `chat_messages` table, no longer relies on external webhook for history retrieval
 - **Session Isolation Completed**: Messages properly filtered by session number ensuring complete independence between sessions
 
+**Audio Message Bug Fix (August 2025)**:
+- **Fixed Audio Message Storage**: Corrected audio message saving to store complete JSON data with base64 in the `content` field instead of just "Mensagem de áudio"
+- **Webhook Response Integration**: Updated code to use correct `base64` field from AI webhook response instead of `audioBase64`
+- **Audio Message Recovery**: Fixed audio message loading from database by properly parsing JSON content with audioBase64 data
+- **Session Independence**: Audio messages now properly isolated per session with complete playback functionality
+
 **Session Management Bug Fix (August 2025)**:
 - **Fixed Session Creation Logic**: Corrected `createNextSession()` to maintain same `chat_id` across sessions instead of creating new ones
 - **Proper Session Isolation**: Sessions now differentiated only by `sessao` column, maintaining proper thread continuity

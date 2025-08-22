@@ -399,8 +399,8 @@ export function useChat() {
         // Create audio message from AI response
         aiMessage = ChatService.createUserMessage(threadId, {
           type: 'audio',
-          audioBase64: aiResponse.audioBase64,
-          mimeType: aiResponse.mimeType,
+          audioBase64: aiResponse.base64, // Use 'base64' from webhook response
+          mimeType: aiResponse.mimeType || 'audio/mp3',
           duration: 0
         });
         aiMessage.sender = 'assistant'; // Override sender for AI audio messages
@@ -412,10 +412,15 @@ export function useChat() {
           sessao: sessionData?.sessao || 1,
           messageId: aiMessage.id,
           sender: 'assistant',
-          content: aiResponse.message || 'Mensagem de áudio',
+          content: JSON.stringify({
+            type: 'audio',
+            audioBase64: aiResponse.base64, // Use 'base64' from webhook response
+            mimeType: aiResponse.mimeType || 'audio/mp3',
+            duration: 0
+          }),
           messageType: 'audio',
-          audioUrl: null, // We store base64 in content for audio messages
-          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.audioBase64 }
+          audioUrl: null,
+          metadata: { mimeType: aiResponse.mimeType || 'audio/mp3' }
         });
       } else {
         // Create text message
