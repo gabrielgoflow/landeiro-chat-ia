@@ -188,14 +188,23 @@ export class ChatService {
           try {
             const contentData = JSON.parse(msg.content);
             if (contentData.type === 'audio') {
+              // audioBase64 already includes the data: prefix, use as-is
               audioBase64 = contentData.audioBase64;
               audioUrl = contentData.audioURL || contentData.audioUrl;
               mimeType = contentData.mimeType || mimeType;
+              
+              // Ensure audioBase64 has correct data URL format
+              if (audioBase64 && !audioBase64.startsWith('data:')) {
+                audioBase64 = `data:${mimeType};base64,${audioBase64}`;
+              }
             }
           } catch (e) {
             console.warn('Failed to parse audio content JSON:', e);
           }
         }
+        
+        // If no audioBase64 but has audioUrl, we'll let the component handle loading from URL
+        // For assistant messages, the audioUrl might be present but audioBase64 might be null
         
         const audioMessage = {
           ...baseMessage,

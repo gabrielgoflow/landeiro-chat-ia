@@ -11,7 +11,17 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
 
   // Debug: log audio props
   useEffect(() => {
-    console.log('AudioMessage props:', { audioUrl, audioBase64: audioBase64 ? 'has base64' : 'no base64', mimeType, sender });
+    console.log('AudioMessage props:', { 
+      audioUrl: audioUrl ? 'has URL' : 'no URL', 
+      audioBase64: audioBase64 ? 'has base64' : 'no base64', 
+      mimeType, 
+      sender 
+    });
+    
+    // Show a warning if neither audioUrl nor audioBase64 is available
+    if (!audioUrl && !audioBase64) {
+      console.warn('AudioMessage: No audio source available (neither URL nor base64)');
+    }
   }, [audioUrl, audioBase64, mimeType, sender]);
 
   useEffect(() => {
@@ -100,7 +110,7 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
     `}>
       <audio 
         ref={audioRef} 
-        src={audioBase64 ? `data:${mimeType || 'audio/webm'};base64,${audioBase64}` : audioUrl}
+        src={audioBase64 || audioUrl}
         preload="metadata"
         className="hidden"
       />
