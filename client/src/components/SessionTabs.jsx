@@ -83,7 +83,7 @@ export function SessionTabs({
     const session = sessions.find(s => s.sessao.toString() === sessionNumber)
     if (session) {
       setActiveSession(sessionNumber)
-      onSessionChange?.(session)
+      onSessionChange?.(session.chat_id)
     }
   }
 

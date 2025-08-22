@@ -1,6 +1,6 @@
 # Overview
 
-A chat application built with React (frontend) and Express.js (backend) that provides an AI-powered conversational interface with audio messaging capabilities. The application features a modern UI with chat threads, real-time messaging, audio recording and playback, and persistent chat history stored in localStorage. It's designed to work with external AI services via webhooks while providing a clean, responsive user experience using shadcn/ui components and Tailwind CSS styling.
+A comprehensive therapy chat application built with React (frontend) and Express.js (backend) that provides an AI-powered conversational interface with advanced session management. The application features a modern UI with tabbed session interface, real-time messaging, audio recording and playback, and comprehensive review/supervision system. Each therapy session maintains independent chat history and reviews, designed specifically for TCC (Cognitive Behavioral Therapy) protocol with external AI services integration.
 
 # User Preferences
 
@@ -45,6 +45,15 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
   - user_id (UUID): Referência ao usuário autenticado
   - chat_id (VARCHAR): ID do chat do OpenAI
   - chat_threads_id (UUID): Referência à tabela chat_threads
+
+**Session Management Implementation (Implemented August 2025)**:
+- **SessionTabs Component**: Tabbed interface showing all sessions for a thread with status indicators
+- **Session Navigation**: Independent chat histories per session while maintaining same thread_id
+- **Status Management**: Sessions automatically marked as "finalizado" when reviews exist, "em_andamento" otherwise
+- **Session Creation**: "Iniciar Próxima Sessão" button creates new sessions with unique chat_ids
+- **API Endpoints**: 
+  - `/api/thread-sessions/:threadId` - Retrieves all sessions for a thread
+  - Enhanced session management in SupabaseService with `createNextSession()` method
 
 **Separated Concerns Tables**:
 - **chat_messages**: Histórico estruturado de mensagens (NOVA)
