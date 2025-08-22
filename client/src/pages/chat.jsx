@@ -504,17 +504,15 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Session Tabs - only show if we have a threadId */}
-        {threadId && (
-          <SessionTabs
-            threadId={threadId}
-            currentChatId={currentThread?.id}
-            onSessionChange={handleSessionChange}
-            onNewSession={handleNewSessionFromTabs}
-            refreshTrigger={sidebarRefreshTrigger}
-            className="border-b"
-          />
-        )}
+        {/* Session Tabs - always show, even for new chats */}
+        <SessionTabs
+          threadId={threadId || currentThread?.id || 'new'}
+          currentChatId={currentThread?.id}
+          onSessionChange={handleSessionChange}
+          onNewSession={handleNewSessionFromTabs}
+          refreshTrigger={sidebarRefreshTrigger}
+          className="border-b"
+        />
 
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0" data-testid="messages-container">

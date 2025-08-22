@@ -13,15 +13,39 @@ export function SessionTabs({
   className = "",
   refreshTrigger // Novo prop para forçar atualização quando necessário
 }) {
-  const [sessions, setSessions] = useState([])
+  // Inicializar com sessão padrão para mostrar imediatamente
+  const [sessions, setSessions] = useState([{
+    chat_id: 'new',
+    thread_id: 'new',
+    diagnostico: 'Nova Sessão',
+    protocolo: 'tcc',
+    sessao: 1,
+    created_at: new Date(),
+    status: 'em_andamento',
+    chat_reviews: []
+  }])
   const [loading, setLoading] = useState(false)
   const [activeSession, setActiveSession] = useState('1')
 
   useEffect(() => {
-    if (threadId) {
+    if (threadId && threadId !== 'new') {
       loadSessions()
+    } else {
+      // Para novos chats, mostrar sessão simbólica imediatamente
+      const symbolicSession = {
+        chat_id: currentChatId || threadId || 'new',
+        thread_id: threadId || 'new',
+        diagnostico: 'Nova Sessão',
+        protocolo: 'tcc',
+        sessao: 1,
+        created_at: new Date(),
+        status: 'em_andamento',
+        chat_reviews: []
+      }
+      setSessions([symbolicSession])
+      setActiveSession('1')
     }
-  }, [threadId, refreshTrigger]) // Recarrega quando threadId ou refreshTrigger mudam
+  }, [threadId, refreshTrigger, currentChatId]) // Recarrega quando threadId ou refreshTrigger mudam
 
   // Removido polling automático - carrega apenas quando há navegação real
   // Isso evita mudanças indesejadas de sessão durante o uso
