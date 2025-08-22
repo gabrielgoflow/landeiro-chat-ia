@@ -141,25 +141,25 @@ export class ChatService {
     }
   }
 
-  static async getSessionMessages(chatId, sessao) {
+  static async getSessionMessages(threadId, sessao) {
     try {
-      // Use session-specific endpoint for chat_id+session filtering
-      const response = await fetch(`/api/session-messages/${chatId}/${sessao}`);
+      // Use session-specific endpoint for thread+session filtering
+      const response = await fetch(`/api/session-messages/${threadId}/${sessao}`);
 
       if (!response.ok) {
         if (response.status === 404 || response.status === 500) {
           // No messages found for this session or error - return empty array
-          console.log(`No messages found for chat ${chatId} session ${sessao} or error occurred`);
+          console.log(`No messages found for thread ${threadId} session ${sessao} or error occurred`);
           return [];
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const messages = await response.json();
-      console.log(`Loaded ${messages.length} session-specific messages for chat ${chatId} session ${sessao}`);
+      console.log(`Loaded ${messages.length} session-specific messages for thread ${threadId} session ${sessao}`);
 
       // Transform messages to expected format
-      return this.transformMessages(messages, `${chatId}_session_${sessao}`);
+      return this.transformMessages(messages, `${threadId}_session_${sessao}`);
     } catch (error) {
       console.error('Error loading session messages:', error);
       return [];
@@ -168,74 +168,34 @@ export class ChatService {
 
   // Helper method to transform database messages to frontend format
   static transformMessages(messages, identifier) {
-    const transformedMessages = messages.map((msg, index) => {
+    const transformedMessages = messages.map(msg => {
       const baseMessage = {
-        id: msg.messageId || msg.message_id || msg.id,
+        id: msg.messageId || msg.message_id,
         sender: msg.sender,
         timestamp: new Date(msg.createdAt || msg.created_at),
       };
 
-      // Handle audio messages - check both camelCase and snake_case
+      // Handle audio messages
       if (msg.messageType === 'audio' || msg.message_type === 'audio') {
-        console.log(`Processing audio message [${index}] from ${msg.sender}:`, {
-          messageType: msg.messageType || msg.message_type,
-          audioUrl: msg.audioUrl || msg.audio_url,
-          content: msg.content?.substring(0, 100) + '...',
-          sender: msg.sender
-        });
-        
-        // If content is a JSON string (as stored in DB), parse it
-        let audioData = {};
-        if (typeof msg.content === 'string') {
-          try {
-            audioData = JSON.parse(msg.content);
-            console.log(`Parsed audio data from content for ${msg.sender}:`, {
-              hasAudioBase64: !!audioData.audioBase64,
-              hasAudioURL: !!audioData.audioURL,
-              mimeType: audioData.mimeType
-            });
-          } catch (e) {
-            console.warn('Failed to parse audio content as JSON:', msg.content?.substring(0, 50));
-          }
-        }
-        
-        const audioMessage = {
+        return {
           ...baseMessage,
           type: 'audio',
-          audioUrl: msg.audioUrl || msg.audio_url || audioData.audioURL,
-          audioBase64: msg.audioBase64 || msg.audio_base64 || audioData.audioBase64,
-          mimeType: msg.mimeType || msg.mime_type || audioData.mimeType || 'audio/webm',
-          duration: msg.duration || audioData.duration || 0,
+          audioUrl: msg.audioUrl || msg.audio_url,
+          audioBase64: msg.audioBase64 || msg.audio_base64,
+          mimeType: msg.mimeType || msg.mime_type || 'audio/webm',
+          duration: msg.duration || 0,
         };
-        
-        console.log(`Final audio message for ${msg.sender}:`, {
-          hasAudioUrl: !!audioMessage.audioUrl,
-          hasAudioBase64: !!audioMessage.audioBase64,
-          mimeType: audioMessage.mimeType
-        });
-        
-        return audioMessage;
       }
 
       // Handle text messages
-      const textMessage = {
+      return {
         ...baseMessage,
         content: msg.content,
         text: msg.content,
       };
-      
-      console.log(`Text message from ${msg.sender}:`, textMessage.content?.substring(0, 50) + '...');
-      
-      return textMessage;
     });
 
     console.log(`Transformed ${transformedMessages.length} messages for ${identifier}`);
-    console.log('Message breakdown by sender:', {
-      user: transformedMessages.filter(m => m.sender === 'user').length,
-      assistant: transformedMessages.filter(m => m.sender === 'assistant').length,
-      total: transformedMessages.length
-    });
-    
     return transformedMessages;
   }
 

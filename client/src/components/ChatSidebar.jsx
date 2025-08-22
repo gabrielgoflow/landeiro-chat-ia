@@ -26,7 +26,6 @@ export function ChatSidebar({
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
   const [userChats, setUserChats] = useState([]);
   const [chatReviews, setChatReviews] = useState({});
-  const [threadSessions, setThreadSessions] = useState({});
   const [loadingChats, setLoadingChats] = useState(false);
 
   const handleSignOut = async () => {
@@ -55,42 +54,18 @@ export function ChatSidebar({
         const chats = await supabaseService.getUserChats(user.id);
         setUserChats(chats);
         
-        // Check review status and load session data for each chat
+        // Check review status for each chat
         const reviewStatuses = {};
-        const sessionsData = {};
-        
         for (const chat of chats) {
           try {
-            // Check review status
             const response = await fetch(`/api/reviews/${chat.chat_id}`);
             reviewStatuses[chat.chat_id] = response.ok;
-            
-            // Load thread sessions to get latest session info
-            if (chat.thread_id) {
-              const sessionsResponse = await fetch(`/api/thread-sessions/${chat.thread_id}`);
-              if (sessionsResponse.ok) {
-                const sessions = await sessionsResponse.json();
-                if (sessions.length > 0) {
-                  // Find latest session (highest session number)
-                  const latestSession = sessions.reduce((latest, session) => 
-                    session.sessao > latest.sessao ? session : latest
-                  );
-                  sessionsData[chat.thread_id] = {
-                    latestSession: latestSession.sessao,
-                    status: latestSession.status || (latestSession.review_id ? 'finalizado' : 'em_andamento'),
-                    totalSessions: sessions.length
-                  };
-                }
-              }
-            }
           } catch (error) {
-            console.error(`Error loading data for chat ${chat.chat_id}:`, error);
+            console.error(`Error checking review for chat ${chat.chat_id}:`, error);
             reviewStatuses[chat.chat_id] = false;
           }
         }
-        
         setChatReviews(reviewStatuses);
-        setThreadSessions(sessionsData);
       } catch (error) {
         console.error('Erro ao carregar chats:', error);
       } finally {
@@ -247,15 +222,7 @@ export function ChatSidebar({
                       {/* Status Tags and Delete Button */}
                       <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
                         <div className="flex items-center space-x-1">
-                          {threadSessions[chat.thread_id] ? (
-                            <Badge className={`text-xs font-medium px-1.5 py-0.5 ${
-                              threadSessions[chat.thread_id].status === 'finalizado'
-                                ? 'bg-green-100 text-green-800 border-green-200'
-                                : 'bg-blue-100 text-blue-800 border-blue-200'
-                            }`}>
-                              {threadSessions[chat.thread_id].status === 'finalizado' ? 'FINALIZADO' : 'EM ANDAMENTO'}
-                            </Badge>
-                          ) : chatReviews[chat.chat_id] ? (
+                          {chatReviews[chat.chat_id] ? (
                             <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
                               FINALIZADO
                             </Badge>
@@ -279,9 +246,9 @@ export function ChatSidebar({
                         </div>
                         
                         {/* Session Badge - below status */}
-                        {threadSessions[chat.thread_id] && (
+                        {chat.sessao && (
                           <Badge variant="default" className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5">
-                            SESSÃO {threadSessions[chat.thread_id].latestSession}
+                            SESSÃO {chat.sessao}
                           </Badge>
                         )}
                       </div>
@@ -298,20 +265,13 @@ export function ChatSidebar({
                         <div className="text-xs text-gray-500">
                           ID: {chat.chat_id.substring(0, 8)}...
                         </div>
-                        <div className="flex items-center justify-between text-xs text-gray-400 mt-1">
-                          <span>
-                            {new Date(chat.created_at).toLocaleDateString('pt-BR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                          {threadSessions[chat.thread_id] && threadSessions[chat.thread_id].totalSessions > 1 && (
-                            <span className="text-indigo-600 font-medium">
-                              {threadSessions[chat.thread_id].totalSessions} sessões
-                            </span>
-                          )}
+                        <div className="text-xs text-gray-400 mt-1">
+                          {new Date(chat.created_at).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
                         </div>
                       </div>
                     </div>

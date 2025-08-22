@@ -52,27 +52,13 @@ export function useChat() {
         try {
           // Search in the known main thread
           const knownThreadId = 'thread_MhnbDaLNDSujRvcmDTQXJMZe';
-          let sessionsResponse = await fetch(`/api/thread-sessions/${knownThreadId}`);
+          const sessionsResponse = await fetch(`/api/thread-sessions/${knownThreadId}`);
           if (sessionsResponse.ok) {
             const sessions = await sessionsResponse.json();
             chatData = sessions.find(session => session.chat_id === chatId);
             
             if (chatData) {
-              console.log('Found session in known thread:', chatData);
-            }
-          }
-          
-          // If still not found, try the newer thread
-          if (!chatData) {
-            const newerThreadId = 'thread_mdHsOPv65Qlbm4UeR7UKupuW';
-            sessionsResponse = await fetch(`/api/thread-sessions/${newerThreadId}`);
-            if (sessionsResponse.ok) {
-              const sessions = await sessionsResponse.json();
-              chatData = sessions.find(session => session.chat_id === chatId);
-              
-              if (chatData) {
-                console.log('Found session in newer thread:', chatData);
-              }
+              console.log('Found session in thread:', chatData);
             }
           }
         } catch (sessionSearchError) {
@@ -174,11 +160,11 @@ export function useChat() {
       setIsLoading(true);
       console.log('Loading chat history for:', chatId, 'session:', sessao);
       
-      // If we have session info, use session-specific loading by chat_id + sessao
+      // If we have session info, try to find thread and use session-specific loading
       const currentThread = chatHistory.threads.find(t => t.id === chatId);
-      if (currentThread?.sessionData?.sessao) {
-        console.log(`Using session-specific loading for chat ${chatId} session ${currentThread.sessionData.sessao}`);
-        const historyMessages = await ChatService.getSessionMessages(chatId, currentThread.sessionData.sessao);
+      if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
+        console.log(`Using session-specific loading for thread ${currentThread.threadId} session ${currentThread.sessionData.sessao}`);
+        const historyMessages = await ChatService.getSessionMessages(currentThread.threadId, currentThread.sessionData.sessao);
         
         // Update chat history with loaded messages (even if empty array)
         setChatHistory(prev => ({
@@ -190,23 +176,21 @@ export function useChat() {
         }));
 
         console.log(`Loaded ${historyMessages.length} session-specific messages for chat ${chatId}`);
-        return; // Exit early to avoid fallback call
-      }
-      
-      // Only use fallback if session-specific loading didn't happen
-      console.log('Using fallback individual chat messages loading for:', chatId);
-      const historyMessages = await ChatService.getMessageHistory(chatId);
-      
-      // Update chat history with loaded messages (even if empty array)
-      setChatHistory(prev => ({
-        ...prev,
-        messages: {
-          ...prev.messages,
-          [chatId]: historyMessages || []
-        }
-      }));
+      } else {
+        // Fallback to individual chat messages
+        const historyMessages = await ChatService.getMessageHistory(chatId);
+        
+        // Update chat history with loaded messages (even if empty array)
+        setChatHistory(prev => ({
+          ...prev,
+          messages: {
+            ...prev.messages,
+            [chatId]: historyMessages || []
+          }
+        }));
 
-      console.log(`Loaded ${historyMessages.length} messages from chat_messages table for session:`, chatId);
+        console.log(`Loaded ${historyMessages.length} messages for chat ${chatId}`);
+      }
     } catch (error) {
       console.error('Error loading chat history:', error);
       setError('Erro ao carregar histórico da conversa');
@@ -243,9 +227,11 @@ export function useChat() {
     setCurrentThreadId(threadId);
     setError(null);
     
-    // SEMPRE carregar mensagens frescas após limpar - usando apenas um método
-    console.log('Loading fresh messages from database...');
-    await loadChatHistory(threadId);
+    // SEMPRE carregar mensagens frescas após limpar com um pequeno delay
+    console.log('Loading fresh messages from chat_messages table...');
+    setTimeout(async () => {
+      await loadChatHistory(threadId);
+    }, 100);
   }, [chatHistory.threads, loadChatHistory, createThreadFromSupabase]);
 
   // Method to force reload a thread (useful for new sessions)
