@@ -6,6 +6,7 @@ export class ChatMessageService {
   static async saveMessage({
     chatId,
     threadId,
+    sessao,
     messageId,
     sender,
     content,
@@ -20,6 +21,7 @@ export class ChatMessageService {
           {
             chat_id: chatId,
             thread_id: threadId,
+            sessao: sessao,
             message_id: messageId,
             sender,
             content,
@@ -53,6 +55,25 @@ export class ChatMessageService {
       return { data: data || [], error: null }
     } catch (error) {
       console.error('Error fetching chat messages:', error)
+      return { data: [], error: error.message }
+    }
+  }
+
+  // Buscar mensagens específicas de uma sessão
+  static async getSessionMessages(threadId, sessao, limit = 100) {
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .eq('sessao', sessao)
+        .order('created_at', { ascending: true })
+        .limit(limit)
+
+      if (error) throw error
+      return { data: data || [], error: null }
+    } catch (error) {
+      console.error('Error fetching session messages:', error)
       return { data: [], error: error.message }
     }
   }

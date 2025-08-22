@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, uuid, smallint } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, uuid, smallint, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -32,6 +32,7 @@ export const chatMessages = pgTable("chat_messages", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   chatId: varchar("chat_id").notNull(),
   threadId: varchar("thread_id"),
+  sessao: integer("sessao").notNull(),
   messageId: varchar("message_id").notNull(),
   sender: varchar("sender", { enum: ["user", "assistant"] }).notNull(),
   content: text("content").notNull(),
@@ -76,6 +77,7 @@ export const insertMessageSchema = createInsertSchema(messages).pick({
 export const insertChatMessageSchema = createInsertSchema(chatMessages).pick({
   chatId: true,
   threadId: true,
+  sessao: true,
   messageId: true,
   sender: true,
   content: true,

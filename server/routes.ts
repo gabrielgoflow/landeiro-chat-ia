@@ -170,6 +170,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get messages for a specific session by thread_id and sessao
+  app.get("/api/session-messages/:threadId/:sessao", async (req, res) => {
+    try {
+      const { threadId, sessao } = req.params;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const messages = await storage.getSessionMessages(threadId, parseInt(sessao), limit);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/thread-messages/:threadId", async (req, res) => {
     try {
       const { threadId } = req.params;

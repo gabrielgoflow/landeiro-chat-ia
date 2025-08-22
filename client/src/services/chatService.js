@@ -113,40 +113,67 @@ export class ChatService {
       const messages = await response.json();
       console.log(`Loaded ${messages.length} messages from chat_messages table for session:`, chatId);
 
-      // Transform database messages to our frontend format
-      const transformedMessages = messages.map(msg => {
-        const baseMessage = {
-          id: msg.messageId || msg.message_id,
-          sender: msg.sender,
-          timestamp: new Date(msg.createdAt || msg.created_at),
-        };
-
-        // Handle audio messages
-        if (msg.messageType === 'audio' || msg.message_type === 'audio') {
-          return {
-            ...baseMessage,
-            type: 'audio',
-            audioUrl: msg.audioUrl || msg.audio_url,
-            audioURL: msg.audioUrl || msg.audio_url, // Include both for compatibility
-            mimeType: 'audio/mp3', // Default to mp3 for stored audio
-            duration: 0,
-          };
-        }
-
-        // Handle text messages
-        return {
-          ...baseMessage,
-          text: msg.content,
-          content: msg.content,
-        };
-      });
-
-      console.log(`Transformed ${transformedMessages.length} messages for session ${chatId}`);
-      return transformedMessages;
+      return this.transformMessages(messages, chatId);
     } catch (error) {
       console.error("Error fetching message history:", error);
       throw error;
     }
+  }
+
+  // Get messages for a specific session by thread_id and sessao
+  static async getSessionMessages(threadId, sessao) {
+    try {
+      const response = await fetch(`/api/session-messages/${threadId}/${sessao}`);
+
+      if (!response.ok) {
+        if (response.status === 404 || response.status === 500) {
+          console.log(`No messages found for thread ${threadId} session ${sessao}`);
+          return [];
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const messages = await response.json();
+      console.log(`Loaded ${messages.length} messages for thread ${threadId} session ${sessao}`);
+
+      return this.transformMessages(messages, `${threadId}_session_${sessao}`);
+    } catch (error) {
+      console.error("Error fetching session messages:", error);
+      throw error;
+    }
+  }
+
+  // Helper method to transform database messages to frontend format
+  static transformMessages(messages, identifier) {
+    const transformedMessages = messages.map(msg => {
+      const baseMessage = {
+        id: msg.messageId || msg.message_id,
+        sender: msg.sender,
+        timestamp: new Date(msg.createdAt || msg.created_at),
+      };
+
+      // Handle audio messages
+      if (msg.messageType === 'audio' || msg.message_type === 'audio') {
+        return {
+          ...baseMessage,
+          type: 'audio',
+          audioUrl: msg.audioUrl || msg.audio_url,
+          audioURL: msg.audioUrl || msg.audio_url, // Include both for compatibility
+          mimeType: 'audio/mp3', // Default to mp3 for stored audio
+          duration: 0,
+        };
+      }
+
+      // Handle text messages
+      return {
+        ...baseMessage,
+        text: msg.content,
+        content: msg.content,
+      };
+    });
+
+    console.log(`Transformed ${transformedMessages.length} messages for ${identifier}`);
+    return transformedMessages;
   }
 
   static async sendMessage(

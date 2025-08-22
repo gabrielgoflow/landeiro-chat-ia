@@ -300,6 +300,7 @@ export function useChat() {
       await ChatMessageService.saveMessage({
         chatId: threadId,
         threadId: currentThread?.threadId || '',
+        sessao: sessionData?.sessao || 1,
         messageId: userMessage.id,
         sender: 'user',
         content: typeof content === 'string' ? content : JSON.stringify(content),
@@ -327,6 +328,7 @@ export function useChat() {
         await ChatMessageService.saveMessage({
           chatId: threadId,
           threadId: currentThread?.threadId || '',
+          sessao: sessionData?.sessao || 1,
           messageId: aiMessage.id,
           sender: 'assistant',
           content: aiResponse.message || 'Mensagem de áudio',
@@ -343,6 +345,7 @@ export function useChat() {
         await ChatMessageService.saveMessage({
           chatId: threadId,
           threadId: currentThread?.threadId || '',
+          sessao: sessionData?.sessao || 1,
           messageId: aiMessage.id,
           sender: 'assistant',
           content: messageText,

@@ -1,6 +1,6 @@
 import { type User, type InsertUser, type ChatReview, type InsertChatReview, type ChatMessage, type InsertChatMessage, users, chatReviews, chatMessages } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { db } from "./db";
 
 // modify the interface with any CRUD methods
@@ -19,6 +19,7 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(chatId: string, limit?: number): Promise<ChatMessage[]>;
   getThreadMessages(threadId: string, limit?: number): Promise<ChatMessage[]>;
+  getSessionMessages(threadId: string, sessao: number, limit?: number): Promise<ChatMessage[]>;
   getChatStats(chatId: string): Promise<any>;
   getChatOverview(chatId: string): Promise<any>;
   getThreadSessions(threadId: string): Promise<any[]>;
@@ -100,6 +101,18 @@ export class MemStorage implements IStorage {
     const allMessages: ChatMessage[] = [];
     for (const messages of Array.from(this.messages.values())) {
       allMessages.push(...messages.filter((m: ChatMessage) => m.threadId === threadId));
+    }
+    return allMessages.slice(-limit).sort((a, b) => 
+      new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
+    );
+  }
+
+  async getSessionMessages(threadId: string, sessao: number, limit = 100): Promise<ChatMessage[]> {
+    const allMessages: ChatMessage[] = [];
+    for (const messages of Array.from(this.messages.values())) {
+      allMessages.push(...messages.filter((m: ChatMessage) => 
+        m.threadId === threadId && m.sessao === sessao
+      ));
     }
     return allMessages.slice(-limit).sort((a, b) => 
       new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
@@ -192,6 +205,18 @@ export class DatabaseStorage implements IStorage {
     if (!db) throw new Error("Database not connected");
     const result = await db.select().from(chatMessages)
       .where(eq(chatMessages.threadId, threadId))
+      .orderBy(chatMessages.createdAt)
+      .limit(limit);
+    return result;
+  }
+
+  async getSessionMessages(threadId: string, sessao: number, limit = 100): Promise<ChatMessage[]> {
+    if (!db) throw new Error("Database not connected");
+    const result = await db.select().from(chatMessages)
+      .where(and(
+        eq(chatMessages.threadId, threadId),
+        eq(chatMessages.sessao, sessao)
+      ))
       .orderBy(chatMessages.createdAt)
       .limit(limit);
     return result;
