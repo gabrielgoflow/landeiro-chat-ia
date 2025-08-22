@@ -157,6 +157,19 @@ export class ChatService {
 
       const messages = await response.json();
       console.log(`Loaded ${messages.length} session-specific messages for thread ${threadId} session ${sessao}`);
+      
+      // Log detailed info about each message
+      messages.forEach((msg, index) => {
+        if (msg.sender === 'assistant') {
+          console.log(`Message ${index} (${msg.sender}):`, {
+            id: msg.message_id,
+            type: msg.message_type,
+            hasContent: !!msg.content,
+            contentLength: msg.content ? msg.content.length : 0,
+            contentPreview: msg.content ? msg.content.substring(0, 50) : 'null'
+          });
+        }
+      });
 
       // Transform messages to expected format
       return this.transformMessages(messages, `${threadId}_session_${sessao}`);

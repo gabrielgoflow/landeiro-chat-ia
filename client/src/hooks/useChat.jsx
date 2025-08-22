@@ -159,12 +159,26 @@ export function useChat() {
     try {
       setIsLoading(true);
       console.log('Loading chat history for:', chatId, 'session:', sessao);
+      console.log('Current chat history state:', Object.keys(chatHistory.messages));
       
       // If we have session info, try to find thread and use session-specific loading
       const currentThread = chatHistory.threads.find(t => t.id === chatId);
+      console.log('Found thread for loading:', currentThread);
+      
       if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
         console.log(`Using session-specific loading for thread ${currentThread.threadId} session ${currentThread.sessionData.sessao}`);
         const historyMessages = await ChatService.getSessionMessages(currentThread.threadId, currentThread.sessionData.sessao);
+        
+        console.log(`Received ${historyMessages.length} messages from ChatService.getSessionMessages`);
+        historyMessages.forEach((msg, idx) => {
+          if (msg.sender === 'assistant' && msg.type === 'audio') {
+            console.log(`Assistant audio message ${idx}:`, {
+              id: msg.id,
+              hasAudioBase64: !!msg.audioBase64,
+              hasAudioUrl: !!msg.audioUrl
+            });
+          }
+        });
         
         // Update chat history with loaded messages (even if empty array)
         setChatHistory(prev => ({
