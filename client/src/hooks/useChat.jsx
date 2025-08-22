@@ -159,26 +159,12 @@ export function useChat() {
     try {
       setIsLoading(true);
       console.log('Loading chat history for:', chatId, 'session:', sessao);
-      console.log('Current chat history state:', Object.keys(chatHistory.messages));
       
       // If we have session info, try to find thread and use session-specific loading
       const currentThread = chatHistory.threads.find(t => t.id === chatId);
-      console.log('Found thread for loading:', currentThread);
-      
       if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
         console.log(`Using session-specific loading for thread ${currentThread.threadId} session ${currentThread.sessionData.sessao}`);
         const historyMessages = await ChatService.getSessionMessages(currentThread.threadId, currentThread.sessionData.sessao);
-        
-        console.log(`Received ${historyMessages.length} messages from ChatService.getSessionMessages`);
-        historyMessages.forEach((msg, idx) => {
-          if (msg.sender === 'assistant' && msg.type === 'audio') {
-            console.log(`Assistant audio message ${idx}:`, {
-              id: msg.id,
-              hasAudioBase64: !!msg.audioBase64,
-              hasAudioUrl: !!msg.audioUrl
-            });
-          }
-        });
         
         // Update chat history with loaded messages (even if empty array)
         setChatHistory(prev => ({
@@ -378,19 +364,28 @@ export function useChat() {
       
       // Handle audio or text response from AI
       let aiMessage;
-      if (typeof aiResponse === 'object' && aiResponse.type === 'audio' && aiResponse.base64) {
-        // Create audio message from AI response - format to match transform expectations
-        aiMessage = {
-          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          sender: 'assistant',
+      if (typeof aiResponse === 'object' && aiResponse.type === 'audio') {
+        // Create audio message from AI response
+        aiMessage = ChatService.createUserMessage(threadId, {
           type: 'audio',
-          audioBase64: `data:audio/mp3;base64,${aiResponse.base64}`,
-          mimeType: 'audio/mp3',
-          duration: 0,
-          timestamp: new Date()
-        };
+          audioBase64: aiResponse.audioBase64,
+          mimeType: aiResponse.mimeType,
+          duration: 0
+        });
+        aiMessage.sender = 'assistant'; // Override sender for AI audio messages
         
-        console.log('AI audio message saved by server endpoint:', aiMessage.id);
+        // Save AI audio message to chat_messages table
+        await ChatMessageService.saveMessage({
+          chatId: threadId,
+          threadId: currentThread?.threadId || '',
+          sessao: sessionData?.sessao || 1,
+          messageId: aiMessage.id,
+          sender: 'assistant',
+          content: aiResponse.message || 'Mensagem de áudio',
+          messageType: 'audio',
+          audioUrl: null, // We store base64 in content for audio messages
+          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.audioBase64 }
+        });
       } else {
         // Create text message
         const messageText = typeof aiResponse === 'string' ? aiResponse : aiResponse.message;
