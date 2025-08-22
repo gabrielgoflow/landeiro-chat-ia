@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, uuid, smallint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -15,7 +15,7 @@ export const chatThreads = pgTable("chat_threads", {
   threadId: varchar("thread_id").notNull(),
   diagnostico: varchar("diagnostico"),
   protocolo: varchar("protocolo"),
-  sessao: varchar("sessao"),
+  sessao: smallint("sessao"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -82,7 +82,7 @@ export type ChatThreadExtended = ChatThread & {
   sessionData?: {
     diagnostico?: string;
     protocolo?: string;
-    sessao?: string;
+    sessao?: number;
   };
 };
 

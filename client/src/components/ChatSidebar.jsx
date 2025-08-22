@@ -246,9 +246,16 @@ export function ChatSidebar({
                       
                       <div className="flex-1 min-w-0 pr-24">
                         <div className="flex flex-col space-y-1 mb-2">
-                          <Badge variant="secondary" className="w-fit text-xs">
-                            {(chat.diagnostico || 'Diagnóstico').toUpperCase()}
-                          </Badge>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="secondary" className="w-fit text-xs">
+                              {(chat.diagnostico || 'Diagnóstico').toUpperCase()}
+                            </Badge>
+                            {chat.sessao && (
+                              <Badge variant="default" className="w-fit text-xs bg-indigo-600">
+                                SESSÃO {chat.sessao}
+                              </Badge>
+                            )}
+                          </div>
                           <Badge variant="outline" className="w-fit text-xs">
                             {(chat.protocolo || 'Protocolo').toUpperCase()}
                           </Badge>
