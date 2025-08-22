@@ -292,30 +292,27 @@ export default function Chat() {
 
   // Handler para trocar de sessão nas abas
   const handleSessionChange = (sessionChatId) => {
-    console.log('Switching to session with chatId:', sessionChatId);
     navigate(`/chat/${sessionChatId}`);
   };
 
   // Detect if current session is finalized based on review
   useEffect(() => {
     const checkSessionStatus = async () => {
-      if (!currentThread?.id) {
+      if (!chatId || chatId === 'new') {
         setIsCurrentSessionFinalized(false);
         return;
       }
 
       try {
-        const response = await fetch(`/api/reviews/${currentThread.id}`);
+        const response = await fetch(`/api/reviews/${chatId}`);
         if (response.ok) {
           const reviewData = await response.json();
-          console.log('Session status check - Review found:', !!reviewData, 'for chat:', currentThread.id);
           setIsCurrentSessionFinalized(!!reviewData);
           setHasReview(!!reviewData);
           if (reviewData) {
             setCurrentReview(reviewData);
           }
         } else if (response.status === 404) {
-          console.log('Session status check - No review found (404) for chat:', currentThread.id);
           setIsCurrentSessionFinalized(false);
           setHasReview(false);
           setCurrentReview(null);
@@ -327,7 +324,7 @@ export default function Chat() {
     };
 
     checkSessionStatus();
-  }, [currentThread?.id]);
+  }, [chatId]);
 
   // Handler para criar nova sessão das abas
   const handleNewSessionFromTabs = () => {
