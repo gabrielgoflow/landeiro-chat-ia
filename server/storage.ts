@@ -19,7 +19,7 @@ export interface IStorage {
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(chatId: string, limit?: number): Promise<ChatMessage[]>;
   getThreadMessages(threadId: string, limit?: number): Promise<ChatMessage[]>;
-  getSessionMessages(threadId: string, sessao: number, limit?: number): Promise<ChatMessage[]>;
+  getSessionMessages(chatId: string, sessao: number, limit?: number): Promise<ChatMessage[]>;
   getChatStats(chatId: string): Promise<any>;
   getChatOverview(chatId: string): Promise<any>;
   getThreadSessions(threadId: string): Promise<any[]>;
@@ -210,11 +210,11 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getSessionMessages(threadId: string, sessao: number, limit = 100): Promise<ChatMessage[]> {
+  async getSessionMessages(chatId: string, sessao: number, limit = 100): Promise<ChatMessage[]> {
     if (!db) throw new Error("Database not connected");
     const result = await db.select().from(chatMessages)
       .where(and(
-        eq(chatMessages.threadId, threadId),
+        eq(chatMessages.chatId, chatId),
         eq(chatMessages.sessao, sessao)
       ))
       .orderBy(chatMessages.createdAt)

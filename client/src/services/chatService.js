@@ -141,25 +141,25 @@ export class ChatService {
     }
   }
 
-  static async getSessionMessages(threadId, sessao) {
+  static async getSessionMessages(chatId, sessao) {
     try {
-      // Use session-specific endpoint for thread+session filtering
-      const response = await fetch(`/api/session-messages/${threadId}/${sessao}`);
+      // Use session-specific endpoint for chat_id+session filtering
+      const response = await fetch(`/api/session-messages/${chatId}/${sessao}`);
 
       if (!response.ok) {
         if (response.status === 404 || response.status === 500) {
           // No messages found for this session or error - return empty array
-          console.log(`No messages found for thread ${threadId} session ${sessao} or error occurred`);
+          console.log(`No messages found for chat ${chatId} session ${sessao} or error occurred`);
           return [];
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const messages = await response.json();
-      console.log(`Loaded ${messages.length} session-specific messages for thread ${threadId} session ${sessao}`);
+      console.log(`Loaded ${messages.length} session-specific messages for chat ${chatId} session ${sessao}`);
 
       // Transform messages to expected format
-      return this.transformMessages(messages, `${threadId}_session_${sessao}`);
+      return this.transformMessages(messages, `${chatId}_session_${sessao}`);
     } catch (error) {
       console.error('Error loading session messages:', error);
       return [];

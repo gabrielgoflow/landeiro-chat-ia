@@ -174,11 +174,11 @@ export function useChat() {
       setIsLoading(true);
       console.log('Loading chat history for:', chatId, 'session:', sessao);
       
-      // If we have session info, try to find thread and use session-specific loading
+      // If we have session info, use session-specific loading by chat_id + sessao
       const currentThread = chatHistory.threads.find(t => t.id === chatId);
-      if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
-        console.log(`Using session-specific loading for thread ${currentThread.threadId} session ${currentThread.sessionData.sessao}`);
-        const historyMessages = await ChatService.getSessionMessages(currentThread.threadId, currentThread.sessionData.sessao);
+      if (currentThread?.sessionData?.sessao) {
+        console.log(`Using session-specific loading for chat ${chatId} session ${currentThread.sessionData.sessao}`);
+        const historyMessages = await ChatService.getSessionMessages(chatId, currentThread.sessionData.sessao);
         
         // Update chat history with loaded messages (even if empty array)
         setChatHistory(prev => ({
