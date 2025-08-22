@@ -190,21 +190,23 @@ export function useChat() {
         }));
 
         console.log(`Loaded ${historyMessages.length} session-specific messages for chat ${chatId}`);
-      } else {
-        // Fallback to individual chat messages
-        const historyMessages = await ChatService.getMessageHistory(chatId);
-        
-        // Update chat history with loaded messages (even if empty array)
-        setChatHistory(prev => ({
-          ...prev,
-          messages: {
-            ...prev.messages,
-            [chatId]: historyMessages || []
-          }
-        }));
-
-        console.log(`Loaded ${historyMessages.length} messages for chat ${chatId}`);
+        return; // Exit early to avoid fallback call
       }
+      
+      // Only use fallback if session-specific loading didn't happen
+      console.log('Using fallback individual chat messages loading for:', chatId);
+      const historyMessages = await ChatService.getMessageHistory(chatId);
+      
+      // Update chat history with loaded messages (even if empty array)
+      setChatHistory(prev => ({
+        ...prev,
+        messages: {
+          ...prev.messages,
+          [chatId]: historyMessages || []
+        }
+      }));
+
+      console.log(`Loaded ${historyMessages.length} messages from chat_messages table for session:`, chatId);
     } catch (error) {
       console.error('Error loading chat history:', error);
       setError('Erro ao carregar histórico da conversa');
