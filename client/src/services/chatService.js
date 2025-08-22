@@ -177,14 +177,36 @@ export class ChatService {
 
       // Handle audio messages
       if (msg.messageType === 'audio' || msg.message_type === 'audio') {
-        return {
+        console.log('Transforming audio message:', msg);
+        
+        let audioUrl = msg.audioUrl || msg.audio_url;
+        let audioBase64 = msg.audioBase64 || msg.audio_base64;
+        let mimeType = msg.mimeType || msg.mime_type || 'audio/webm';
+        
+        // If content is a JSON string (user messages), parse it to extract audio data
+        if (msg.content && typeof msg.content === 'string' && msg.content.startsWith('{')) {
+          try {
+            const contentData = JSON.parse(msg.content);
+            if (contentData.type === 'audio') {
+              audioBase64 = contentData.audioBase64;
+              audioUrl = contentData.audioURL || contentData.audioUrl;
+              mimeType = contentData.mimeType || mimeType;
+            }
+          } catch (e) {
+            console.warn('Failed to parse audio content JSON:', e);
+          }
+        }
+        
+        const audioMessage = {
           ...baseMessage,
           type: 'audio',
-          audioUrl: msg.audioUrl || msg.audio_url,
-          audioBase64: msg.audioBase64 || msg.audio_base64,
-          mimeType: msg.mimeType || msg.mime_type || 'audio/webm',
+          audioUrl,
+          audioBase64,
+          mimeType,
           duration: msg.duration || 0,
         };
+        console.log('Transformed audio message:', audioMessage);
+        return audioMessage;
       }
 
       // Handle text messages

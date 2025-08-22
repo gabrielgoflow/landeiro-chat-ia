@@ -9,6 +9,11 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
   const [isLoading, setIsLoading] = useState(true);
   const audioRef = useRef(null);
 
+  // Debug: log audio props
+  useEffect(() => {
+    console.log('AudioMessage props:', { audioUrl, audioBase64: audioBase64 ? 'has base64' : 'no base64', mimeType, sender });
+  }, [audioUrl, audioBase64, mimeType, sender]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -38,11 +43,13 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
 
     const handleError = (e) => {
       console.error('Audio loading error:', e);
+      console.error('Audio src was:', audio.src);
       setIsLoading(false);
     };
 
     // Reset loading state when audio source changes
     setIsLoading(true);
+    console.log('Audio src set to:', audio.src);
 
     audio.addEventListener('loadeddata', handleLoadedData);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -93,7 +100,7 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
     `}>
       <audio 
         ref={audioRef} 
-        src={audioBase64 || audioUrl}
+        src={audioBase64 ? `data:${mimeType || 'audio/webm'};base64,${audioBase64}` : audioUrl}
         preload="metadata"
         className="hidden"
       />
