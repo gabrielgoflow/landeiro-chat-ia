@@ -204,6 +204,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/thread-sessions/:threadId", async (req, res) => {
+    try {
+      const { threadId } = req.params;
+      const sessions = await storage.getThreadSessions(threadId);
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

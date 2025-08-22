@@ -12,6 +12,7 @@ import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
 import { MessageInput } from "@/components/MessageInput.jsx";
 import { NewChatDialog } from "@/components/NewChatDialog.jsx";
 import { ReviewSidebar } from "@/components/ReviewSidebar";
+import { SessionTabs } from "@/components/SessionTabs.jsx";
 
 export default function Chat() {
   const { chatId } = useParams();
@@ -24,6 +25,8 @@ export default function Chat() {
   const [isLoadingReview, setIsLoadingReview] = useState(false);
   const [hasReview, setHasReview] = useState(false);
   const [isStartingNextSession, setIsStartingNextSession] = useState(false);
+  const [currentSessionData, setCurrentSessionData] = useState(null);
+  const [threadId, setThreadId] = useState(null);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -88,6 +91,17 @@ export default function Chat() {
       initializeChat();
     }
   }, [chatId, threads, selectThread, startNewThread, createThreadFromSupabase]);
+
+  // Extract threadId from current thread
+  useEffect(() => {
+    if (currentThread?.threadId) {
+      setThreadId(currentThread.threadId);
+      setCurrentSessionData(currentThread.sessionData);
+    } else {
+      setThreadId(null);
+      setCurrentSessionData(null);
+    }
+  }, [currentThread]);
 
   // Check if current chat has a review
   useEffect(() => {
@@ -248,6 +262,23 @@ export default function Chat() {
     }
   };
 
+  // Handler para mudança de sessão via tabs
+  const handleSessionChange = (sessionData) => {
+    console.log('Changing to session:', sessionData);
+    // Navegar para o chat da sessão selecionada
+    if (sessionData.chat_id !== currentThread?.id) {
+      window.location.href = `/chat/${sessionData.chat_id}`;
+    }
+  };
+
+  // Handler para criar nova sessão via tabs
+  const handleNewSessionFromTabs = async () => {
+    if (!currentThread) return;
+    
+    // Usar a mesma lógica do botão "Iniciar Próxima Sessão"
+    await handleStartNextSession();
+  };
+
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
       <ChatSidebar
@@ -365,6 +396,17 @@ export default function Chat() {
             </Button>
           </div>
         </div>
+
+        {/* Session Tabs - only show if we have a threadId */}
+        {threadId && (
+          <SessionTabs
+            threadId={threadId}
+            currentChatId={currentThread?.id}
+            onSessionChange={handleSessionChange}
+            onNewSession={handleNewSessionFromTabs}
+            className="border-b"
+          />
+        )}
 
         {/* Messages Container */}
         <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0" data-testid="messages-container">

@@ -21,6 +21,7 @@ export interface IStorage {
   getThreadMessages(threadId: string, limit?: number): Promise<ChatMessage[]>;
   getChatStats(chatId: string): Promise<any>;
   getChatOverview(chatId: string): Promise<any>;
+  getThreadSessions(threadId: string): Promise<any[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -76,6 +77,7 @@ export class MemStorage implements IStorage {
       threadId: insertMessage.threadId || null,
       audioUrl: insertMessage.audioUrl || null,
       metadata: insertMessage.metadata || {},
+      messageType: insertMessage.messageType || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -129,6 +131,12 @@ export class MemStorage implements IStorage {
       reviewCreated: review?.createdAt || null,
       ...stats
     };
+  }
+
+  async getThreadSessions(threadId: string): Promise<any[]> {
+    // In-memory implementation - basic fallback
+    // For full functionality, database implementation is recommended
+    return [];
   }
 }
 
@@ -227,6 +235,26 @@ export class DatabaseStorage implements IStorage {
     `);
 
     return (result as any)[0] || null;
+  }
+
+  async getThreadSessions(threadId: string): Promise<any[]> {
+    if (!db) throw new Error("Database not connected");
+    
+    // Get all sessions for a thread_id with their review status
+    const result = await db.execute(sql`
+      SELECT 
+        ct.*,
+        cr.id as review_id,
+        cr.resumo_atendimento,
+        cr.created_at as review_created,
+        CASE WHEN cr.id IS NOT NULL THEN 'finalizado' ELSE 'em_andamento' END as status
+      FROM chat_threads ct
+      LEFT JOIN chat_reviews cr ON ct.chat_id = cr.chat_id
+      WHERE ct.thread_id = ${threadId}
+      ORDER BY ct.sessao ASC
+    `);
+
+    return result as any[];
   }
 }
 
