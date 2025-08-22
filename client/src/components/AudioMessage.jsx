@@ -53,7 +53,23 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
 
     const handleError = (e) => {
       console.error('Audio loading error:', e);
-      console.error('Audio src was:', audio.src);
+      console.error('Audio src length:', audio.src ? audio.src.length : 'null');
+      console.error('Audio src prefix:', audio.src ? audio.src.substring(0, 100) : 'null');
+      
+      // Try to decode and validate the base64
+      if (audio.src && audio.src.startsWith('data:audio')) {
+        try {
+          const base64Part = audio.src.split(',')[1];
+          if (base64Part) {
+            // Test if base64 is valid
+            atob(base64Part.substring(0, 100)); // Test first 100 chars
+            console.error('Base64 appears valid, might be format/codec issue');
+          }
+        } catch (decodeError) {
+          console.error('Base64 decode error:', decodeError);
+        }
+      }
+      
       setIsLoading(false);
     };
 
@@ -87,6 +103,27 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
     } else {
       audio.play().catch(error => {
         console.error('Audio play error:', error);
+        
+        // Try alternative playback method for problematic audio
+        if (audioBase64 && audioBase64.startsWith('data:audio')) {
+          console.log('Trying alternative audio playback method...');
+          
+          // Create a new audio element as fallback
+          const fallbackAudio = new Audio(audioBase64);
+          fallbackAudio.play().catch(fallbackError => {
+            console.error('Fallback audio play error:', fallbackError);
+            
+            // Last resort: try downloading and playing
+            try {
+              const link = document.createElement('a');
+              link.href = audioBase64;
+              link.download = `audio-${Date.now()}.mp3`;
+              console.log('Audio download link created - user can right-click to save');
+            } catch (downloadError) {
+              console.error('Download fallback failed:', downloadError);
+            }
+          });
+        }
       });
     }
     setIsPlaying(!isPlaying);
