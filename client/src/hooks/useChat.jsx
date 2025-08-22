@@ -342,14 +342,19 @@ export function useChat() {
           content: aiResponse.text || 'Mensagem de áudio'
         };
         
-        // Save AI audio message to chat_messages table
+        // Save AI audio message to chat_messages table - save full response object in content
         await ChatMessageService.saveMessage({
           chatId: threadId,
           threadId: currentThread?.threadId || '',
           sessao: sessionData?.sessao || 1,
           messageId: aiMessage.id,
           sender: 'assistant',
-          content: aiResponse.base64, // Save the base64 directly in content for audio messages
+          content: JSON.stringify({
+            type: 'audio',
+            audioBase64: `data:audio/mp3;base64,${aiResponse.base64}`,
+            mimeType: aiResponse.mimeType || 'audio/mp3',
+            text: aiResponse.text || 'Mensagem de áudio'
+          }),
           messageType: 'audio',
           audioUrl: null,
           metadata: { mimeType: aiResponse.mimeType, text: aiResponse.text || 'Mensagem de áudio' }
