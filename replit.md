@@ -38,10 +38,21 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
   - thread_id (VARCHAR): ID do thread do OpenAI Assistant  
   - diagnostico (VARCHAR): Diagnóstico selecionado (ex: ansiedade)
   - protocolo (VARCHAR): Sempre "tcc" (TCC é o protocolo padrão fixo)
+  - sessao (SMALLINT): Número da sessão de terapia (auto-incrementado por usuário)
 - **user_chats**: Relaciona user_id com chat_id do OpenAI
   - user_id (UUID): Referência ao usuário autenticado
   - chat_id (VARCHAR): ID do chat do OpenAI
   - chat_threads_id (UUID): Referência à tabela chat_threads
+- **chat_reviews**: Supervisão e revisão das sessões de terapia
+  - id (VARCHAR): ID único do review
+  - chat_id (VARCHAR): Referência ao chat
+  - resumo_atendimento (TEXT): Resumo da sessão
+  - feedback_direto (TEXT): Feedback direto para o terapeuta
+  - sinais_paciente (ARRAY): Sinais observados no paciente
+  - pontos_positivos (ARRAY): Aspectos positivos da sessão
+  - pontos_negativos (ARRAY): Aspectos a melhorar
+  - sessao (SMALLINT): Número da sessão correspondente
+  - created_at (TIMESTAMP): Data de criação do review
 - **Row Level Security (RLS)**: Implementado para garantir isolamento de dados por usuário
 
 **Database Schema** (configured but not actively used):
