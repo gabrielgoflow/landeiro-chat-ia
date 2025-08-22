@@ -18,6 +18,15 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
       setIsLoading(false);
     };
 
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration || 0);
+      setIsLoading(false);
+    };
+
+    const handleCanPlay = () => {
+      setIsLoading(false);
+    };
+
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime || 0);
     };
@@ -32,18 +41,25 @@ export function AudioMessage({ audioUrl, audioBase64, mimeType = 'audio/webm', s
       setIsLoading(false);
     };
 
+    // Reset loading state when audio source changes
+    setIsLoading(true);
+
     audio.addEventListener('loadeddata', handleLoadedData);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
 
     return () => {
       audio.removeEventListener('loadeddata', handleLoadedData);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
     };
-  }, [audioUrl]);
+  }, [audioUrl, audioBase64]);
 
   const togglePlayback = () => {
     const audio = audioRef.current;
