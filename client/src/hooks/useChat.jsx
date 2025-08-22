@@ -132,6 +132,15 @@ export function useChat() {
       setIsLoading(true);
       console.log('Loading chat history for:', chatId, 'session:', sessao);
       
+      // Clear messages for this chat before loading new ones
+      setChatHistory(prev => ({
+        ...prev,
+        messages: {
+          ...prev.messages,
+          [chatId]: []
+        }
+      }));
+      
       // If we have session info, try to find thread and use session-specific loading
       const currentThread = chatHistory.threads.find(t => t.id === chatId);
       if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
@@ -193,7 +202,7 @@ export function useChat() {
     const existingMessages = chatHistory.messages[threadId];
     console.log('Existing messages for thread:', existingMessages?.length || 0);
     
-    // Always load fresh messages from chat_messages table for the specific session
+    // Always load fresh messages for this thread
     console.log('Loading fresh messages from chat_messages table...');
     await loadChatHistory(threadId);
   }, [chatHistory.threads, chatHistory.messages, loadChatHistory, createThreadFromSupabase]);

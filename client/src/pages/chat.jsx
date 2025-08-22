@@ -296,6 +296,8 @@ export default function Chat() {
   // Handler para trocar de sessão nas abas
   const handleSessionChange = (sessionChatId) => {
     console.log('Changing to session:', sessionChatId);
+    
+    // Navegar para a nova sessão (isso vai disparar o recarregamento das mensagens)
     navigate(`/chat/${sessionChatId}`);
   };
 
