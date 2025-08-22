@@ -114,7 +114,7 @@ export function useChat() {
     }
   }, [user]);
 
-  const startNewThread = useCallback(async (sessionData = null) => {
+  const startNewThread = useCallback(async (sessionData = null, onChatCreated = null) => {
     const newThread = ChatService.createNewThread(sessionData);
     
     // Save to local storage first
@@ -160,6 +160,11 @@ export function useChat() {
           }));
           
           console.log(`Thread saved to Supabase successfully - Session ${sessionNumber}`);
+          
+          // Notify that a new chat was created (for sidebar refresh)
+          if (onChatCreated) {
+            onChatCreated(newThread);
+          }
         } else {
           console.error('Error saving to Supabase:', chatThreadError);
         }

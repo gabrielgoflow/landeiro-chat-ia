@@ -29,6 +29,7 @@ export default function Chat() {
   const [currentSessionData, setCurrentSessionData] = useState(null);
   const [threadId, setThreadId] = useState(null);
   const [isCurrentSessionFinalized, setIsCurrentSessionFinalized] = useState(false);
+  const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -183,7 +184,12 @@ export default function Chat() {
   };
 
   const handleNewChatConfirm = (formData) => {
-    startNewThread(formData);
+    // Callback para atualizar sidebar quando novo chat é criado
+    const onChatCreated = () => {
+      setSidebarRefreshTrigger(prev => prev + 1);
+    };
+    
+    startNewThread(formData, onChatCreated);
     setShowNewChatDialog(false);
   };
 
@@ -368,6 +374,7 @@ export default function Chat() {
         onStartNewThread={() => setShowNewChatDialog(true)}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        refreshTrigger={sidebarRefreshTrigger}
       />
 
       {/* Main Chat Area */}

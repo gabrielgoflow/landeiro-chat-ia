@@ -18,7 +18,8 @@ export function ChatSidebar({
   onDeleteThread,
   onStartNewThread,
   isOpen,
-  onClose
+  onClose,
+  refreshTrigger
 }) {
   const isMobile = useIsMobile();
   const { user, signOut } = useAuth();
@@ -99,7 +100,7 @@ export function ChatSidebar({
     };
     
     loadUserChats();
-  }, [user]);
+  }, [user, refreshTrigger]);
 
   const handleNewChatConfirm = (formData) => {
     // Chama a função original passando os dados do diagnóstico e protocolo
