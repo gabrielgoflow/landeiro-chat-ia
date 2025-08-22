@@ -51,6 +51,7 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 - **Session Navigation**: Independent chat histories per session while maintaining same thread_id
 - **Status Management**: Sessions automatically marked as "finalizado" when reviews exist, "em_andamento" otherwise
 - **Session Creation**: "Iniciar Próxima Sessão" button creates new sessions with unique chat_ids
+- **Session Stability (Fixed August 2025)**: Removed automatic polling that caused unwanted session switching - sessions now only load on navigation
 - **API Endpoints**: 
   - `/api/thread-sessions/:threadId` - Retrieves all sessions for a thread
   - Enhanced session management in SupabaseService with `createNextSession()` method

@@ -10,7 +10,8 @@ export function SessionTabs({
   currentChatId, 
   onSessionChange, 
   onNewSession,
-  className = "" 
+  className = "",
+  refreshTrigger // Novo prop para forçar atualização quando necessário
 }) {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -20,18 +21,10 @@ export function SessionTabs({
     if (threadId) {
       loadSessions()
     }
-  }, [threadId])
+  }, [threadId, refreshTrigger]) // Recarrega quando threadId ou refreshTrigger mudam
 
-  // Polling para atualizar sessões automaticamente (detectar reviews criados)
-  useEffect(() => {
-    if (!threadId) return;
-
-    const interval = setInterval(() => {
-      loadSessions();
-    }, 60000); // Verifica a cada 60 segundos (ainda menos agressivo)
-
-    return () => clearInterval(interval);
-  }, [threadId]);
+  // Removido polling automático - carrega apenas quando há navegação real
+  // Isso evita mudanças indesejadas de sessão durante o uso
 
   const loadSessions = async () => {
     try {
