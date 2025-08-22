@@ -85,13 +85,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Landeiro Chat IA endpoint - handles both text and audio responses
   app.post("/api/landeiro-chat-ia", async (req, res) => {
     try {
-      const { message, chatId, email } = req.body;
+      const { message, chat_id, email, user_email } = req.body;
 
       // Include all required fields for the external AI service
       const requestBody: any = {
         message,
-        email: email || 'gabriel@goflow.digital',
-        chat_id: chatId || req.body.chatId, // Support both chatId and chat_id
+        email: user_email || email || 'gabriel@goflow.digital',
+        chat_id: chat_id, // Use chat_id as sent from frontend
       };
 
       // Add other fields from original request if they exist
