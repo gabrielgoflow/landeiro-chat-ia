@@ -421,6 +421,16 @@ export function useChat() {
     sendMessage,
     createThreadFromSupabase,
     reloadThread,
-    clearError: () => setError(null)
+    clearError: () => setError(null),
+    clearMessages: (chatId) => {
+      console.log('Clearing messages for chat:', chatId);
+      setChatHistory(prev => ({
+        ...prev,
+        messages: {
+          ...prev.messages,
+          [chatId]: []
+        }
+      }));
+    }
   };
 }

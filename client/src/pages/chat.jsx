@@ -47,7 +47,8 @@ export default function Chat() {
     sendMessage,
     createThreadFromSupabase,
     reloadThread,
-    clearError
+    clearError,
+    clearMessages
   } = useChat();
 
   // Auto-scroll to bottom when new messages are added
@@ -296,9 +297,13 @@ export default function Chat() {
   // Handler para trocar de sessão nas abas
   const handleSessionChange = (sessionChatId) => {
     console.log('Changing to session:', sessionChatId);
+    console.log('Current thread before change:', currentThread?.id);
     
-    // Primeiro, limpar todas as mensagens da tela para evitar confusão visual
-    // Isso força uma renderização limpa antes de carregar a nova sessão
+    // IMPORTANTE: Limpar mensagens ANTES de navegar
+    console.log('Clearing messages for session isolation before navigation');
+    if (clearMessages) {
+      clearMessages(sessionChatId);
+    }
     
     // Navegar para a nova sessão
     navigate(`/chat/${sessionChatId}`);
