@@ -122,6 +122,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if response contains base64 audio
       if (aiData.base64) {
+        // First, save AI response as audio message to database WITH the base64 data
+        const audioContent = JSON.stringify({
+          type: 'audio',
+          audioBase64: `data:audio/mp3;base64,${aiData.base64}`,
+          mimeType: 'audio/mp3'
+        });
+
+        // Get session data from request body for proper message saving
+        const sessionData = {
+          thread_id: req.body.threadId,
+          sessao: req.body.sessao || 1
+        };
+
+        console.log('Saving AI audio message with data:', {
+          chatId: requestBody.chat_id,
+          threadId: sessionData.thread_id,
+          sessao: sessionData.sessao,
+          hasBase64: !!aiData.base64
+        });
+
+        const aiMessage = {
+          chatId: requestBody.chat_id,
+          threadId: sessionData.thread_id || requestBody.chat_id,
+          sessao: sessionData.sessao,
+          messageId: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          sender: 'assistant' as 'assistant',
+          content: audioContent, // Store the audio data in content as JSON
+          messageType: 'audio',
+          audioUrl: null,
+          metadata: {
+            mimeType: 'audio/mp3'
+          }
+        };
+
+        await storage.createChatMessage(aiMessage);
+
         // Return audio response
         res.json({
           type: 'audio',

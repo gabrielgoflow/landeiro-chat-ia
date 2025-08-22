@@ -22,6 +22,17 @@ export function SessionTabs({
     }
   }, [threadId])
 
+  // Atualizar a sessão ativa quando currentChatId muda, mas sem resetar durante navigation
+  useEffect(() => {
+    if (currentChatId && sessions.length > 0) {
+      const currentSession = sessions.find(s => s.chat_id === currentChatId)
+      if (currentSession) {
+        console.log('Setting active session to:', currentSession.sessao.toString(), 'for chatId:', currentChatId)
+        setActiveSession(currentSession.sessao.toString())
+      }
+    }
+  }, [currentChatId, sessions])
+
   // Polling para atualizar sessões automaticamente (detectar reviews criados)
   useEffect(() => {
     if (!threadId) return;
@@ -66,11 +77,11 @@ export function SessionTabs({
           
           setSessions(formattedSessions)
           
-          // Encontrar a sessão atual baseada no currentChatId
+          // Encontrar a sessão atual baseada no currentChatId APENAS se não temos uma sessão ativa
           const currentSession = formattedSessions.find(s => s.chat_id === currentChatId)
-          if (currentSession) {
+          if (currentSession && !activeSession) {
             setActiveSession(currentSession.sessao.toString())
-          } else if (formattedSessions.length > 0) {
+          } else if (formattedSessions.length > 0 && !activeSession) {
             setActiveSession(formattedSessions[0].sessao.toString())
           }
           

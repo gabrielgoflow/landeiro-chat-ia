@@ -157,9 +157,34 @@ export class ChatService {
 
       const messages = await response.json();
       console.log(`Loaded ${messages.length} session-specific messages for thread ${threadId} session ${sessao}`);
+      
+      // Log detailed info about each message
+      messages.forEach((msg, index) => {
+        console.log(`Message ${index} (${msg.sender}):`, {
+          id: msg.message_id,
+          type: msg.message_type,
+          hasContent: !!msg.content,
+          contentLength: msg.content ? msg.content.length : 0,
+          contentPreview: msg.content ? msg.content.substring(0, 50) : 'null',
+          isAssistant: msg.sender === 'assistant'
+        });
+      });
 
       // Transform messages to expected format
-      return this.transformMessages(messages, `${threadId}_session_${sessao}`);
+      const transformedMessages = this.transformMessages(messages, `${threadId}_session_${sessao}`);
+      
+      // Log assistant messages after transformation
+      const assistantMessages = transformedMessages.filter(msg => msg.sender === 'assistant');
+      console.log(`After transformation - found ${assistantMessages.length} assistant messages:`, 
+        assistantMessages.map(msg => ({
+          id: msg.id,
+          type: msg.type,
+          hasAudioBase64: !!msg.audioBase64,
+          hasAudioUrl: !!msg.audioUrl
+        }))
+      );
+      
+      return transformedMessages;
     } catch (error) {
       console.error('Error loading session messages:', error);
       return [];
@@ -168,6 +193,8 @@ export class ChatService {
 
   // Helper method to transform database messages to frontend format
   static transformMessages(messages, identifier) {
+    console.log(`🔄 TRANSFORMING ${messages.length} messages for ${identifier}`);
+    
     const transformedMessages = messages.map(msg => {
       const baseMessage = {
         id: msg.messageId || msg.message_id,
@@ -175,16 +202,79 @@ export class ChatService {
         timestamp: new Date(msg.createdAt || msg.created_at),
       };
 
-      // Handle audio messages
-      if (msg.messageType === 'audio' || msg.message_type === 'audio') {
-        return {
+      // Handle audio messages - check for explicit audio type OR content containing base64 audio
+      const isExplicitAudio = msg.messageType === 'audio' || msg.message_type === 'audio';
+      const hasAudioContent = msg.content && typeof msg.content === 'string' && 
+        (msg.content.includes('base64,') || msg.content.startsWith('data:audio'));
+      
+      if (isExplicitAudio || hasAudioContent) {
+        console.log('🎵 TRANSFORMING AUDIO MESSAGE:', {
+          id: msg.message_id,
+          sender: msg.sender,
+          type: msg.message_type,
+          isExplicitAudio,
+          hasAudioContent,
+          contentPreview: msg.content ? msg.content.substring(0, 50) : 'null'
+        });
+        console.log('Message content type:', typeof msg.content);
+        console.log('Content preview:', msg.content ? msg.content.substring(0, 100) : 'null');
+        
+        let audioUrl = msg.audioUrl || msg.audio_url;
+        let audioBase64 = msg.audioBase64 || msg.audio_base64;
+        let mimeType = msg.mimeType || msg.mime_type || 'audio/webm';
+        
+        // If content contains base64 audio data directly (assistant messages)
+        if (msg.content && typeof msg.content === 'string' && msg.content.includes('base64,')) {
+          // Extract base64 audio from content - could be direct base64 or data URL
+          if (msg.content.startsWith('data:audio')) {
+            audioBase64 = msg.content;
+            const mimeMatch = msg.content.match(/data:audio\/([^;]+)/);
+            mimeType = mimeMatch ? `audio/${mimeMatch[1]}` : 'audio/mp3';
+          } else if (msg.content.includes('base64,')) {
+            const base64Part = msg.content.split('base64,')[1];
+            audioBase64 = `data:audio/mp3;base64,${base64Part}`;
+            mimeType = 'audio/mp3';
+          }
+        }
+        // If content is a JSON string (user messages), parse it to extract audio data
+        else if (msg.content && typeof msg.content === 'string' && msg.content.startsWith('{')) {
+          try {
+            const contentData = JSON.parse(msg.content);
+            if (contentData.type === 'audio') {
+              // audioBase64 already includes the data: prefix, use as-is
+              audioBase64 = contentData.audioBase64;
+              audioUrl = contentData.audioURL || contentData.audioUrl;
+              mimeType = contentData.mimeType || mimeType;
+              
+              // Ensure audioBase64 has correct data URL format
+              if (audioBase64 && !audioBase64.startsWith('data:')) {
+                audioBase64 = `data:${mimeType};base64,${audioBase64}`;
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to parse audio content JSON:', e);
+          }
+        }
+        
+        // If no audioBase64 but has audioUrl, we'll let the component handle loading from URL
+        // For assistant messages, the audioUrl might be present but audioBase64 might be null
+        
+        const audioMessage = {
           ...baseMessage,
           type: 'audio',
-          audioUrl: msg.audioUrl || msg.audio_url,
-          audioBase64: msg.audioBase64 || msg.audio_base64,
-          mimeType: msg.mimeType || msg.mime_type || 'audio/webm',
+          audioUrl,
+          audioBase64,
+          mimeType,
           duration: msg.duration || 0,
         };
+        console.log('Transformed audio message result:', {
+          id: audioMessage.id,
+          sender: audioMessage.sender,
+          hasAudioBase64: !!audioMessage.audioBase64,
+          hasAudioUrl: !!audioMessage.audioUrl,
+          mimeType: audioMessage.mimeType
+        });
+        return audioMessage;
       }
 
       // Handle text messages
@@ -212,6 +302,7 @@ export class ChatService {
         payload.diagnostico = sessionData.diagnostico;
         payload.protocolo = sessionData.protocolo || 'tcc';
         payload.sessao = sessionData.sessao;
+        payload.threadId = threadId; // Include threadId for AI response saving
       }
 
       // Handle audio content
