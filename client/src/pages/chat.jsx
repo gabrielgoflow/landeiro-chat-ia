@@ -299,13 +299,19 @@ export default function Chat() {
     console.log('Changing to session:', sessionChatId);
     console.log('Current thread before change:', currentThread?.id);
     
-    // IMPORTANTE: Limpar mensagens ANTES de navegar
-    console.log('Clearing messages for session isolation before navigation');
+    // IMPORTANTE: Limpar mensagens da sessão ATUAL antes de navegar
+    if (currentThread?.id && clearMessages) {
+      console.log('Clearing current session messages before navigation:', currentThread.id);
+      clearMessages(currentThread.id);
+    }
+    
+    // Também limpar mensagens da sessão de destino para garantir limpeza total
     if (clearMessages) {
+      console.log('Clearing destination session messages:', sessionChatId);
       clearMessages(sessionChatId);
     }
     
-    // Navegar para a nova sessão
+    // Navegar para a nova sessão - isso vai disparar o carregamento das mensagens corretas
     navigate(`/chat/${sessionChatId}`);
   };
 
