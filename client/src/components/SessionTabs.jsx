@@ -28,7 +28,7 @@ export function SessionTabs({
 
     const interval = setInterval(() => {
       loadSessions();
-    }, 30000); // Verifica a cada 30 segundos (menos agressivo)
+    }, 60000); // Verifica a cada 60 segundos (ainda menos agressivo)
 
     return () => clearInterval(interval);
   }, [threadId]);
@@ -68,11 +68,15 @@ export function SessionTabs({
           
           // Encontrar a sessão atual baseada no currentChatId
           const currentSession = formattedSessions.find(s => s.chat_id === currentChatId)
+          
           if (currentSession) {
             setActiveSession(currentSession.sessao.toString())
-          } else if (formattedSessions.length > 0) {
+          } else if (formattedSessions.length > 0 && !activeSession) {
+            // Só definir a primeira sessão se ainda não temos uma sessão ativa
+            // Isso evita que o polling resete a sessão ativa
             setActiveSession(formattedSessions[0].sessao.toString())
           }
+          // Se não encontrar a sessão atual mas já temos uma ativa, preserva a ativa
           
         } else {
           console.warn('Failed to load thread sessions')
