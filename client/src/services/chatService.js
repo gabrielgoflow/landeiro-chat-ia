@@ -183,13 +183,24 @@ export class ChatService {
           content: msg.content
         });
         
+        // If content is a JSON string (as stored in DB), parse it
+        let audioData = {};
+        if (typeof msg.content === 'string') {
+          try {
+            audioData = JSON.parse(msg.content);
+            console.log('Parsed audio data from content:', audioData);
+          } catch (e) {
+            console.warn('Failed to parse audio content as JSON:', msg.content);
+          }
+        }
+        
         return {
           ...baseMessage,
           type: 'audio',
-          audioUrl: msg.audioUrl || msg.audio_url,
-          audioBase64: msg.audioBase64 || msg.audio_base64,
-          mimeType: msg.mimeType || msg.mime_type || 'audio/webm',
-          duration: msg.duration || 0,
+          audioUrl: msg.audioUrl || msg.audio_url || audioData.audioURL,
+          audioBase64: msg.audioBase64 || msg.audio_base64 || audioData.audioBase64,
+          mimeType: msg.mimeType || msg.mime_type || audioData.mimeType || 'audio/webm',
+          duration: msg.duration || audioData.duration || 0,
         };
       }
 
