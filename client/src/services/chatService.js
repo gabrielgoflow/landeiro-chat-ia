@@ -170,13 +170,19 @@ export class ChatService {
   static transformMessages(messages, identifier) {
     const transformedMessages = messages.map(msg => {
       const baseMessage = {
-        id: msg.messageId || msg.message_id,
+        id: msg.messageId || msg.message_id || msg.id,
         sender: msg.sender,
         timestamp: new Date(msg.createdAt || msg.created_at),
       };
 
-      // Handle audio messages
+      // Handle audio messages - check both camelCase and snake_case
       if (msg.messageType === 'audio' || msg.message_type === 'audio') {
+        console.log('Processing audio message:', {
+          messageType: msg.messageType || msg.message_type,
+          audioUrl: msg.audioUrl || msg.audio_url,
+          content: msg.content
+        });
+        
         return {
           ...baseMessage,
           type: 'audio',
@@ -196,6 +202,7 @@ export class ChatService {
     });
 
     console.log(`Transformed ${transformedMessages.length} messages for ${identifier}`);
+    console.log('Sample transformed message:', transformedMessages[0]);
     return transformedMessages;
   }
 

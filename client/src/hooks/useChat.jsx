@@ -52,13 +52,27 @@ export function useChat() {
         try {
           // Search in the known main thread
           const knownThreadId = 'thread_MhnbDaLNDSujRvcmDTQXJMZe';
-          const sessionsResponse = await fetch(`/api/thread-sessions/${knownThreadId}`);
+          let sessionsResponse = await fetch(`/api/thread-sessions/${knownThreadId}`);
           if (sessionsResponse.ok) {
             const sessions = await sessionsResponse.json();
             chatData = sessions.find(session => session.chat_id === chatId);
             
             if (chatData) {
-              console.log('Found session in thread:', chatData);
+              console.log('Found session in known thread:', chatData);
+            }
+          }
+          
+          // If still not found, try the newer thread
+          if (!chatData) {
+            const newerThreadId = 'thread_mdHsOPv65Qlbm4UeR7UKupuW';
+            sessionsResponse = await fetch(`/api/thread-sessions/${newerThreadId}`);
+            if (sessionsResponse.ok) {
+              const sessions = await sessionsResponse.json();
+              chatData = sessions.find(session => session.chat_id === chatId);
+              
+              if (chatData) {
+                console.log('Found session in newer thread:', chatData);
+              }
             }
           }
         } catch (sessionSearchError) {
