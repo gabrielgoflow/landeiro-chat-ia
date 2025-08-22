@@ -199,9 +199,46 @@ export function useChat() {
     setCurrentThreadId(threadId);
     setError(null);
     
-    // SEMPRE carregar mensagens frescas após limpar
-    console.log('Loading fresh messages from chat_messages table...');
-    await loadChatHistory(threadId);
+    // Carregar mensagens específicas da sessão
+    console.log('Loading session-specific messages...');
+    const thread = chatHistory.threads.find(t => t.id === threadId) || existingThread;
+    if (thread?.sessionData?.sessao) {
+      console.log(`Loading messages for chat_id: ${threadId}, sessao: ${thread.sessionData.sessao}`);
+      try {
+        const response = await fetch(`/api/messages/${threadId}/${thread.sessionData.sessao}`);
+        if (response.ok) {
+          const messages = await response.json();
+          console.log('Loaded session messages:', messages.length);
+          
+          // Transform messages to chat format
+          const transformedMessages = messages.map(msg => ({
+            id: msg.messageId,
+            threadId: threadId,
+            content: msg.messageType === 'audio' ? JSON.parse(msg.content) : msg.content,
+            sender: msg.sender === 'assistant' ? 'ai' : msg.sender,
+            timestamp: new Date(msg.createdAt),
+            type: msg.messageType
+          }));
+          
+          // Update messages directly
+          setChatHistory(prev => ({
+            ...prev,
+            messages: {
+              ...prev.messages,
+              [threadId]: transformedMessages
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading session messages:', error);
+        // Fallback to regular message loading
+        await loadChatHistory(threadId);
+      }
+    } else {
+      // Fallback to regular message loading
+      console.log('Loading fresh messages from chat_messages table...');
+      await loadChatHistory(threadId);
+    }
   }, [chatHistory.threads, loadChatHistory, createThreadFromSupabase]);
 
   // Method to force reload a thread (useful for new sessions)
