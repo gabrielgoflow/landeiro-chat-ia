@@ -28,6 +28,7 @@ export default function Chat() {
   const [isStartingNextSession, setIsStartingNextSession] = useState(false);
   const [currentSessionData, setCurrentSessionData] = useState(null);
   const [threadId, setThreadId] = useState(null);
+  const [isCurrentSessionFinalized, setIsCurrentSessionFinalized] = useState(false);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -269,6 +270,7 @@ export default function Chat() {
         setHasReview(false);
         setCurrentReview(null);
         setShowReviewSidebar(false);
+        setIsCurrentSessionFinalized(false); // Nova sessão não está finalizada
         
         // Navegar para o novo chat
         navigate(`/chat/${newChatId}`);
@@ -293,6 +295,37 @@ export default function Chat() {
     console.log('Switching to session with chatId:', sessionChatId);
     navigate(`/chat/${sessionChatId}`);
   };
+
+  // Detect if current session is finalized based on review
+  useEffect(() => {
+    const checkSessionStatus = async () => {
+      if (!currentThread?.id) {
+        setIsCurrentSessionFinalized(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/reviews/${currentThread.id}`);
+        if (response.ok) {
+          const reviewData = await response.json();
+          setIsCurrentSessionFinalized(!!reviewData);
+          setHasReview(!!reviewData);
+          if (reviewData) {
+            setCurrentReview(reviewData);
+          }
+        } else if (response.status === 404) {
+          setIsCurrentSessionFinalized(false);
+          setHasReview(false);
+          setCurrentReview(null);
+        }
+      } catch (error) {
+        console.error('Error checking session status:', error);
+        setIsCurrentSessionFinalized(false);
+      }
+    };
+
+    checkSessionStatus();
+  }, [currentThread?.id]);
 
   // Handler para criar nova sessão das abas
   const handleNewSessionFromTabs = () => {
@@ -508,7 +541,7 @@ export default function Chat() {
           isLoading={isLoading}
           error={error}
           onClearError={clearError}
-          isFinalized={hasReview}
+          isFinalized={isCurrentSessionFinalized}
         />
       </div>
       
