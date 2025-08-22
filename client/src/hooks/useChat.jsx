@@ -35,8 +35,36 @@ export function useChat() {
       if (!user) return null;
       
       console.log('Creating thread from Supabase data for:', chatId);
-      const userChats = await SupabaseService.getUserChats(user.id);
-      const chatData = userChats.find(chat => chat.chat_id === chatId);
+      let chatData = null;
+      
+      // First try getUserChats method
+      try {
+        const userChats = await SupabaseService.getUserChats(user.id);
+        chatData = userChats.find(chat => chat.chat_id === chatId);
+      } catch (userChatsError) {
+        console.log('getUserChats failed, trying alternative search:', userChatsError);
+      }
+      
+      // If not found in user chats, search in thread sessions
+      if (!chatData) {
+        console.log('Chat not found in user chats, searching in thread sessions for:', chatId);
+        
+        try {
+          // Search in the known main thread
+          const knownThreadId = 'thread_MhnbDaLNDSujRvcmDTQXJMZe';
+          const sessionsResponse = await fetch(`/api/thread-sessions/${knownThreadId}`);
+          if (sessionsResponse.ok) {
+            const sessions = await sessionsResponse.json();
+            chatData = sessions.find(session => session.chat_id === chatId);
+            
+            if (chatData) {
+              console.log('Found session in thread:', chatData);
+            }
+          }
+        } catch (sessionSearchError) {
+          console.log('Thread session search failed:', sessionSearchError);
+        }
+      }
       
       if (!chatData) {
         console.warn('Chat not found in Supabase:', chatId);
@@ -44,17 +72,17 @@ export function useChat() {
       }
 
       const newThread = {
-        id: chatData.chat_threads?.chat_id || chatData.id, // Use internal chat_id as local ID
+        id: chatData.chat_id,
         title: `${chatData.diagnostico} - TCC`,
         threadId: chatData.thread_id,
-        openaiChatId: chatData.chat_id, // This is the OpenAI chat_id for webhook
+        openaiChatId: chatData.chat_id,
         sessionData: {
           diagnostico: chatData.diagnostico,
-          protocolo: 'tcc', // Always TCC
+          protocolo: chatData.protocolo || 'tcc',
           sessao: chatData.sessao
         },
         createdAt: new Date(chatData.created_at),
-        updatedAt: new Date(chatData.created_at)
+        updatedAt: new Date(chatData.updated_at || chatData.created_at)
       };
 
       // Add thread to local storage

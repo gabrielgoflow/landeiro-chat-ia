@@ -203,7 +203,8 @@ export class ChatService {
     try {
       const payload = {
         user_email: USER_EMAIL,
-        chat_id: chatId,
+        chat_id: chatId, // This is the session-specific chat ID
+        chatId: chatId,  // Also include as chatId for compatibility
       };
 
       // Add session data if available
