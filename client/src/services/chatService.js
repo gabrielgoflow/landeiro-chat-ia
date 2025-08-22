@@ -243,6 +243,7 @@ export class ChatService {
         payload.diagnostico = sessionData.diagnostico;
         payload.protocolo = sessionData.protocolo || 'tcc';
         payload.sessao = sessionData.sessao;
+        payload.threadId = threadId; // Include threadId for AI response saving
       }
 
       // Handle audio content

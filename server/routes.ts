@@ -135,6 +135,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sessao: req.body.sessao || 1
         };
 
+        console.log('Saving AI audio message with data:', {
+          chatId: requestBody.chat_id,
+          threadId: sessionData.thread_id,
+          sessao: sessionData.sessao,
+          hasBase64: !!aiData.base64
+        });
+
         const aiMessage = {
           chatId: requestBody.chat_id,
           threadId: sessionData.thread_id || requestBody.chat_id,
