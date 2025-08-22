@@ -178,6 +178,8 @@ export class ChatService {
       // Handle audio messages
       if (msg.messageType === 'audio' || msg.message_type === 'audio') {
         console.log('Transforming audio message:', msg);
+        console.log('Message content type:', typeof msg.content);
+        console.log('Content preview:', msg.content ? msg.content.substring(0, 100) : 'null');
         
         let audioUrl = msg.audioUrl || msg.audio_url;
         let audioBase64 = msg.audioBase64 || msg.audio_base64;
@@ -214,7 +216,13 @@ export class ChatService {
           mimeType,
           duration: msg.duration || 0,
         };
-        console.log('Transformed audio message:', audioMessage);
+        console.log('Transformed audio message result:', {
+          id: audioMessage.id,
+          sender: audioMessage.sender,
+          hasAudioBase64: !!audioMessage.audioBase64,
+          hasAudioUrl: !!audioMessage.audioUrl,
+          mimeType: audioMessage.mimeType
+        });
         return audioMessage;
       }
 
