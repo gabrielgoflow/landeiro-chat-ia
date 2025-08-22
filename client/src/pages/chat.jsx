@@ -310,6 +310,7 @@ export default function Chat() {
         const response = await fetch(`/api/reviews/${chatId}`);
         if (response.ok) {
           const reviewData = await response.json();
+          console.log('Review found - setting chat as finalized');
           setIsCurrentSessionFinalized(!!reviewData);
           setHasReview(!!reviewData);
           if (reviewData) {
@@ -326,7 +327,13 @@ export default function Chat() {
       }
     };
 
+    // Initial check
     checkSessionStatus();
+
+    // Set up periodic checking every 5 seconds to detect async review creation
+    const interval = setInterval(checkSessionStatus, 5000);
+
+    return () => clearInterval(interval);
   }, [chatId]);
 
   // Handler para criar nova sessão das abas
