@@ -10,6 +10,7 @@ export function useChat() {
   const [currentThreadId, setCurrentThreadId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [skipNextReload, setSkipNextReload] = useState(false);
 
   // Load chat history from localStorage on mount
   useEffect(() => {
@@ -258,9 +259,17 @@ export function useChat() {
     setCurrentThreadId(threadId);
     setError(null);
     
-    // SEMPRE carregar mensagens frescas após limpar - usando apenas um método
-    console.log('Loading fresh messages from database...');
-    await loadChatHistory(threadId);
+    // Só carregar mensagens da base se não temos mensagens locais e não estamos pulando reload
+    const existingMessages = chatHistory.messages[threadId] || [];
+    if (existingMessages.length === 0 && !skipNextReload) {
+      console.log('Loading fresh messages from database...');
+      await loadChatHistory(threadId);
+    } else if (skipNextReload) {
+      console.log('Skipping database load due to recent message send');
+      setSkipNextReload(false); // Reset flag
+    } else {
+      console.log('Using existing local messages, skipping database load');
+    }
   }, [chatHistory.threads, loadChatHistory, createThreadFromSupabase]);
 
   // Method to force reload a thread (useful for new sessions)
@@ -367,6 +376,7 @@ export function useChat() {
 
     setIsLoading(true);
     setError(null);
+    setSkipNextReload(true); // Evita reload automático durante envio
 
     try {
       // Get current thread to access session data
@@ -466,6 +476,7 @@ export function useChat() {
       setError(errorMessage);
     } finally {
       setIsLoading(false);
+      setSkipNextReload(false); // Reset flag após envio completo
     }
   }, [currentThreadId, chatHistory]);
 
