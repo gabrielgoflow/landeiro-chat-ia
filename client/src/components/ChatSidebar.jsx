@@ -99,6 +99,9 @@ export function ChatSidebar({
       }
     };
     
+    if (refreshTrigger > 0) {
+      console.log('ChatSidebar: refreshTrigger changed to:', refreshTrigger, '- reloading chats');
+    }
     loadUserChats();
   }, [user, refreshTrigger]);
 

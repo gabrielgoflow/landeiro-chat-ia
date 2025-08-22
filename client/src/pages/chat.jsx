@@ -186,7 +186,12 @@ export default function Chat() {
   const handleNewChatConfirm = (formData) => {
     // Callback para atualizar sidebar quando novo chat é criado
     const onChatCreated = () => {
-      setSidebarRefreshTrigger(prev => prev + 1);
+      console.log('Chat created callback triggered - updating sidebar refresh trigger');
+      setSidebarRefreshTrigger(prev => {
+        const newValue = prev + 1;
+        console.log('Sidebar refresh trigger updated from', prev, 'to', newValue);
+        return newValue;
+      });
     };
     
     startNewThread(formData, onChatCreated);

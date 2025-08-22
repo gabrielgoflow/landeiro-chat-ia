@@ -163,6 +163,7 @@ export function useChat() {
           
           // Notify that a new chat was created (for sidebar refresh)
           if (onChatCreated) {
+            console.log('Calling onChatCreated callback to refresh sidebar');
             onChatCreated(newThread);
           }
         } else {
