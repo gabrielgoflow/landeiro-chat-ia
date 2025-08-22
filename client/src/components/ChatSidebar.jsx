@@ -271,13 +271,13 @@ export function ChatSidebar({
                       {/* Status Tags and Delete Button */}
                       <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
                         <div className="flex items-center space-x-1">
-                          {threadSessions[chat.thread_id] ? (
+                          {threadSessions[chat.thread_id || chat.chat_id] ? (
                             <Badge className={`text-xs font-medium px-1.5 py-0.5 ${
-                              threadSessions[chat.thread_id].status === 'finalizado'
+                              threadSessions[chat.thread_id || chat.chat_id].status === 'finalizado'
                                 ? 'bg-green-100 text-green-800 border-green-200'
                                 : 'bg-blue-100 text-blue-800 border-blue-200'
                             }`}>
-                              {threadSessions[chat.thread_id].status === 'finalizado' ? 'FINALIZADO' : 'EM ANDAMENTO'}
+                              {threadSessions[chat.thread_id || chat.chat_id].status === 'finalizado' ? 'FINALIZADO' : 'EM ANDAMENTO'}
                             </Badge>
                           ) : chatReviews[chat.chat_id] ? (
                             <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
@@ -303,9 +303,13 @@ export function ChatSidebar({
                         </div>
                         
                         {/* Session Badge - below status */}
-                        {threadSessions[chat.thread_id] && (
+                        {threadSessions[chat.thread_id || chat.chat_id] ? (
                           <Badge variant="default" className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5">
-                            SESSÃO {threadSessions[chat.thread_id].latestSession}
+                            SESSÃO {threadSessions[chat.thread_id || chat.chat_id].latestSession}
+                          </Badge>
+                        ) : (
+                          <Badge variant="default" className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5">
+                            SESSÃO 1
                           </Badge>
                         )}
                       </div>
@@ -331,9 +335,9 @@ export function ChatSidebar({
                               minute: '2-digit'
                             })}
                           </span>
-                          {threadSessions[chat.thread_id] && threadSessions[chat.thread_id].totalSessions > 1 && (
+                          {threadSessions[chat.thread_id || chat.chat_id] && threadSessions[chat.thread_id || chat.chat_id].totalSessions > 1 && (
                             <span className="text-indigo-600 font-medium">
-                              {threadSessions[chat.thread_id].totalSessions} sessões
+                              {threadSessions[chat.thread_id || chat.chat_id].totalSessions} sessões
                             </span>
                           )}
                         </div>
