@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertChatReviewSchema } from "@shared/schema";
+import { insertChatReviewSchema, insertChatMessageSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage.js";
 import { ObjectPermission } from "./objectAcl.js";
 
@@ -145,6 +145,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: 'text',
         message: 'Entendo que você está tentando se comunicar comigo. No momento estou com dificuldades técnicas para processar sua mensagem adequadamente. Por favor, tente novamente em alguns instantes ou descreva em texto como posso ajudá-lo hoje.',
       });
+    }
+  });
+
+  // Chat Messages Endpoints - for structured message history
+  app.post("/api/chat-messages", async (req, res) => {
+    try {
+      const messageData = insertChatMessageSchema.parse(req.body);
+      const message = await storage.createChatMessage(messageData);
+      res.status(201).json(message);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/chat-messages/:chatId", async (req, res) => {
+    try {
+      const { chatId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const messages = await storage.getChatMessages(chatId, limit);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/thread-messages/:threadId", async (req, res) => {
+    try {
+      const { threadId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const messages = await storage.getThreadMessages(threadId, limit);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/chat-stats/:chatId", async (req, res) => {
+    try {
+      const { chatId } = req.params;
+      const stats = await storage.getChatStats(chatId);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/chat-overview/:chatId", async (req, res) => {
+    try {
+      const { chatId } = req.params;
+      const overview = await storage.getChatOverview(chatId);
+      if (!overview) {
+        return res.status(404).json({ error: "Chat not found" });
+      }
+      res.json(overview);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 

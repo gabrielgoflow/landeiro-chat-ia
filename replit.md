@@ -31,9 +31,11 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 
 **Development Storage**: In-memory storage using Map data structures for users and chat data
 
-**Supabase Database Schema**:
+**Enhanced Database Architecture (Opção 1 + Melhorias)**:
 - **Authentication**: Supabase Auth for user management and security
-- **chat_threads**: Relaciona chat interno com thread_id do OpenAI Assistant
+
+**Core Tables**:
+- **chat_threads**: Controle de sessões e metadata
   - chat_id (VARCHAR): ID único do chat interno
   - thread_id (VARCHAR): ID do thread do OpenAI Assistant  
   - diagnostico (VARCHAR): Diagnóstico selecionado (ex: ansiedade)
@@ -43,8 +45,18 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
   - user_id (UUID): Referência ao usuário autenticado
   - chat_id (VARCHAR): ID do chat do OpenAI
   - chat_threads_id (UUID): Referência à tabela chat_threads
-- **chat_reviews**: Supervisão e revisão das sessões de terapia
-  - id (VARCHAR): ID único do review
+
+**Separated Concerns Tables**:
+- **chat_messages**: Histórico estruturado de mensagens (NOVA)
+  - chat_id (VARCHAR): Referência ao chat
+  - thread_id (VARCHAR): Referência ao thread
+  - message_id (VARCHAR): ID único da mensagem
+  - sender (VARCHAR): 'user' ou 'assistant'
+  - content (TEXT): Conteúdo da mensagem
+  - message_type (VARCHAR): 'text' ou 'audio'
+  - audio_url (VARCHAR): URL do áudio (se aplicável)
+  - metadata (JSONB): Metadados da mensagem
+- **chat_reviews**: Reviews de supervisão (separados do histórico)
   - chat_id (VARCHAR): Referência ao chat
   - resumo_atendimento (TEXT): Resumo da sessão
   - feedback_direto (TEXT): Feedback direto para o terapeuta
@@ -52,8 +64,14 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
   - pontos_positivos (ARRAY): Aspectos positivos da sessão
   - pontos_negativos (ARRAY): Aspectos a melhorar
   - sessao (SMALLINT): Número da sessão correspondente
-  - created_at (TIMESTAMP): Data de criação do review
-- **Row Level Security (RLS)**: Implementado para garantir isolamento de dados por usuário
+
+**Optimized Views**:
+- **v_chat_overview**: Overview completo de chats com status e estatísticas
+- **v_user_sessions**: Histórico de sessões por usuário
+
+**Performance Indexes**: Índices otimizados para chat_id, thread_id, created_at, sender
+
+**Benefits**: Separação clara review vs histórico, queries otimizadas, escalabilidade melhorada, manutenção simplificada
 
 **Database Schema** (configured but not actively used):
 - **PostgreSQL** with Drizzle ORM for type-safe database operations
