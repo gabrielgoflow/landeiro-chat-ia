@@ -16,6 +16,7 @@ export default function ChatsPage() {
   const [userChats, setUserChats] = useState([])
   const [loading, setLoading] = useState(true)
   const [chatReviews, setChatReviews] = useState({})
+  const [threadSessions, setThreadSessions] = useState({})
 
   useEffect(() => {
     if (user) {
@@ -29,18 +30,42 @@ export default function ChatsPage() {
       const chats = await supabaseService.getUserChats(user.id)
       setUserChats(chats)
       
-      // Check review status for each chat
+      // Check review status and load session data for each chat
       const reviewStatuses = {}
+      const sessionsData = {}
+      
       for (const chat of chats) {
         try {
+          // Check review status
           const response = await fetch(`/api/reviews/${chat.chat_id}`)
           reviewStatuses[chat.chat_id] = response.ok
+          
+          // Load thread sessions to get latest session info
+          if (chat.thread_id) {
+            const sessionsResponse = await fetch(`/api/thread-sessions/${chat.thread_id}`)
+            if (sessionsResponse.ok) {
+              const sessions = await sessionsResponse.json()
+              if (sessions.length > 0) {
+                // Find latest session (highest session number)
+                const latestSession = sessions.reduce((latest, session) => 
+                  session.sessao > latest.sessao ? session : latest
+                )
+                sessionsData[chat.thread_id] = {
+                  latestSession: latestSession.sessao,
+                  status: latestSession.status || (latestSession.review_id ? 'finalizado' : 'em_andamento'),
+                  totalSessions: sessions.length
+                }
+              }
+            }
+          }
         } catch (error) {
-          console.error(`Error checking review for chat ${chat.chat_id}:`, error)
+          console.error(`Error loading data for chat ${chat.chat_id}:`, error)
           reviewStatuses[chat.chat_id] = false
         }
       }
+      
       setChatReviews(reviewStatuses)
+      setThreadSessions(sessionsData)
     } catch (error) {
       console.error('Erro ao carregar chats:', error)
     } finally {
@@ -160,9 +185,22 @@ export default function ChatsPage() {
             {userChats.map((chat) => (
               <Link key={chat.chat_id} href={`/chat/${chat.chat_id}`}>
                 <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full relative" data-testid={`card-chat-${chat.chat_id}`}>
-                  {/* Status Tag */}
-                  <div className="absolute top-2 right-2 z-10">
-                    {chatReviews[chat.chat_id] ? (
+                  {/* Status and Session Tags */}
+                  <div className="absolute top-2 right-2 z-10 flex flex-col items-end space-y-1">
+                    {threadSessions[chat.thread_id] ? (
+                      <>
+                        <Badge className={`text-xs font-medium ${
+                          threadSessions[chat.thread_id].status === 'finalizado'
+                            ? 'bg-green-100 text-green-800 border-green-200'
+                            : 'bg-blue-100 text-blue-800 border-blue-200'
+                        }`}>
+                          {threadSessions[chat.thread_id].status === 'finalizado' ? 'FINALIZADO' : 'EM ANDAMENTO'}
+                        </Badge>
+                        <Badge variant="default" className="text-xs bg-indigo-600 text-white px-2 py-0.5">
+                          SESSÃO {threadSessions[chat.thread_id].latestSession}
+                        </Badge>
+                      </>
+                    ) : chatReviews[chat.chat_id] ? (
                       <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium">
                         FINALIZADO
                       </Badge>
@@ -193,8 +231,15 @@ export default function ChatsPage() {
                         {formatDate(chat.created_at)}
                       </div>
                       
-                      <div className="text-sm text-gray-800">
-                        <strong>ID:</strong> {chat.chat_id.substring(0, 8)}...
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-800">
+                          <strong>ID:</strong> {chat.chat_id.substring(0, 8)}...
+                        </div>
+                        {threadSessions[chat.thread_id] && threadSessions[chat.thread_id].totalSessions > 1 && (
+                          <div className="text-xs text-indigo-600 font-medium">
+                            {threadSessions[chat.thread_id].totalSessions} sessões
+                          </div>
+                        )}
                       </div>
 
                       <div className="border-t pt-3">
