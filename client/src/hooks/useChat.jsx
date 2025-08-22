@@ -374,18 +374,9 @@ export function useChat() {
         });
         aiMessage.sender = 'assistant'; // Override sender for AI audio messages
         
-        // Save AI audio message to chat_messages table
-        await ChatMessageService.saveMessage({
-          chatId: threadId,
-          threadId: currentThread?.threadId || '',
-          sessao: sessionData?.sessao || 1,
-          messageId: aiMessage.id,
-          sender: 'assistant',
-          content: aiResponse.message || 'Mensagem de áudio',
-          messageType: 'audio',
-          audioUrl: null, // We store base64 in content for audio messages
-          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.audioBase64 }
-        });
+        // AI audio messages are already saved by the server endpoint
+        // No need to save again here as it would create duplicates
+        console.log('AI audio message already saved by server endpoint');
       } else {
         // Create text message
         const messageText = typeof aiResponse === 'string' ? aiResponse : aiResponse.message;
