@@ -1,33 +1,38 @@
 import { supabase } from '@/lib/supabase.js'
 
 export class SupabaseService {
-  // Buscar próximo número de sessão para um usuário
-  static async getNextSessionNumber(userId) {
+  // Incrementar sessão de um chat existente (para "Iniciar Próxima Sessão")
+  static async incrementChatSession(chatId) {
     try {
+      // Buscar sessão atual do chat
+      const { data: currentData, error: selectError } = await supabase
+        .from('chat_threads')
+        .select('sessao')
+        .eq('chat_id', chatId)
+        .single()
+
+      if (selectError) throw selectError
+
+      const nextSession = (currentData.sessao || 1) + 1
+
+      // Atualizar para próxima sessão
       const { data, error } = await supabase
-        .from('user_chats')
-        .select(`
-          chat_threads!inner (
-            sessao
-          )
-        `)
-        .eq('user_id', userId)
-        .not('chat_threads.sessao', 'is', null)
-        .order('chat_threads.sessao', { ascending: false })
-        .limit(1)
+        .from('chat_threads')
+        .update({ sessao: nextSession })
+        .eq('chat_id', chatId)
+        .select()
+        .single()
 
       if (error) throw error
-      
-      const lastSession = data?.[0]?.chat_threads?.sessao || 0
-      return lastSession + 1
+      return { data, error: null, newSession: nextSession }
     } catch (error) {
-      console.error('Error getting next session number:', error)
-      return 1 // Se houver erro, começa com sessão 1
+      console.error('Error incrementing chat session:', error)
+      return { data: null, error: error.message, newSession: null }
     }
   }
 
   // Criar relação entre chat interno e thread_id do OpenAI
-  static async createChatThread(chatId, threadId, diagnostico, protocolo, sessao = null) {
+  static async createChatThread(chatId, threadId, diagnostico, protocolo, sessao = 1) {
     try {
       const { data, error } = await supabase
         .from('chat_threads')
@@ -37,7 +42,7 @@ export class SupabaseService {
             thread_id: threadId,
             diagnostico,
             protocolo,
-            sessao
+            sessao: sessao // Sempre começa com sessão 1 para novos chats
           }
         ])
         .select()

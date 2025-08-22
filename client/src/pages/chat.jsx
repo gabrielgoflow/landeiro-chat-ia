@@ -23,6 +23,7 @@ export default function Chat() {
   const [currentReview, setCurrentReview] = useState(null);
   const [isLoadingReview, setIsLoadingReview] = useState(false);
   const [hasReview, setHasReview] = useState(false);
+  const [isStartingNextSession, setIsStartingNextSession] = useState(false);
   const messagesEndRef = useRef(null);
   const initializedRef = useRef(false);
   const isMobile = useIsMobile();
@@ -211,6 +212,34 @@ export default function Chat() {
     }
   };
 
+  const handleStartNextSession = async () => {
+    if (!currentThread) return;
+    
+    setIsStartingNextSession(true);
+    try {
+      // Incrementar sessão no Supabase
+      const { data, error, newSession } = await supabaseService.incrementChatSession(currentThread.id);
+      
+      if (!error && newSession) {
+        console.log(`Chat reactivated for Session ${newSession}`);
+        
+        // Reset review state to reactivate chat
+        setHasReview(false);
+        setCurrentReview(null);
+        setShowReviewSidebar(false);
+        
+        // Refresh the page to reload the chat in active state
+        window.location.reload();
+      } else {
+        console.error('Error starting next session:', error);
+      }
+    } catch (error) {
+      console.error('Error starting next session:', error);
+    } finally {
+      setIsStartingNextSession(false);
+    }
+  };
+
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
       <ChatSidebar
@@ -262,19 +291,40 @@ export default function Chat() {
           <div className="flex items-center space-x-2">
             {/* Conditional review button - only shows when review exists */}
             {hasReview && (
-              <Button
-                onClick={loadReview}
-                disabled={isLoadingReview}
-                className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                data-testid="view-review-button"
-              >
-                {isLoadingReview ? (
-                  <i className="fas fa-spinner fa-spin mr-2"></i>
-                ) : (
-                  <i className="fas fa-file-alt mr-2"></i>
-                )}
-                Ver Review
-              </Button>
+              <>
+                <Button
+                  onClick={loadReview}
+                  disabled={isLoadingReview}
+                  className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                  data-testid="view-review-button"
+                >
+                  {isLoadingReview ? (
+                    <i className="fas fa-spinner fa-spin mr-2"></i>
+                  ) : (
+                    <i className="fas fa-file-alt mr-2"></i>
+                  )}
+                  Ver Review
+                </Button>
+                
+                <Button
+                  onClick={handleStartNextSession}
+                  disabled={isStartingNextSession}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  data-testid="start-next-session-button"
+                >
+                  {isStartingNextSession ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin mr-2"></i>
+                      Iniciando...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-play mr-2"></i>
+                      Iniciar Próxima Sessão
+                    </>
+                  )}
+                </Button>
+              </>
             )}
             
             {currentThread && !hasReview && (
