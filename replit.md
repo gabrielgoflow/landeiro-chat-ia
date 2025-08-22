@@ -84,6 +84,12 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
 - **Message Preservation**: Implemented complete preservation of local message history during navigation between sessions
 - **Asynchronous Message Display**: Fixed bug where newly sent messages required page refresh to appear in chat interface
 
+**Immediate UI Updates Implementation (August 2025)**:
+- **Instant Session Badges**: ChatSidebar now shows "SESSÃO 1" badge immediately when new chat is created, with fallback logic for all edge cases
+- **Always-Visible Session Tabs**: SessionTabs component always displays at least one session tab, even for new chats without database entries
+- **Removed Loading Dependencies**: Eliminated loading states that blocked UI rendering, ensuring immediate visual feedback
+- **Review-Based Input Disable**: MessageInput automatically becomes read-only when chat has review in chat_reviews table, showing "Atendimento finalizado" overlay
+
 **Separated Concerns Tables**:
 - **chat_messages**: Histórico estruturado de mensagens (NOVA)
   - chat_id (VARCHAR): Referência ao chat

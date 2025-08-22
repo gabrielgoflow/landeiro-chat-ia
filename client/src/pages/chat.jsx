@@ -608,7 +608,7 @@ export default function Chat() {
           isLoading={isLoading}
           error={error}
           onClearError={clearError}
-          isFinalized={isCurrentSessionFinalized}
+          isFinalized={hasReview || isCurrentSessionFinalized}
         />
       </div>
       
