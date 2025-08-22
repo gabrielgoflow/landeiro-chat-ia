@@ -98,88 +98,51 @@ export class ChatService {
 
   static async getMessageHistory(chatId) {
     try {
-      const response = await fetch(
-        "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-get-history",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            chat_id: chatId,
-            email: USER_EMAIL,
-          }),
-        },
-      );
+      // Use our chat_messages table instead of OpenAI Assistant messages
+      const response = await fetch(`/api/chat-messages/${chatId}`);
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 500) {
+          // No messages found for this session or error - return empty array
+          console.log(`No messages found for session ${chatId} or error occurred`);
+          return [];
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      console.log("Raw response from history endpoint:", data);
+      const messages = await response.json();
+      console.log(`Loaded ${messages.length} messages from chat_messages table for session:`, chatId);
 
-      // Transform OpenAI messages to our format
-      const messages = [];
-      if (data && data.data) {
-        // Sort by created_at ascending (oldest first)
-        const sortedMessages = data.data.sort(
-          (a, b) => a.created_at - b.created_at,
-        );
-        console.log("Sorted messages from OpenAI:", sortedMessages);
+      // Transform database messages to our frontend format
+      const transformedMessages = messages.map(msg => {
+        const baseMessage = {
+          id: msg.messageId || msg.message_id,
+          sender: msg.sender,
+          timestamp: new Date(msg.createdAt || msg.created_at),
+        };
 
-        let firstUserMessageSkipped = false;
-        
-        for (const msg of sortedMessages) {
-          const messageText = msg.content[0]?.text?.value || "";
-          
-          // Check if message is an audio message (JSON string)
-          let transformedMsg;
-          try {
-            const audioData = JSON.parse(messageText);
-            if (audioData.type === 'audio') {
-              // This is an audio message
-              transformedMsg = {
-                id: msg.id,
-                type: 'audio',
-                audioBase64: audioData.audioBase64,
-                audioUrl: audioData.audioUrl || audioData.audioURL, // Support both formats
-                audioURL: audioData.audioURL, // Include audioURL for consistency
-                mimeType: audioData.mimeType || 'audio/webm',
-                duration: audioData.duration || 0,
-                sender: msg.role === "user" ? "user" : "assistant",
-                timestamp: new Date(msg.created_at * 1000),
-              };
-            } else {
-              throw new Error('Not audio message');
-            }
-          } catch {
-            // Regular text message
-            transformedMsg = {
-              id: msg.id,
-              text: messageText,
-              content: messageText, // Add content for compatibility
-              sender: msg.role === "user" ? "user" : "assistant",
-              timestamp: new Date(msg.created_at * 1000),
-            };
-          }
-          
-          // Skip the first user message (it's always duplicated)
-          if (msg.role === "user" && !firstUserMessageSkipped) {
-            firstUserMessageSkipped = true;
-            console.log("Skipped first user message:", transformedMsg);
-            continue;
-          }
-          
-          messages.push(transformedMsg);
-          console.log("Transformed message:", transformedMsg);
+        // Handle audio messages
+        if (msg.messageType === 'audio' || msg.message_type === 'audio') {
+          return {
+            ...baseMessage,
+            type: 'audio',
+            audioUrl: msg.audioUrl || msg.audio_url,
+            audioURL: msg.audioUrl || msg.audio_url, // Include both for compatibility
+            mimeType: 'audio/mp3', // Default to mp3 for stored audio
+            duration: 0,
+          };
         }
-      } else {
-        console.log("No data array found in response:", data);
-      }
 
-      console.log("Final messages array:", messages);
-      return messages;
+        // Handle text messages
+        return {
+          ...baseMessage,
+          text: msg.content,
+          content: msg.content,
+        };
+      });
+
+      console.log(`Transformed ${transformedMessages.length} messages for session ${chatId}`);
+      return transformedMessages;
     } catch (error) {
       console.error("Error fetching message history:", error);
       throw error;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChatService } from "@/services/chatService.js";
 import { SupabaseService } from "@/services/supabaseService.js";
+import { ChatMessageService } from "@/services/chatMessageService.js";
 import { useAuth } from "@/hooks/useAuth.jsx";
 
 export function useChat() {
@@ -295,6 +296,18 @@ export function useChat() {
       
       console.log('Current thread for message:', { threadId, sessionData });
       
+      // Save user message to chat_messages table
+      await ChatMessageService.saveMessage({
+        chatId: threadId,
+        threadId: currentThread?.threadId || '',
+        messageId: userMessage.id,
+        sender: 'user',
+        content: typeof content === 'string' ? content : JSON.stringify(content),
+        messageType: typeof content === 'object' && content.type === 'audio' ? 'audio' : 'text',
+        audioUrl: typeof content === 'object' && content.audioUrl ? content.audioUrl : null,
+        metadata: {}
+      });
+      
       // Send to webhook and get AI response (using threadId as chat_id)
       const aiResponse = await ChatService.sendMessage(content, threadId, sessionData, threadId);
       
@@ -309,10 +322,34 @@ export function useChat() {
           duration: 0
         });
         aiMessage.sender = 'assistant'; // Override sender for AI audio messages
+        
+        // Save AI audio message to chat_messages table
+        await ChatMessageService.saveMessage({
+          chatId: threadId,
+          threadId: currentThread?.threadId || '',
+          messageId: aiMessage.id,
+          sender: 'assistant',
+          content: aiResponse.message || 'Mensagem de áudio',
+          messageType: 'audio',
+          audioUrl: null, // We store base64 in content for audio messages
+          metadata: { mimeType: aiResponse.mimeType, audioBase64: aiResponse.audioBase64 }
+        });
       } else {
         // Create text message
         const messageText = typeof aiResponse === 'string' ? aiResponse : aiResponse.message;
         aiMessage = ChatService.createAiMessage(threadId, messageText);
+        
+        // Save AI text message to chat_messages table
+        await ChatMessageService.saveMessage({
+          chatId: threadId,
+          threadId: currentThread?.threadId || '',
+          messageId: aiMessage.id,
+          sender: 'assistant',
+          content: messageText,
+          messageType: 'text',
+          audioUrl: null,
+          metadata: {}
+        });
       }
 
       setChatHistory(prev => ({
