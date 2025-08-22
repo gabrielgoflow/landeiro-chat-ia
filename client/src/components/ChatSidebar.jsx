@@ -67,21 +67,29 @@ export function ChatSidebar({
             reviewStatuses[chat.chat_id] = response.ok;
             
             // Load thread sessions to get latest session info
-            if (chat.thread_id) {
-              const sessionsResponse = await fetch(`/api/thread-sessions/${chat.thread_id}`);
-              if (sessionsResponse.ok) {
-                const sessions = await sessionsResponse.json();
-                if (sessions.length > 0) {
-                  // Find latest session (highest session number)
-                  const latestSession = sessions.reduce((latest, session) => 
-                    session.sessao > latest.sessao ? session : latest
-                  );
-                  sessionsData[chat.thread_id] = {
-                    latestSession: latestSession.sessao,
-                    status: latestSession.status || (latestSession.review_id ? 'finalizado' : 'em_andamento'),
-                    totalSessions: sessions.length
-                  };
+            // For new chats without thread_id, use chat_id as fallback
+            const threadIdToUse = chat.thread_id || chat.chat_id;
+            if (threadIdToUse) {
+              try {
+                const sessionsResponse = await fetch(`/api/thread-sessions/${threadIdToUse}`);
+                if (sessionsResponse.ok) {
+                  const sessions = await sessionsResponse.json();
+                  if (sessions.length > 0) {
+                    // Find latest session (highest session number)
+                    const latestSession = sessions.reduce((latest, session) => 
+                      session.sessao > latest.sessao ? session : latest
+                    );
+                    sessionsData[threadIdToUse] = {
+                      latestSession: latestSession.sessao,
+                      status: latestSession.status || (latestSession.review_id ? 'finalizado' : 'em_andamento'),
+                      totalSessions: sessions.length
+                    };
+                  }
+                } else {
+                  console.log(`No sessions found for thread ${threadIdToUse}`);
                 }
+              } catch (sessionError) {
+                console.error(`Error loading sessions for thread ${threadIdToUse}:`, sessionError);
               }
             }
           } catch (error) {

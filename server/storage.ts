@@ -267,6 +267,7 @@ export class DatabaseStorage implements IStorage {
     
     // Get all sessions for a thread_id with their review status
     // Join reviews by BOTH chat_id AND sessao to ensure correct association
+    // Also search by chat_id as fallback for new threads without thread_id
     const result = await db.execute(sql`
       SELECT 
         ct.*,
@@ -276,7 +277,7 @@ export class DatabaseStorage implements IStorage {
         CASE WHEN cr.id IS NOT NULL THEN 'finalizado' ELSE 'em_andamento' END as status
       FROM chat_threads ct
       LEFT JOIN chat_reviews cr ON ct.chat_id = cr.chat_id AND ct.sessao = cr.sessao
-      WHERE ct.thread_id = ${threadId}
+      WHERE ct.thread_id = ${threadId} OR ct.chat_id = ${threadId}
       ORDER BY ct.sessao ASC
     `);
 

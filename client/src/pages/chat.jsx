@@ -494,6 +494,7 @@ export default function Chat() {
             currentChatId={currentThread?.id}
             onSessionChange={handleSessionChange}
             onNewSession={handleNewSessionFromTabs}
+            refreshTrigger={sidebarRefreshTrigger}
             className="border-b"
           />
         )}
