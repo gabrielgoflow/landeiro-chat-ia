@@ -230,19 +230,8 @@ export function useChat() {
   const selectThread = useCallback(async (threadId) => {
     console.log('Selecting thread:', threadId);
     
-    // Preservar mensagens existentes - só limpar se for uma navegação entre threads diferentes
-    if (currentThreadId && currentThreadId !== threadId) {
-      console.log('Clearing messages for thread isolation:', threadId);
-      setChatHistory(prev => ({
-        ...prev,
-        messages: {
-          ...prev.messages,
-          [threadId]: []
-        }
-      }));
-    } else {
-      console.log('Preserving existing messages for same thread:', threadId);
-    }
+    // NUNCA limpar mensagens - sempre preservar o histórico local
+    console.log('Preserving all existing messages during navigation');
     
     // Check if thread exists locally
     const existingThread = chatHistory.threads.find(t => t.id === threadId);
@@ -259,14 +248,11 @@ export function useChat() {
     setCurrentThreadId(threadId);
     setError(null);
     
-    // Só carregar mensagens da base se não temos mensagens locais e não estamos pulando reload
+    // Sempre carregar mensagens da base se não temos mensagens locais
     const existingMessages = chatHistory.messages[threadId] || [];
-    if (existingMessages.length === 0 && !skipNextReload) {
+    if (existingMessages.length === 0) {
       console.log('Loading fresh messages from database...');
       await loadChatHistory(threadId);
-    } else if (skipNextReload) {
-      console.log('Skipping database load due to recent message send');
-      setSkipNextReload(false); // Reset flag
     } else {
       console.log('Using existing local messages, skipping database load');
     }
