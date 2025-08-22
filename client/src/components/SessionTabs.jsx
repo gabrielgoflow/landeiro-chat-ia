@@ -28,7 +28,7 @@ export function SessionTabs({
 
     const interval = setInterval(() => {
       loadSessions();
-    }, 5000); // Verifica a cada 5 segundos
+    }, 30000); // Verifica a cada 30 segundos (menos agressivo)
 
     return () => clearInterval(interval);
   }, [threadId]);

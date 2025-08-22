@@ -299,7 +299,7 @@ export default function Chat() {
     navigate(`/chat/${sessionChatId}`);
   };
 
-  // Detect if current session is finalized based on review
+  // Detect if current session is finalized based on review (one-time check only)
   useEffect(() => {
     const checkSessionStatus = async () => {
       if (!chatId || chatId === 'new') {
@@ -328,13 +328,8 @@ export default function Chat() {
       }
     };
 
-    // Initial check
+    // Only check once when chatId changes
     checkSessionStatus();
-
-    // Set up periodic checking every 5 seconds to detect async review creation
-    const interval = setInterval(checkSessionStatus, 5000);
-
-    return () => clearInterval(interval);
   }, [chatId]);
 
   // Handler para criar nova sessão das abas

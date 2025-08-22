@@ -138,12 +138,12 @@ export function useChat() {
         console.log(`Using session-specific loading for thread ${currentThread.threadId} session ${currentThread.sessionData.sessao}`);
         const historyMessages = await ChatService.getSessionMessages(currentThread.threadId, currentThread.sessionData.sessao);
         
-        // Update chat history with loaded messages
+        // Update chat history with loaded messages (even if empty array)
         setChatHistory(prev => ({
           ...prev,
           messages: {
             ...prev.messages,
-            [chatId]: historyMessages
+            [chatId]: historyMessages || []
           }
         }));
 
@@ -152,12 +152,12 @@ export function useChat() {
         // Fallback to individual chat messages
         const historyMessages = await ChatService.getMessageHistory(chatId);
         
-        // Update chat history with loaded messages
+        // Update chat history with loaded messages (even if empty array)
         setChatHistory(prev => ({
           ...prev,
           messages: {
             ...prev.messages,
-            [chatId]: historyMessages
+            [chatId]: historyMessages || []
           }
         }));
 
