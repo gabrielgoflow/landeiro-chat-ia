@@ -15,12 +15,8 @@ import { ReviewSidebar } from "@/components/ReviewSidebar";
 import { SessionTabs } from "@/components/SessionTabs.jsx";
 
 export default function Chat() {
-  const { threadId: urlThreadId } = useParams();
+  const { chatId } = useParams();
   const [location, navigate] = useLocation();
-  
-  // Parse URL parameters for session info
-  const urlParams = new URLSearchParams(location.split('?')[1] || '');
-  const sessionParam = urlParams.get('session');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showNewChatDialog, setShowNewChatDialog] = useState(false);
@@ -66,53 +62,31 @@ export default function Chat() {
     }
   }, [currentThread, isMobile]);
 
-  // Initialize based on threadId parameter
+  // Initialize based on chatId parameter
   useEffect(() => {
     const initializeChat = async () => {
       // Reset session finalized state when navigating
       setIsCurrentSessionFinalized(false);
       
-      if (urlThreadId && urlThreadId !== 'new') {
-        // For thread-based URLs, we need to find a session (chat_id) to load
-        // If session param is provided, find the specific session
-        // Otherwise, load the latest session for this thread
-        
-        console.log('Loading thread:', urlThreadId, 'session:', sessionParam);
-        
-        // Try to find thread sessions from Supabase
-        try {
-          const response = await fetch(`/api/thread-sessions/${urlThreadId}`);
-          if (response.ok) {
-            const sessions = await response.json();
-            if (sessions.length > 0) {
-              // Find specific session or default to latest
-              let targetSession;
-              if (sessionParam) {
-                targetSession = sessions.find(s => s.sessao === parseInt(sessionParam));
-              }
-              if (!targetSession) {
-                // Default to latest session
-                targetSession = sessions.sort((a, b) => b.sessao - a.sessao)[0];
-              }
-              
-              console.log('Loading session:', targetSession.chat_id);
-              const createdThread = await createThreadFromSupabase(targetSession.chat_id);
-              if (createdThread) {
-                selectThread(targetSession.chat_id);
-              }
-            } else {
-              console.warn('No sessions found for thread:', urlThreadId);
-              setShowNewChatDialog(true);
-            }
+      if (chatId && chatId !== 'new') {
+        // Load specific chat by ID
+        const existingThread = threads.find(t => t.id === chatId);
+        if (existingThread) {
+          console.log('Found existing thread locally:', chatId);
+          selectThread(existingThread.id);
+        } else {
+          // Chat ID not found in current threads, try to load from Supabase
+          console.log('Thread not found locally, trying to load from Supabase:', chatId);
+          const createdThread = await createThreadFromSupabase(chatId);
+          if (createdThread) {
+            console.log('Thread created from Supabase, now selecting:', chatId);
+            selectThread(chatId);
           } else {
-            console.warn('Thread not found:', urlThreadId);
+            console.warn('Chat ID not found in Supabase, redirecting to new chat:', chatId);
             setShowNewChatDialog(true);
           }
-        } catch (error) {
-          console.error('Error loading thread sessions:', error);
-          setShowNewChatDialog(true);
         }
-      } else if (urlThreadId === 'new' || (threads.length === 0 && !urlThreadId)) {
+      } else if (chatId === 'new' || (threads.length === 0 && !chatId)) {
         // Create new thread for /chat/new or when no threads exist
         setShowNewChatDialog(true);
       }
@@ -122,7 +96,7 @@ export default function Chat() {
       initializedRef.current = true;
       initializeChat();
     }
-  }, [urlThreadId, sessionParam, threads, selectThread, startNewThread, createThreadFromSupabase]);
+  }, [chatId, threads, selectThread, startNewThread, createThreadFromSupabase]);
 
   // Extract threadId from current thread
   useEffect(() => {
@@ -207,7 +181,7 @@ export default function Chat() {
     const newThread = await startNewThread(formData);
     setShowNewChatDialog(false);
     
-    // For new threads, use the chat_id for now until we get thread_id from OpenAI
+    // Redirect to the new chat URL and refresh sidebar
     if (newThread && newThread.id) {
       navigate(`/chat/${newThread.id}`);
       // Refresh sidebar to show new chat immediately
@@ -335,20 +309,20 @@ export default function Chat() {
     // Clear current messages first to show loading state
     clearError();
     
-    // Instead of navigating to new URL, directly load the session messages
-    await selectThread(sessionChatId);
+    // Navigate to the new URL - this will trigger selectThread through URL params
+    navigate(`/chat/${sessionChatId}`);
   };
 
   // Detect if current session is finalized based on review
   useEffect(() => {
     const checkSessionStatus = async () => {
-      if (!currentThread?.id) {
+      if (!chatId || chatId === 'new') {
         setIsCurrentSessionFinalized(false);
         return;
       }
 
       try {
-        const response = await fetch(`/api/reviews/${currentThread.id}`);
+        const response = await fetch(`/api/reviews/${chatId}`);
         if (response.ok) {
           const reviewData = await response.json();
           console.log('Review found - setting chat as finalized');
@@ -375,7 +349,7 @@ export default function Chat() {
     const interval = setInterval(checkSessionStatus, 5000);
 
     return () => clearInterval(interval);
-  }, [currentThread?.id]);
+  }, [chatId]);
 
   // Handler para criar nova sessão das abas
   const handleNewSessionFromTabs = () => {

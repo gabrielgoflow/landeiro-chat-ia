@@ -46,13 +46,11 @@ The server uses **Express.js** with TypeScript in a minimal REST API structure:
   - chat_id (VARCHAR): ID do chat do OpenAI
   - chat_threads_id (UUID): Referência à tabela chat_threads
 
-**Session Management Implementation (Updated August 2025)**:
+**Session Management Implementation (Implemented August 2025)**:
 - **SessionTabs Component**: Tabbed interface showing all sessions for a thread with status indicators
-- **Thread-Based URLs**: URLs now use thread_id format: `/chat/thread_WzxBH440CxozOaaOFLoUDH45?session=2`
-- **Session Navigation**: Sessions controlled by tabs, not separate URLs - cleaner UX
+- **Session Navigation**: Independent chat histories per session while maintaining same thread_id
 - **Status Management**: Sessions automatically marked as "finalizado" when reviews exist, "em_andamento" otherwise
 - **Session Creation**: "Iniciar Próxima Sessão" button creates new sessions with unique chat_ids
-- **URL Architecture**: One URL per therapy thread, sessions as internal state/optional params
 - **API Endpoints**: 
   - `/api/thread-sessions/:threadId` - Retrieves all sessions for a thread
   - Enhanced session management in SupabaseService with `createNextSession()` method
