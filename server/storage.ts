@@ -1,4 +1,14 @@
-import { type User, type InsertUser, type ChatReview, type InsertChatReview, type ChatMessage, type InsertChatMessage, users, chatReviews, chatMessages } from "@shared/schema";
+import {
+  type User,
+  type InsertUser,
+  type ChatReview,
+  type InsertChatReview,
+  type ChatMessage,
+  type InsertChatMessage,
+  users,
+  chatReviews,
+  chatMessages,
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, sql, and } from "drizzle-orm";
 import { db } from "./db";
@@ -10,16 +20,20 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   // Chat Reviews
   createChatReview(review: InsertChatReview): Promise<ChatReview>;
   getChatReview(chatId: string): Promise<ChatReview | undefined>;
-  
+
   // Chat Messages - structured history
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(chatId: string, limit?: number): Promise<ChatMessage[]>;
   getThreadMessages(threadId: string, limit?: number): Promise<ChatMessage[]>;
-  getSessionMessages(threadId: string, sessao: number, limit?: number): Promise<ChatMessage[]>;
+  getSessionMessages(
+    threadId: string,
+    sessao: number,
+    limit?: number,
+  ): Promise<ChatMessage[]>;
   getChatStats(chatId: string): Promise<any>;
   getChatOverview(chatId: string): Promise<any>;
   getThreadSessions(threadId: string): Promise<any[]>;
@@ -70,7 +84,9 @@ export class MemStorage implements IStorage {
   }
 
   // Chat Messages implementation
-  async createChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
+  async createChatMessage(
+    insertMessage: InsertChatMessage,
+  ): Promise<ChatMessage> {
     const id = randomUUID();
     const message: ChatMessage = {
       ...insertMessage,
@@ -82,53 +98,75 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    
+
     const chatMessages = this.messages.get(insertMessage.chatId) || [];
     chatMessages.push(message);
     this.messages.set(insertMessage.chatId, chatMessages);
-    
+
     return message;
   }
 
   async getChatMessages(chatId: string, limit = 100): Promise<ChatMessage[]> {
     const messages = this.messages.get(chatId) || [];
-    return messages.slice(-limit).sort((a, b) => 
-      new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
-    );
+    return messages
+      .slice(-limit)
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime(),
+      );
   }
 
-  async getThreadMessages(threadId: string, limit = 100): Promise<ChatMessage[]> {
+  async getThreadMessages(
+    threadId: string,
+    limit = 100,
+  ): Promise<ChatMessage[]> {
     const allMessages: ChatMessage[] = [];
     for (const messages of Array.from(this.messages.values())) {
-      allMessages.push(...messages.filter((m: ChatMessage) => m.threadId === threadId));
+      allMessages.push(
+        ...messages.filter((m: ChatMessage) => m.threadId === threadId),
+      );
     }
-    return allMessages.slice(-limit).sort((a, b) => 
-      new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
-    );
+    return allMessages
+      .slice(-limit)
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime(),
+      );
   }
 
-  async getSessionMessages(threadId: string, sessao: number, limit = 100): Promise<ChatMessage[]> {
+  async getSessionMessages(
+    threadId: string,
+    sessao: number,
+    limit = 100,
+  ): Promise<ChatMessage[]> {
     const allMessages: ChatMessage[] = [];
     for (const messages of Array.from(this.messages.values())) {
-      allMessages.push(...messages.filter((m: ChatMessage) => 
-        m.threadId === threadId && m.sessao === sessao
-      ));
+      allMessages.push(
+        ...messages.filter(
+          (m: ChatMessage) => m.threadId === threadId && m.sessao === sessao,
+        ),
+      );
     }
-    return allMessages.slice(-limit).sort((a, b) => 
-      new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime()
-    );
+    return allMessages
+      .slice(-limit)
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime(),
+      );
   }
 
   async getChatStats(chatId: string): Promise<any> {
     const messages = this.messages.get(chatId) || [];
     return {
       totalMessages: messages.length,
-      userMessages: messages.filter(m => m.sender === 'user').length,
-      assistantMessages: messages.filter(m => m.sender === 'assistant').length,
-      audioMessages: messages.filter(m => m.messageType === 'audio').length,
-      textMessages: messages.filter(m => m.messageType === 'text').length,
+      userMessages: messages.filter((m) => m.sender === "user").length,
+      assistantMessages: messages.filter((m) => m.sender === "assistant")
+        .length,
+      audioMessages: messages.filter((m) => m.messageType === "audio").length,
+      textMessages: messages.filter((m) => m.messageType === "text").length,
       firstMessage: messages.length > 0 ? messages[0].createdAt : null,
-      lastMessage: messages.length > 0 ? messages[messages.length - 1].createdAt : null
+      lastMessage:
+        messages.length > 0 ? messages[messages.length - 1].createdAt : null,
     };
   }
 
@@ -136,13 +174,13 @@ export class MemStorage implements IStorage {
     const review = this.reviews.get(chatId);
     const messages = this.messages.get(chatId) || [];
     const stats = await this.getChatStats(chatId);
-    
+
     return {
       chatId,
-      status: review ? 'finalizado' : 'em_andamento',
+      status: review ? "finalizado" : "em_andamento",
       reviewId: review?.id || null,
       reviewCreated: review?.createdAt || null,
-      ...stats
+      ...stats,
     };
   }
 
@@ -157,13 +195,21 @@ export class MemStorage implements IStorage {
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     if (!db) throw new Error("Database not connected");
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
     return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     if (!db) throw new Error("Database not connected");
-    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
     return result[0];
   }
 
@@ -175,48 +221,75 @@ export class DatabaseStorage implements IStorage {
 
   async createChatReview(insertReview: InsertChatReview): Promise<ChatReview> {
     if (!db) throw new Error("Database not connected");
-    const result = await db.insert(chatReviews).values(insertReview).returning();
+    const result = await db
+      .insert(chatReviews)
+      .values(insertReview)
+      .returning();
     return result[0];
   }
 
   async getChatReview(chatId: string): Promise<ChatReview | undefined> {
     if (!db) throw new Error("Database not connected");
-    const result = await db.select().from(chatReviews).where(eq(chatReviews.chatId, chatId)).limit(1);
+    const result = await db
+      .select()
+      .from(chatReviews)
+      .where(eq(chatReviews.chatId, chatId))
+      .limit(1);
     return result[0];
   }
 
   // Chat Messages Database implementation
-  async createChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
+  async createChatMessage(
+    insertMessage: InsertChatMessage,
+  ): Promise<ChatMessage> {
     if (!db) throw new Error("Database not connected");
-    const result = await db.insert(chatMessages).values(insertMessage).returning();
+    const result = await db
+      .insert(chatMessages)
+      .values(insertMessage)
+      .returning();
     return result[0];
   }
 
   async getChatMessages(chatId: string, limit = 100): Promise<ChatMessage[]> {
     if (!db) throw new Error("Database not connected");
-    const result = await db.select().from(chatMessages)
+    const result = await db
+      .select()
+      .from(chatMessages)
       .where(eq(chatMessages.chatId, chatId))
       .orderBy(chatMessages.createdAt)
       .limit(limit);
     return result;
   }
 
-  async getThreadMessages(threadId: string, limit = 100): Promise<ChatMessage[]> {
+  async getThreadMessages(
+    threadId: string,
+    limit = 100,
+  ): Promise<ChatMessage[]> {
     if (!db) throw new Error("Database not connected");
-    const result = await db.select().from(chatMessages)
+    const result = await db
+      .select()
+      .from(chatMessages)
       .where(eq(chatMessages.threadId, threadId))
       .orderBy(chatMessages.createdAt)
       .limit(limit);
     return result;
   }
 
-  async getSessionMessages(threadId: string, sessao: number, limit = 100): Promise<ChatMessage[]> {
+  async getSessionMessages(
+    threadId: string,
+    sessao: number,
+    limit = 100,
+  ): Promise<ChatMessage[]> {
     if (!db) throw new Error("Database not connected");
-    const result = await db.select().from(chatMessages)
-      .where(and(
-        eq(chatMessages.threadId, threadId),
-        eq(chatMessages.sessao, sessao)
-      ))
+    const result = await db
+      .select()
+      .from(chatMessages)
+      .where(
+        and(
+          eq(chatMessages.threadId, threadId),
+          eq(chatMessages.sessao, sessao),
+        ),
+      )
       .orderBy(chatMessages.createdAt)
       .limit(limit);
     return result;
@@ -224,7 +297,7 @@ export class DatabaseStorage implements IStorage {
 
   async getChatStats(chatId: string): Promise<any> {
     if (!db) throw new Error("Database not connected");
-    
+
     // Use raw SQL for better performance with aggregations
     const result = await db.execute(sql`
       SELECT 
@@ -247,13 +320,13 @@ export class DatabaseStorage implements IStorage {
       audioMessages: parseInt(stats.audio_messages as string) || 0,
       textMessages: parseInt(stats.text_messages as string) || 0,
       firstMessage: stats.first_message || null,
-      lastMessage: stats.last_message || null
+      lastMessage: stats.last_message || null,
     };
   }
 
   async getChatOverview(chatId: string): Promise<any> {
     if (!db) throw new Error("Database not connected");
-    
+
     // Use the view we created for optimized overview queries
     const result = await db.execute(sql`
       SELECT * FROM v_chat_overview WHERE chat_id = ${chatId}
@@ -264,24 +337,23 @@ export class DatabaseStorage implements IStorage {
 
   async getThreadSessions(threadId: string): Promise<any[]> {
     if (!db) throw new Error("Database not connected");
-    
     // Get all sessions for a thread_id with their review status
     const result = await db.execute(sql`
       SELECT 
-        ct.*,
-        cr.id as review_id,
-        cr.resumo_atendimento,
-        cr.created_at as review_created,
+        ct.*, 
+        cr.id as review_id, 
+        cr.resumo_atendimento, 
+        cr.created_at as review_created, 
         CASE WHEN cr.id IS NOT NULL THEN 'finalizado' ELSE 'em_andamento' END as status
       FROM chat_threads ct
-      LEFT JOIN chat_reviews cr ON ct.chat_id = cr.chat_id
+      LEFT JOIN chat_reviews cr ON ct.chat_id = cr.chat_id AND ct.sessao = cr.sessao
       WHERE ct.thread_id = ${threadId}
       ORDER BY ct.sessao ASC
     `);
-
     return result as any[];
   }
 }
 
 // Use database storage if available, otherwise memory storage
-export const storage = (db && process.env.DATABASE_URL) ? new DatabaseStorage() : new MemStorage();
+export const storage =
+  db && process.env.DATABASE_URL ? new DatabaseStorage() : new MemStorage();

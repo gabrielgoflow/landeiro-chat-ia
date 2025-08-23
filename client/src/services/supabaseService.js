@@ -1,33 +1,40 @@
-import { supabase } from '@/lib/supabase.js'
+import { supabase } from "@/lib/supabase.js";
 
 export class SupabaseService {
   // Incrementar sessão de um chat existente (para "Iniciar Próxima Sessão")
   static async incrementChatSession(chatId) {
     try {
-      // Buscar sessão atual do chat
-      const { data: currentData, error: selectError } = await supabase
-        .from('chat_threads')
-        .select('sessao')
-        .eq('chat_id', chatId)
-        .single()
+      // Buscar o último registro desse chat_id
+      const { data: lastSession, error: selectError } = await supabase
+        .from("chat_threads")
+        .select("*")
+        .eq("chat_id", chatId)
+        .order("sessao", { ascending: false })
+        .limit(1)
+        .single();
 
-      if (selectError) throw selectError
+      if (selectError) throw selectError;
 
-      const nextSession = (currentData.sessao || 1) + 1
+      const nextSession = (lastSession?.sessao || 0) + 1;
 
-      // Atualizar para próxima sessão
-      const { data, error } = await supabase
-        .from('chat_threads')
-        .update({ sessao: nextSession })
-        .eq('chat_id', chatId)
+      // Inserir novo registro com mesmo chat_id, mas sessao incrementada
+      const { data: newThread, error: insertError } = await supabase
+        .from("chat_threads")
+        .insert({
+          chat_id: chatId,
+          thread_id: lastSession.thread_id,
+          diagnostico: lastSession.diagnostico,
+          protocolo: lastSession.protocolo,
+          sessao: nextSession,
+        })
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
-      return { data, error: null, newSession: nextSession }
+      if (insertError) throw insertError;
+      return { data: newThread, error: null, newSession: nextSession };
     } catch (error) {
-      console.error('Error incrementing chat session:', error)
-      return { data: null, error: error.message, newSession: null }
+      console.error("Error incrementing chat session:", error);
+      return { data: null, error: error.message, newSession: null };
     }
   }
 
@@ -36,88 +43,98 @@ export class SupabaseService {
     try {
       // Primeiro, buscar a última sessão deste thread
       const { data: lastSession, error: lastSessionError } = await supabase
-        .from('chat_threads')
-        .select('sessao')
-        .eq('thread_id', threadId)
-        .order('sessao', { ascending: false })
+        .from("chat_threads")
+        .select("sessao")
+        .eq("thread_id", threadId)
+        .order("sessao", { ascending: false })
         .limit(1)
-        .single()
+        .single();
 
-      if (lastSessionError && lastSessionError.code !== 'PGRST116') {
-        throw lastSessionError
+      if (lastSessionError && lastSessionError.code !== "PGRST116") {
+        throw lastSessionError;
       }
 
-      const newSessionNumber = (lastSession?.sessao || 0) + 1
-      const newChatId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const newSessionNumber = (lastSession?.sessao || 0) + 1;
+      const newChatId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Criar novo chat_thread
       const { data: newThread, error: threadError } = await supabase
-        .from('chat_threads')
+        .from("chat_threads")
         .insert({
           chat_id: newChatId,
           thread_id: threadId,
           diagnostico,
           protocolo,
-          sessao: newSessionNumber
+          sessao: newSessionNumber,
         })
         .select()
-        .single()
+        .single();
 
-      if (threadError) throw threadError
+      if (threadError) throw threadError;
 
       // Criar relação user_chat usando usuário padrão
-      const userId = await SupabaseService.getCurrentUserId()
+      const userId = await SupabaseService.getCurrentUserId();
       if (userId) {
         const { error: userChatError } = await supabase
-          .from('user_chats')
+          .from("user_chats")
           .insert({
             user_id: userId,
             chat_id: newChatId,
-            chat_threads_id: newThread.id
-          })
+            chat_threads_id: newThread.id,
+          });
 
-        if (userChatError) console.warn('Warning: Could not create user_chat relation:', userChatError)
+        if (userChatError)
+          console.warn(
+            "Warning: Could not create user_chat relation:",
+            userChatError,
+          );
       }
 
-      return { 
-        data: newThread, 
-        error: null, 
+      return {
+        data: newThread,
+        error: null,
         newChatId,
-        newSession: newSessionNumber 
-      }
+        newSession: newSessionNumber,
+      };
     } catch (error) {
-      console.error('Error creating next session:', error)
-      return { 
-        data: null, 
-        error: error.message, 
+      console.error("Error creating next session:", error);
+      return {
+        data: null,
+        error: error.message,
         newChatId: null,
-        newSession: null 
-      }
+        newSession: null,
+      };
     }
   }
 
   // Criar relação entre chat interno e thread_id do OpenAI
-  static async createChatThread(chatId, threadId, diagnostico, protocolo, sessao = 1) {
+  static async createChatThread(
+    chatId,
+    threadId,
+    diagnostico,
+    protocolo,
+    sessao = 1,
+  ) {
     try {
       const { data, error } = await supabase
-        .from('chat_threads')
+        .from("chat_threads")
         .insert([
           {
             chat_id: chatId,
             thread_id: threadId,
             diagnostico,
             protocolo,
-            sessao: sessao // Sempre começa com sessão 1 para novos chats
-          }
+            sessao: sessao, // Sempre começa com sessão 1 para novos chats
+          },
         ])
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
-      return { data, error: null }
+      if (error) throw error;
+      return { data, error: null };
     } catch (error) {
-      console.error('Error creating chat thread:', error)
-      return { data: null, error: error.message }
+      console.error("Error creating chat thread:", error);
+      return { data: null, error: error.message };
     }
   }
 
@@ -125,16 +142,16 @@ export class SupabaseService {
   static async getThreadIdByChatId(chatId) {
     try {
       const { data, error } = await supabase
-        .from('chat_threads')
-        .select('thread_id, diagnostico, protocolo, sessao')
-        .eq('chat_id', chatId)
-        .single()
+        .from("chat_threads")
+        .select("thread_id, diagnostico, protocolo, sessao")
+        .eq("chat_id", chatId)
+        .single();
 
-      if (error && error.code !== 'PGRST116') throw error // PGRST116 = not found
-      return { data, error: null }
+      if (error && error.code !== "PGRST116") throw error; // PGRST116 = not found
+      return { data, error: null };
     } catch (error) {
-      console.error('Error getting thread ID:', error)
-      return { data: null, error: error.message }
+      console.error("Error getting thread ID:", error);
+      return { data: null, error: error.message };
     }
   }
 
@@ -142,22 +159,22 @@ export class SupabaseService {
   static async createUserChat(userId, openaiChatId, chatThreadsId = null) {
     try {
       const { data, error } = await supabase
-        .from('user_chats')
+        .from("user_chats")
         .insert([
           {
             user_id: userId,
             chat_id: openaiChatId,
-            chat_threads_id: chatThreadsId
-          }
+            chat_threads_id: chatThreadsId,
+          },
         ])
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
-      return { data, error: null }
+      if (error) throw error;
+      return { data, error: null };
     } catch (error) {
-      console.error('Error creating user chat:', error)
-      return { data: null, error: error.message }
+      console.error("Error creating user chat:", error);
+      return { data: null, error: error.message };
     }
   }
 
@@ -165,8 +182,9 @@ export class SupabaseService {
   static async getUserChats(userId) {
     try {
       const { data, error } = await supabase
-        .from('user_chats')
-        .select(`
+        .from("user_chats")
+        .select(
+          `
           *,
           chat_threads (
             chat_id,
@@ -177,45 +195,50 @@ export class SupabaseService {
             created_at,
             updated_at
           )
-        `)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+        `,
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
 
-      if (error) throw error
-      
+      if (error) throw error;
+
       // Transform and group by thread_id, keeping only the latest session per thread
-      const transformedData = data?.map(userChat => ({
-        ...userChat,
-        chat_id: userChat.chat_threads?.chat_id || userChat.chat_id,
-        thread_id: userChat.chat_threads?.thread_id,
-        diagnostico: userChat.chat_threads?.diagnostico,
-        protocolo: userChat.chat_threads?.protocolo,
-        sessao: userChat.chat_threads?.sessao,
-        created_at: userChat.chat_threads?.created_at || userChat.created_at
-      })) || []
-      
+      const transformedData =
+        data?.map((userChat) => ({
+          ...userChat,
+          chat_id: userChat.chat_threads?.chat_id || userChat.chat_id,
+          thread_id: userChat.chat_threads?.thread_id,
+          diagnostico: userChat.chat_threads?.diagnostico,
+          protocolo: userChat.chat_threads?.protocolo,
+          sessao: userChat.chat_threads?.sessao,
+          created_at: userChat.chat_threads?.created_at || userChat.created_at,
+        })) || [];
+
       // Group by thread_id and keep only the latest session for each thread
       const threadGroups = {};
-      transformedData.forEach(chat => {
+      transformedData.forEach((chat) => {
         const threadId = chat.thread_id;
         if (!threadId) {
           // If no thread_id, treat as individual chat
           threadGroups[chat.chat_id] = chat;
         } else {
           // If thread_id exists, keep only the latest session
-          if (!threadGroups[threadId] || chat.sessao > threadGroups[threadId].sessao) {
+          if (
+            !threadGroups[threadId] ||
+            chat.sessao > threadGroups[threadId].sessao
+          ) {
             threadGroups[threadId] = chat;
           }
         }
       });
-      
+
       // Convert back to array and sort by created_at
-      return Object.values(threadGroups).sort((a, b) => 
-        new Date(b.created_at) - new Date(a.created_at)
+      return Object.values(threadGroups).sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at),
       );
     } catch (error) {
-      console.error('Error getting user chats:', error)
-      return []
+      console.error("Error getting user chats:", error);
+      return [];
     }
   }
 
@@ -223,17 +246,17 @@ export class SupabaseService {
   static async updateChatThread(chatId, threadId) {
     try {
       const { data, error } = await supabase
-        .from('chat_threads')
+        .from("chat_threads")
         .update({ thread_id: threadId })
-        .eq('chat_id', chatId)
+        .eq("chat_id", chatId)
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
-      return { data, error: null }
+      if (error) throw error;
+      return { data, error: null };
     } catch (error) {
-      console.error('Error updating chat thread:', error)
-      return { data: null, error: error.message }
+      console.error("Error updating chat thread:", error);
+      return { data: null, error: error.message };
     }
   }
 
@@ -241,15 +264,15 @@ export class SupabaseService {
   static async deleteChatThread(chatId) {
     try {
       const { error } = await supabase
-        .from('chat_threads')
+        .from("chat_threads")
         .delete()
-        .eq('chat_id', chatId)
+        .eq("chat_id", chatId);
 
-      if (error) throw error
-      return { error: null }
+      if (error) throw error;
+      return { error: null };
     } catch (error) {
-      console.error('Error deleting chat thread:', error)
-      return { error: error.message }
+      console.error("Error deleting chat thread:", error);
+      return { error: error.message };
     }
   }
 
@@ -257,32 +280,29 @@ export class SupabaseService {
   static async deleteUserChat(userId, chatId) {
     try {
       // First delete the review if it exists
-      await supabase
-        .from('chat_reviews')
-        .delete()
-        .eq('chat_id', chatId)
+      await supabase.from("chat_reviews").delete().eq("chat_id", chatId);
 
       // Delete the user chat relationship
       const { error: userChatError } = await supabase
-        .from('user_chats')
+        .from("user_chats")
         .delete()
-        .eq('user_id', userId)
-        .eq('chat_id', chatId)
+        .eq("user_id", userId)
+        .eq("chat_id", chatId);
 
-      if (userChatError) throw userChatError
+      if (userChatError) throw userChatError;
 
       // Delete the chat thread (CASCADE will handle related data)
       const { error: chatThreadError } = await supabase
-        .from('chat_threads')
+        .from("chat_threads")
         .delete()
-        .eq('chat_id', chatId)
+        .eq("chat_id", chatId);
 
-      if (chatThreadError) throw chatThreadError
+      if (chatThreadError) throw chatThreadError;
 
-      return { error: null }
+      return { error: null };
     } catch (error) {
-      console.error('Error deleting user chat:', error)
-      throw error
+      console.error("Error deleting user chat:", error);
+      throw error;
     }
   }
 
@@ -290,18 +310,18 @@ export class SupabaseService {
   static async getOpenAIChatByUser(userId) {
     try {
       const { data, error } = await supabase
-        .from('user_chats')
-        .select('chat_id')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+        .from("user_chats")
+        .select("chat_id")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
         .limit(1)
-        .single()
+        .single();
 
-      if (error && error.code !== 'PGRST116') throw error
-      return { data, error: null }
+      if (error && error.code !== "PGRST116") throw error;
+      return { data, error: null };
     } catch (error) {
-      console.error('Error getting OpenAI chat:', error)
-      return { data: null, error: error.message }
+      console.error("Error getting OpenAI chat:", error);
+      return { data: null, error: error.message };
     }
   }
 
@@ -310,20 +330,20 @@ export class SupabaseService {
     try {
       // Por simplicidade, usar o primeiro usuário encontrado ou um padrão
       const { data, error } = await supabase
-        .from('user_chats')
-        .select('user_id')
+        .from("user_chats")
+        .select("user_id")
         .limit(1)
-        .single()
+        .single();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error && error.code !== "PGRST116") {
         // Se não houver usuários, retornar um UUID padrão
-        return '2e8960cd-5745-4d81-8971-eecd7fc46510'
+        return "2e8960cd-5745-4d81-8971-eecd7fc46510";
       }
 
-      return data?.user_id || '2e8960cd-5745-4d81-8971-eecd7fc46510'
+      return data?.user_id || "2e8960cd-5745-4d81-8971-eecd7fc46510";
     } catch (error) {
-      console.warn('Using default user ID:', error)
-      return '2e8960cd-5745-4d81-8971-eecd7fc46510'
+      console.warn("Using default user ID:", error);
+      return "2e8960cd-5745-4d81-8971-eecd7fc46510";
     }
   }
 
@@ -331,30 +351,30 @@ export class SupabaseService {
   static async checkTablesExist() {
     try {
       const { data: chatThreads, error: error1 } = await supabase
-        .from('chat_threads')
-        .select('count', { count: 'exact' })
-        .limit(1)
+        .from("chat_threads")
+        .select("count", { count: "exact" })
+        .limit(1);
 
       const { data: userChats, error: error2 } = await supabase
-        .from('user_chats')
-        .select('count', { count: 'exact' })
-        .limit(1)
+        .from("user_chats")
+        .select("count", { count: "exact" })
+        .limit(1);
 
       return {
         chatThreadsExists: !error1,
         userChatsExists: !error2,
-        errors: { chatThreads: error1, userChats: error2 }
-      }
+        errors: { chatThreads: error1, userChats: error2 },
+      };
     } catch (error) {
-      console.error('Error checking tables:', error)
+      console.error("Error checking tables:", error);
       return {
         chatThreadsExists: false,
         userChatsExists: false,
-        errors: { general: error.message }
-      }
+        errors: { general: error.message },
+      };
     }
   }
 }
 
-export { SupabaseService as supabaseService }
-export default SupabaseService
+export { SupabaseService as supabaseService };
+export default SupabaseService;
