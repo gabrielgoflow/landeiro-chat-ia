@@ -15,6 +15,7 @@ export function ChatSidebar({
   onSelectThread,
   onDeleteThread,
   onStartNewThread,
+  onNewChatConfirm,
   isOpen,
   onClose,
 }) {
@@ -89,14 +90,24 @@ export function ChatSidebar({
   }, [user]);
 
   const handleNewChatConfirm = async (formData) => {
-    // Chama a função original passando os dados do diagnóstico e protocolo
-    const newThread = await onStartNewThread(formData);
-    setShowNewChatDialog(false);
+    // Se temos a função de confirmação do chat principal, usa ela (com redirecionamento)
+    if (onNewChatConfirm) {
+      await onNewChatConfirm(formData);
 
-    toast({
-      title: "Nova conversa iniciada",
-      description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`,
-    });
+      toast({
+        title: "Nova conversa iniciada",
+        description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`,
+      });
+    } else {
+      // Fallback para compatibilidade
+      const newThread = await onStartNewThread(formData);
+      setShowNewChatDialog(false);
+
+      toast({
+        title: "Nova conversa iniciada",
+        description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`,
+      });
+    }
   };
 
   const handleDeleteChat = async (chatId, e) => {

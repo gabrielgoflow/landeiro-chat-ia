@@ -1,6 +1,17 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { ChatReview } from "@shared/schema";
+
+interface ChatReview {
+  id?: string;
+  chat_id?: string;
+  resumo_atendimento?: string;
+  feedback_direto?: string;
+  sinais_paciente?: string[];
+  pontos_positivos?: string[];
+  pontos_negativos?: string[];
+  created_at?: string;
+  sessao?: number;
+}
 
 interface ReviewSidebarProps {
   review: ChatReview | null;
@@ -14,16 +25,18 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
   return (
     <>
       {/* Overlay */}
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 z-40"
         onClick={onClose}
       />
-      
+
       {/* Sidebar */}
       <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">Review do Atendimento</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Review do Atendimento
+          </h2>
           <Button
             variant="ghost"
             size="sm"
@@ -44,7 +57,9 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
                 Resumo do Atendimento
               </h3>
               <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-gray-700 text-sm leading-relaxed">{review.resumoAtendimento}</p>
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {review.resumo_atendimento}
+                </p>
               </div>
             </div>
 
@@ -55,7 +70,9 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
                 Feedback Direto
               </h3>
               <div className="bg-purple-50 p-3 rounded-lg">
-                <p className="text-gray-700 text-sm leading-relaxed">{review.feedbackDireto}</p>
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {review.feedback_direto}
+                </p>
               </div>
             </div>
 
@@ -66,8 +83,11 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
                 Sinais do Paciente
               </h3>
               <div className="space-y-2">
-                {(review.sinaisPaciente || []).map((sinal, index) => (
-                  <div key={index} className="bg-orange-50 p-2 rounded border-l-4 border-orange-400">
+                {(review.sinais_paciente || []).map((sinal, index) => (
+                  <div
+                    key={index}
+                    className="bg-orange-50 p-2 rounded border-l-4 border-orange-400"
+                  >
                     <p className="text-gray-700 text-sm">{sinal}</p>
                   </div>
                 ))}
@@ -81,8 +101,11 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
                 Pontos Positivos
               </h3>
               <div className="space-y-2">
-                {(review.pontosPositivos || []).map((ponto, index) => (
-                  <div key={index} className="bg-green-50 p-2 rounded border-l-4 border-green-400">
+                {(review.pontos_positivos || []).map((ponto, index) => (
+                  <div
+                    key={index}
+                    className="bg-green-50 p-2 rounded border-l-4 border-green-400"
+                  >
                     <p className="text-gray-700 text-sm">{ponto}</p>
                   </div>
                 ))}
@@ -96,8 +119,11 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
                 Pontos para Melhoria
               </h3>
               <div className="space-y-2">
-                {(review.pontosNegativos || []).map((ponto, index) => (
-                  <div key={index} className="bg-red-50 p-2 rounded border-l-4 border-red-400">
+                {(review.pontos_negativos || []).map((ponto, index) => (
+                  <div
+                    key={index}
+                    className="bg-red-50 p-2 rounded border-l-4 border-red-400"
+                  >
                     <p className="text-gray-700 text-sm">{ponto}</p>
                   </div>
                 ))}
@@ -108,10 +134,7 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
 
         {/* Footer */}
         <div className="p-4 border-t bg-gray-50">
-          <Button 
-            onClick={onClose}
-            className="w-full"
-          >
+          <Button onClick={onClose} className="w-full">
             Fechar Review
           </Button>
         </div>

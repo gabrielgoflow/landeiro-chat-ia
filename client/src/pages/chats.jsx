@@ -163,7 +163,7 @@ export default function ChatsPage() {
           <Button
             className="bg-blue-600 hover:bg-blue-700"
             data-testid="button-new-chat"
-            onClick={() => navigate('/chat/new')}
+            onClick={() => navigate("/chat/new")}
           >
             <Plus className="h-5 w-5 mr-2" />
             Nova Conversa
