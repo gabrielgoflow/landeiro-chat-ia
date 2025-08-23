@@ -11,9 +11,7 @@ import { NewChatDialog } from "./NewChatDialog.jsx";
 import { Trash2 } from "lucide-react";
 
 export function ChatSidebar({
-  threads,
   currentThread,
-  messages,
   onSelectThread,
   onDeleteThread,
   onStartNewThread,
@@ -44,41 +42,52 @@ export function ChatSidebar({
     }
   };
 
-  // Load user chats from Supabase
-  useEffect(() => {
-    const loadUserChats = async () => {
-      if (!user) return;
-      
-      try {
-        setLoadingChats(true);
-        const chats = await supabaseService.getUserChats(user.id);
-        setUserChats(chats);
-        
-        // Check review status for each chat
-        const reviewStatuses = {};
-        for (const chat of chats) {
-          try {
-            const response = await fetch(`/api/reviews/${chat.chat_id}`);
-            reviewStatuses[chat.chat_id] = response.ok;
-          } catch (error) {
-            console.error(`Error checking review for chat ${chat.chat_id}:`, error);
-            reviewStatuses[chat.chat_id] = false;
-          }
-        }
-        setChatReviews(reviewStatuses);
-      } catch (error) {
-        console.error('Erro ao carregar chats:', error);
-      } finally {
-        setLoadingChats(false);
-      }
-    };
+  // Function to load user chats from Supabase
+  const loadUserChats = async () => {
+    if (!user) return;
     
+    try {
+      setLoadingChats(true);
+      const chats = await supabaseService.getUserChats(user.id);
+      setUserChats(chats);
+      
+      // Check review status for each chat
+      const reviewStatuses = {};
+      for (const chat of chats) {
+        try {
+          const response = await fetch(`/api/reviews/${chat.chat_id}`);
+          reviewStatuses[chat.chat_id] = response.ok;
+        } catch (error) {
+          console.error(`Error checking review for chat ${chat.chat_id}:`, error);
+          reviewStatuses[chat.chat_id] = false;
+        }
+      }
+      setChatReviews(reviewStatuses);
+    } catch (error) {
+      console.error('Erro ao carregar chats:', error);
+    } finally {
+      setLoadingChats(false);
+    }
+  };
+
+  // Load user chats from Supabase on mount and when user changes
+  useEffect(() => {
     loadUserChats();
   }, [user]);
 
-  const handleNewChatConfirm = (formData) => {
+  // Expose refresh function globally for when new chats are created
+  useEffect(() => {
+    window.refreshSidebar = loadUserChats;
+    return () => {
+      delete window.refreshSidebar;
+    };
+  }, [user]);
+
+  const handleNewChatConfirm = async (formData) => {
     // Chama a função original passando os dados do diagnóstico e protocolo
-    onStartNewThread(formData);
+    const newThread = await onStartNewThread(formData);
+    setShowNewChatDialog(false);
+    
     toast({
       title: 'Nova conversa iniciada',
       description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`

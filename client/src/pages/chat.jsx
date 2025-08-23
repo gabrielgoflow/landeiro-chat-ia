@@ -181,11 +181,13 @@ export default function Chat() {
     const newThread = await startNewThread(formData);
     setShowNewChatDialog(false);
     
-    // Redirect to the new chat URL and refresh to ensure sidebar updates
+    // Redirect to the new chat URL and refresh sidebar
     if (newThread && newThread.id) {
       navigate(`/chat/${newThread.id}`);
-      // Force a page refresh to ensure the chat appears in the sidebar
-      window.location.reload();
+      // Refresh sidebar to show new chat immediately
+      if (window.refreshSidebar) {
+        await window.refreshSidebar();
+      }
     }
   };
 
@@ -285,8 +287,10 @@ export default function Chat() {
         // Navegar para o novo chat
         navigate(`/chat/${newChatId}`);
         
-        // Force a page refresh to ensure the new session appears in sidebar and tabs
-        window.location.reload();
+        // Refresh sidebar to show new session immediately
+        if (window.refreshSidebar) {
+          await window.refreshSidebar();
+        }
         
       } else {
         console.error('Error starting next session:', error);
@@ -350,12 +354,10 @@ export default function Chat() {
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
       <ChatSidebar
-        threads={threads}
         currentThread={currentThread}
-        messages={allMessages}
         onSelectThread={selectThread}
         onDeleteThread={deleteThread}
-        onStartNewThread={() => setShowNewChatDialog(true)}
+        onStartNewThread={startNewThread}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
