@@ -143,7 +143,7 @@ export default function Chat() {
     }
   }, [currentThread, chatId]);
 
-  // Check if current chat has a review - CONSOLIDADO para evitar loops
+  // Check if current chat has a review - CONSOLIDADO e corrigido para usar sessão selecionada
   useEffect(() => {
     const checkForReview = async () => {
       // Reset estados primeiro
@@ -151,14 +151,15 @@ export default function Chat() {
       setIsCurrentSessionFinalized(false);
       setCurrentReview(null);
 
-      if (!currentThread?.id || !currentThread?.sessionData?.sessao) {
+      // Usa selectedSessionId e selectedSessaoNumber para verificar a sessão correta
+      if (!selectedSessionId || !selectedSessaoNumber) {
         return;
       }
 
-      const chatId = currentThread.id;
-      const sessao = currentThread.sessionData.sessao;
+      const chatId = selectedSessionId;
+      const sessao = selectedSessaoNumber;
 
-      console.log("Checking review for chatId + sessao:", { chatId, sessao });
+      console.log("Checking review for SELECTED session:", { chatId, sessao });
 
       try {
         // Usa Supabase diretamente em vez de API dupla
@@ -172,13 +173,16 @@ export default function Chat() {
         const hasReview = !!review && !error;
 
         if (hasReview) {
-          console.log("Review found for session:", { chatId, sessao });
+          console.log("Review found for selected session:", { chatId, sessao });
           setHasReview(true);
           setIsCurrentSessionFinalized(true);
           setCurrentReview(review);
           setIsFinalizingChat(false);
         } else {
-          console.log("No review found for session:", { chatId, sessao });
+          console.log("No review found for selected session:", {
+            chatId,
+            sessao,
+          });
         }
       } catch (error) {
         console.error("Error checking review:", error);
@@ -189,18 +193,22 @@ export default function Chat() {
     const timeoutId = setTimeout(checkForReview, 200);
 
     return () => clearTimeout(timeoutId);
-  }, [currentThread?.id, currentThread?.sessionData?.sessao]);
+  }, [selectedSessionId, selectedSessaoNumber]);
 
-  // Function to load review for current chat - SIMPLIFICADO
+  // Function to load review for current chat - CORRIGIDO para usar sessão selecionada
   const loadReview = async () => {
-    if (!currentThread?.id || !currentThread?.sessionData?.sessao) {
-      console.log("No current thread or session data");
+    // Usa selectedSessionId e selectedSessaoNumber em vez de currentThread
+    if (!selectedSessionId || !selectedSessaoNumber) {
+      console.log("No selected session or session number:", {
+        selectedSessionId,
+        selectedSessaoNumber,
+      });
       return;
     }
 
-    const chatId = currentThread.id;
-    const sessao = currentThread.sessionData.sessao;
-    console.log("Loading review for session:", { chatId, sessao });
+    const chatId = selectedSessionId;
+    const sessao = selectedSessaoNumber;
+    console.log("Loading review for SELECTED session:", { chatId, sessao });
 
     setIsLoadingReview(true);
     try {
@@ -213,11 +221,17 @@ export default function Chat() {
         .single();
 
       if (review && !error) {
-        console.log("Review loaded and showing sidebar:", review);
+        console.log(
+          "Review loaded for selected session and showing sidebar:",
+          review,
+        );
         setCurrentReview(review);
         setShowReviewSidebar(true);
       } else {
-        console.log("No review found for session:", { chatId, sessao });
+        console.log("No review found for selected session:", {
+          chatId,
+          sessao,
+        });
       }
     } catch (error) {
       console.error("Error loading review:", error);
