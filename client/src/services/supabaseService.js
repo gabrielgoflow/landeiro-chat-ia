@@ -161,7 +161,7 @@ export class SupabaseService {
     }
   }
 
-  // Buscar chats do usuário
+  // Buscar chats do usuário agrupados por thread_id (apenas sessão mais recente)
   static async getUserChats(userId) {
     try {
       const { data, error } = await supabase
@@ -183,7 +183,7 @@ export class SupabaseService {
 
       if (error) throw error
       
-      // Transform data to flatten chat_threads info
+      // Transform and group by thread_id, keeping only the latest session per thread
       const transformedData = data?.map(userChat => ({
         ...userChat,
         chat_id: userChat.chat_threads?.chat_id || userChat.chat_id,
@@ -194,7 +194,25 @@ export class SupabaseService {
         created_at: userChat.chat_threads?.created_at || userChat.created_at
       })) || []
       
-      return transformedData
+      // Group by thread_id and keep only the latest session for each thread
+      const threadGroups = {};
+      transformedData.forEach(chat => {
+        const threadId = chat.thread_id;
+        if (!threadId) {
+          // If no thread_id, treat as individual chat
+          threadGroups[chat.chat_id] = chat;
+        } else {
+          // If thread_id exists, keep only the latest session
+          if (!threadGroups[threadId] || chat.sessao > threadGroups[threadId].sessao) {
+            threadGroups[threadId] = chat;
+          }
+        }
+      });
+      
+      // Convert back to array and sort by created_at
+      return Object.values(threadGroups).sort((a, b) => 
+        new Date(b.created_at) - new Date(a.created_at)
+      );
     } catch (error) {
       console.error('Error getting user chats:', error)
       return []

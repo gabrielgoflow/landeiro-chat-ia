@@ -51,10 +51,11 @@ export function ChatSidebar({
       const chats = await supabaseService.getUserChats(user.id);
       setUserChats(chats);
       
-      // Check review status for each chat
+      // Check review status for the latest session of each thread
       const reviewStatuses = {};
       for (const chat of chats) {
         try {
+          // Check if the latest session has a review (thread is finalized)
           const response = await fetch(`/api/reviews/${chat.chat_id}`);
           reviewStatuses[chat.chat_id] = response.ok;
         } catch (error) {
@@ -223,7 +224,7 @@ export function ChatSidebar({
                         }
                       `}
                       onClick={() => {
-                        // Navigate to the chat
+                        // Navigate to the latest session of this thread
                         window.location.href = `/chat/${chat.chat_id}`;
                       }}
                       data-testid={`chat-${chat.chat_id}`}
@@ -254,10 +255,10 @@ export function ChatSidebar({
                           </Button>
                         </div>
                         
-                        {/* Session Badge - below status */}
+                        {/* Latest Session Badge - below status */}
                         {chat.sessao && (
                           <Badge variant="default" className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5">
-                            SESSÃO {chat.sessao}
+                            SESSÃO {chat.sessao} (ATUAL)
                           </Badge>
                         )}
                       </div>
@@ -272,7 +273,7 @@ export function ChatSidebar({
                           </Badge>
                         </div>
                         <div className="text-xs text-gray-500">
-                          ID: {chat.chat_id.substring(0, 8)}...
+                          {chat.thread_id ? `Thread: ${chat.thread_id.substring(7, 15)}...` : `ID: ${chat.chat_id.substring(0, 8)}...`}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
                           {new Date(chat.created_at).toLocaleDateString('pt-BR', {
