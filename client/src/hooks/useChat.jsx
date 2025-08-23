@@ -130,10 +130,10 @@ export function useChat() {
     return newThread;
   }, [user]);
 
-  const loadChatHistory = useCallback(async (chatId, sessao = null) => {
+  const loadChatHistory = useCallback(async (chatId, forceSessionReload = false) => {
     try {
       setIsLoading(true);
-      console.log('Loading chat history for:', chatId, 'session:', sessao);
+      console.log('Loading chat history for:', chatId, 'forceSessionReload:', forceSessionReload);
       
       // Try to get thread data from Supabase to find the correct thread_id and session
       let threadId = null;

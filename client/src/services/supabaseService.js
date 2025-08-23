@@ -141,13 +141,24 @@ export class SupabaseService {
   // Buscar dados completos do chat thread por chat_id
   static async getChatThread(chatId) {
     try {
+      console.log('Getting chat thread for:', chatId);
       const { data, error } = await supabase
         .from('chat_threads')
         .select('*')
         .eq('chat_id', chatId)
         .single()
 
-      if (error && error.code !== 'PGRST116') throw error // PGRST116 = not found
+      if (error && error.code !== 'PGRST116') {
+        console.error('Supabase error getting chat thread:', error);
+        throw error;
+      }
+      
+      if (error && error.code === 'PGRST116') {
+        console.log('Chat thread not found for chatId:', chatId);
+        return null;
+      }
+      
+      console.log('Found chat thread data:', data);
       return data
     } catch (error) {
       console.error('Error getting chat thread:', error)

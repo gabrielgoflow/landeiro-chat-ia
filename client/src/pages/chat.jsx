@@ -303,8 +303,13 @@ export default function Chat() {
   }
 
   // Handler para trocar de sessão nas abas
-  const handleSessionChange = (sessionChatId) => {
+  const handleSessionChange = async (sessionChatId) => {
     console.log('Changing to session:', sessionChatId);
+    
+    // Clear current messages first to show loading state
+    clearError();
+    
+    // Navigate to the new URL - this will trigger selectThread through URL params
     navigate(`/chat/${sessionChatId}`);
   };
 
