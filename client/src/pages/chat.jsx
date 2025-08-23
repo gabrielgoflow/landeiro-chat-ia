@@ -177,9 +177,14 @@ export default function Chat() {
     await sendMessage(message);
   };
 
-  const handleNewChatConfirm = (formData) => {
-    startNewThread(formData);
+  const handleNewChatConfirm = async (formData) => {
+    const newThread = await startNewThread(formData);
     setShowNewChatDialog(false);
+    
+    // Redirect to the new chat URL
+    if (newThread && newThread.id) {
+      navigate(`/chat/${newThread.id}`);
+    }
   };
 
   const handleFinalizeChat = async () => {

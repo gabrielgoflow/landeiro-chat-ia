@@ -125,6 +125,9 @@ export function useChat() {
         // Don't show error to user, just log it
       }
     }
+    
+    // Return the created thread so it can be used for navigation
+    return newThread;
   }, [user]);
 
   const loadChatHistory = useCallback(async (chatId, sessao = null) => {
