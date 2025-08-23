@@ -254,36 +254,40 @@ export default function Chat() {
     
     setIsStartingNextSession(true);
     try {
-      // Criar uma nova sessão com o MESMO chat_id, apenas incrementando o número da sessão
-      const { data, error, newSession } = await supabaseService.createNextSession(
+      // Criar uma nova sessão com um novo chat_id
+      const { data, error, newChatId, newSession } = await supabaseService.createNextSession(
         currentThread.threadId, // thread_id do OpenAI
         currentThread.sessionData.diagnostico,
         currentThread.sessionData.protocolo
       );
       
-      if (!error && newSession) {
-        console.log(`New session ${newSession} created for chat_id: ${currentThread.id}`);
+      if (!error && newChatId && newSession) {
+        console.log(`New session ${newSession} created with chat_id: ${newChatId}`);
         
-        // Atualizar thread local com nova sessão (MESMO chat_id)
-        const updatedThread = {
-          ...currentThread,
+        // Criar novo thread local
+        const newThread = {
+          id: newChatId,
+          title: `${currentThread.sessionData.diagnostico} - ${currentThread.sessionData.protocolo.toUpperCase()}`,
+          threadId: currentThread.threadId, // Mesmo thread_id do OpenAI
+          openaiChatId: newChatId,
           sessionData: {
             ...currentThread.sessionData,
             sessao: newSession
           },
+          createdAt: new Date(),
           updatedAt: new Date(),
         };
         
-        // Limpar estado da sessão anterior
+        // Limpar estado local primeiro
         setHasReview(false);
         setCurrentReview(null);
         setShowReviewSidebar(false);
-        setIsCurrentSessionFinalized(false);
+        setIsCurrentSessionFinalized(false); // Nova sessão não está finalizada
         
-        // Atualizar thread atual sem navegar
-        await reloadThread(currentThread.id);
+        // Navegar para o novo chat
+        navigate(`/chat/${newChatId}`);
         
-        // Refresh sidebar to show new session
+        // Refresh sidebar to show new session immediately
         if (window.refreshSidebar) {
           await window.refreshSidebar();
         }
@@ -299,13 +303,8 @@ export default function Chat() {
   }
 
   // Handler para trocar de sessão nas abas
-  const handleSessionChange = async (sessionChatId) => {
+  const handleSessionChange = (sessionChatId) => {
     console.log('Changing to session:', sessionChatId);
-    
-    // Clear current messages first to show loading state
-    clearError();
-    
-    // Navigate to the new URL - this will trigger selectThread through URL params
     navigate(`/chat/${sessionChatId}`);
   };
 

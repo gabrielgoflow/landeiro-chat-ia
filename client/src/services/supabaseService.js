@@ -31,13 +31,13 @@ export class SupabaseService {
     }
   }
 
-  // Criar próxima sessão para um chat_id existente (incrementa apenas o número da sessão)
+  // Criar próxima sessão (novo chat_id com mesmo thread_id)
   static async createNextSession(threadId, diagnostico, protocolo) {
     try {
-      // Buscar a última sessão para este thread_id
+      // Primeiro, buscar a última sessão deste thread
       const { data: lastSession, error: lastSessionError } = await supabase
         .from('chat_threads')
-        .select('sessao, chat_id')
+        .select('sessao')
         .eq('thread_id', threadId)
         .order('sessao', { ascending: false })
         .limit(1)
@@ -48,17 +48,13 @@ export class SupabaseService {
       }
 
       const newSessionNumber = (lastSession?.sessao || 0) + 1
-      const chatId = lastSession?.chat_id // Usar o MESMO chat_id
+      const newChatId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-      if (!chatId) {
-        throw new Error('No existing chat_id found for this thread')
-      }
-
-      // Criar novo registro de sessão com o MESMO chat_id
+      // Criar novo chat_thread
       const { data: newThread, error: threadError } = await supabase
         .from('chat_threads')
         .insert({
-          chat_id: chatId, // MESMO chat_id
+          chat_id: newChatId,
           thread_id: threadId,
           diagnostico,
           protocolo,
@@ -69,9 +65,24 @@ export class SupabaseService {
 
       if (threadError) throw threadError
 
+      // Criar relação user_chat usando usuário padrão
+      const userId = await SupabaseService.getCurrentUserId()
+      if (userId) {
+        const { error: userChatError } = await supabase
+          .from('user_chats')
+          .insert({
+            user_id: userId,
+            chat_id: newChatId,
+            chat_threads_id: newThread.id
+          })
+
+        if (userChatError) console.warn('Warning: Could not create user_chat relation:', userChatError)
+      }
+
       return { 
         data: newThread, 
         error: null, 
+        newChatId,
         newSession: newSessionNumber 
       }
     } catch (error) {
@@ -79,6 +90,7 @@ export class SupabaseService {
       return { 
         data: null, 
         error: error.message, 
+        newChatId: null,
         newSession: null 
       }
     }
@@ -123,34 +135,6 @@ export class SupabaseService {
     } catch (error) {
       console.error('Error getting thread ID:', error)
       return { data: null, error: error.message }
-    }
-  }
-
-  // Buscar dados completos do chat thread por chat_id
-  static async getChatThread(chatId) {
-    try {
-      console.log('Getting chat thread for:', chatId);
-      const { data, error } = await supabase
-        .from('chat_threads')
-        .select('*')
-        .eq('chat_id', chatId)
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Supabase error getting chat thread:', error);
-        throw error;
-      }
-      
-      if (error && error.code === 'PGRST116') {
-        console.log('Chat thread not found for chatId:', chatId);
-        return null;
-      }
-      
-      console.log('Found chat thread data:', data);
-      return data
-    } catch (error) {
-      console.error('Error getting chat thread:', error)
-      return null
     }
   }
 

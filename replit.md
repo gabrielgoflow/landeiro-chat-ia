@@ -6,11 +6,6 @@ A comprehensive therapy chat application built with React (frontend) and Express
 
 Preferred communication style: Simple, everyday language.
 
-## Session Navigation Behavior
-- User corrected architecture: 1 chat_id should have multiple sessions (sessao: 1, 2, 3...)
-- Fixed implementation: Sessions now increment sessao number within same chat_id
-- Architecture decision corrected: 1 chat_id = multiple sessions, same URL but different session numbers
-
 # System Architecture
 
 ## Frontend Architecture

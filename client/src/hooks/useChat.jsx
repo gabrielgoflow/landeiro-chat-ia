@@ -130,54 +130,49 @@ export function useChat() {
     return newThread;
   }, [user]);
 
-  const loadChatHistory = useCallback(async (chatId, forceSessionReload = false) => {
+  const loadChatHistory = useCallback(async (chatId, sessao = null) => {
     try {
       setIsLoading(true);
-      console.log('Loading chat history for:', chatId, 'forceSessionReload:', forceSessionReload);
+      console.log('Loading chat history for:', chatId, 'session:', sessao);
       
-      // Try to get thread data from Supabase to find the correct thread_id and session
-      let threadId = null;
-      let sessionNumber = null;
-      
-      try {
-        const threadData = await supabaseService.getChatThread(chatId);
-        threadId = threadData?.thread_id;
-        sessionNumber = threadData?.sessao;
-        console.log(`Found thread data: threadId=${threadId}, session=${sessionNumber}`);
-      } catch (error) {
-        console.log('Could not get thread data from Supabase, using chat_id fallback');
-      }
-      
-      let historyMessages = [];
-      
-      // If we have thread_id and session, use session-specific loading
-      if (threadId && sessionNumber) {
-        console.log(`Loading messages for thread ${threadId} session ${sessionNumber}`);
-        historyMessages = await ChatService.getSessionMessages(threadId, sessionNumber);
-        console.log(`Loaded ${historyMessages.length} session-specific messages`);
-      } else {
-        // Fallback to chat_id loading
-        console.log(`Loading messages by chat_id: ${chatId}`);
-        historyMessages = await ChatService.getMessageHistory(chatId);
-        console.log(`Loaded ${historyMessages.length} messages by chat_id`);
-      }
-      
-      // Update chat history with loaded messages
-      setChatHistory(prev => ({
-        ...prev,
-        messages: {
-          ...prev.messages,
-          [chatId]: historyMessages
-        }
-      }));
+      // If we have session info, try to find thread and use session-specific loading
+      const currentThread = chatHistory.threads.find(t => t.id === chatId);
+      if (currentThread?.threadId && currentThread?.sessionData?.sessao) {
+        console.log(`Using session-specific loading for thread ${currentThread.threadId} session ${currentThread.sessionData.sessao}`);
+        const historyMessages = await ChatService.getSessionMessages(currentThread.threadId, currentThread.sessionData.sessao);
+        
+        // Update chat history with loaded messages
+        setChatHistory(prev => ({
+          ...prev,
+          messages: {
+            ...prev.messages,
+            [chatId]: historyMessages
+          }
+        }));
 
+        console.log(`Loaded ${historyMessages.length} session-specific messages for chat ${chatId}`);
+      } else {
+        // Fallback to individual chat messages
+        const historyMessages = await ChatService.getMessageHistory(chatId);
+        
+        // Update chat history with loaded messages
+        setChatHistory(prev => ({
+          ...prev,
+          messages: {
+            ...prev.messages,
+            [chatId]: historyMessages
+          }
+        }));
+
+        console.log(`Loaded ${historyMessages.length} messages for chat ${chatId}`);
+      }
     } catch (error) {
       console.error('Error loading chat history:', error);
       setError('Erro ao carregar histórico da conversa');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [chatHistory.threads]);
 
   const selectThread = useCallback(async (threadId) => {
     console.log('Selecting thread:', threadId);
