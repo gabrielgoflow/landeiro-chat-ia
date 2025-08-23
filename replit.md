@@ -6,6 +6,11 @@ A comprehensive therapy chat application built with React (frontend) and Express
 
 Preferred communication style: Simple, everyday language.
 
+## Session Navigation Behavior
+- User questioned why "Iniciar Próxima Sessão" navigates to new URL instead of refreshing current page
+- Current implementation: Each session gets unique chat_id and URL for independent navigation
+- Architecture decision: 1 thread_id = multiple sessions, each with unique chat_id and URL
+
 # System Architecture
 
 ## Frontend Architecture
