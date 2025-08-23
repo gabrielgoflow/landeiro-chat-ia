@@ -181,9 +181,11 @@ export default function Chat() {
     const newThread = await startNewThread(formData);
     setShowNewChatDialog(false);
     
-    // Redirect to the new chat URL
+    // Redirect to the new chat URL and refresh to ensure sidebar updates
     if (newThread && newThread.id) {
       navigate(`/chat/${newThread.id}`);
+      // Force a page refresh to ensure the chat appears in the sidebar
+      window.location.reload();
     }
   };
 
