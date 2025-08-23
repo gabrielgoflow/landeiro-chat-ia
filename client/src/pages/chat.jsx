@@ -285,10 +285,8 @@ export default function Chat() {
         // Navegar para o novo chat
         navigate(`/chat/${newChatId}`);
         
-        // Forçar reload do thread para garantir sincronização
-        setTimeout(() => {
-          reloadThread(newChatId);
-        }, 100);
+        // Force a page refresh to ensure the new session appears in sidebar and tabs
+        window.location.reload();
         
       } else {
         console.error('Error starting next session:', error);
