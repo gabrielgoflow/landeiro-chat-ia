@@ -17,7 +17,7 @@ function Router() {
       <Route path="/" component={ChatsPage} />
       <Route path="/chats" component={ChatsPage} />
       <Route path="/chat/new" component={Chat} />
-      <Route path="/chat/:chatId" component={Chat} />
+      <Route path="/chat/:threadId" component={Chat} />
       <Route path="/admin-setup" component={AdminSetup} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
