@@ -181,63 +181,34 @@ export class SupabaseService {
   // Buscar chats do usuário agrupados por thread_id (apenas sessão mais recente)
   static async getUserChats(userId) {
     try {
-      const { data, error } = await supabase
+      // 1. Buscar todos os chat_id do usuário
+      const { data: userChats, error: userChatsError } = await supabase
         .from("user_chats")
-        .select(
-          `
-          *,
-          chat_threads (
-            chat_id,
-            thread_id,
-            diagnostico,
-            protocolo,
-            sessao,
-            created_at,
-            updated_at
-          )
-        `,
-        )
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+        .select("chat_id")
+        .eq("user_id", userId);
 
-      if (error) throw error;
+      if (userChatsError) throw userChatsError;
+      const chatIds = userChats.map((uc) => uc.chat_id);
 
-      // Transform and group by thread_id, keeping only the latest session per thread
-      const transformedData =
-        data?.map((userChat) => ({
-          ...userChat,
-          chat_id: userChat.chat_threads?.chat_id || userChat.chat_id,
-          thread_id: userChat.chat_threads?.thread_id,
-          diagnostico: userChat.chat_threads?.diagnostico,
-          protocolo: userChat.chat_threads?.protocolo,
-          sessao: userChat.chat_threads?.sessao,
-          created_at: userChat.chat_threads?.created_at || userChat.created_at,
-        })) || [];
+      // 2. Buscar os dados na view chat_overview
+      let chats = [];
+      if (chatIds.length > 0) {
+        const { data: overviewData, error: overviewError } = await supabase
+          .from("v_chat_overview")
+          .select("*")
+          .in("chat_id", chatIds);
 
-      // Group by thread_id and keep only the latest session for each thread
-      const threadGroups = {};
-      transformedData.forEach((chat) => {
-        const threadId = chat.thread_id;
-        if (!threadId) {
-          // If no thread_id, treat as individual chat
-          threadGroups[chat.chat_id] = chat;
-        } else {
-          // If thread_id exists, keep only the latest session
-          if (
-            !threadGroups[threadId] ||
-            chat.sessao > threadGroups[threadId].sessao
-          ) {
-            threadGroups[threadId] = chat;
-          }
-        }
-      });
+        if (overviewError) throw overviewError;
+        chats = overviewData || [];
+      }
 
-      // Convert back to array and sort by created_at
-      return Object.values(threadGroups).sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at),
+      // 3. Ordenar por data da última mensagem
+      chats.sort(
+        (a, b) => new Date(b.last_message_at) - new Date(a.last_message_at),
       );
+      return chats;
     } catch (error) {
-      console.error("Error getting user chats:", error);
+      console.error("Error getting user chats from chat_overview:", error);
       return [];
     }
   }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ export function ChatSidebar({
   onDeleteThread,
   onStartNewThread,
   isOpen,
-  onClose
+  onClose,
 }) {
   const isMobile = useIsMobile();
   const { user, signOut } = useAuth();
@@ -30,14 +30,14 @@ export function ChatSidebar({
     const { error } = await signOut();
     if (error) {
       toast({
-        title: 'Erro ao sair',
+        title: "Erro ao sair",
         description: error.message,
-        variant: 'destructive'
+        variant: "destructive",
       });
     } else {
       toast({
-        title: 'Logout realizado',
-        description: 'Você foi desconectado com sucesso'
+        title: "Logout realizado",
+        description: "Você foi desconectado com sucesso",
       });
     }
   };
@@ -45,27 +45,31 @@ export function ChatSidebar({
   // Function to load user chats from Supabase
   const loadUserChats = async () => {
     if (!user) return;
-    
+
     try {
       setLoadingChats(true);
       const chats = await supabaseService.getUserChats(user.id);
       setUserChats(chats);
-      
+
       // Check review status for the latest session of each thread
       const reviewStatuses = {};
       for (const chat of chats) {
         try {
-          // Check if the latest session has a review (thread is finalized)
-          const response = await fetch(`/api/reviews/${chat.chat_id}`);
-          reviewStatuses[chat.chat_id] = response.ok;
+          // Verifica review para o par chat_id + última sessão
+          const { data: review, error } = await supabaseService.supabase
+            .from("chat_reviews")
+            .select("*")
+            .eq("chat_id", chat.chat_id)
+            .eq("sessao", chat.sessao)
+            .single();
+          reviewStatuses[chat.chat_id] = !!review && !error;
         } catch (error) {
-          console.error(`Error checking review for chat ${chat.chat_id}:`, error);
           reviewStatuses[chat.chat_id] = false;
         }
       }
       setChatReviews(reviewStatuses);
     } catch (error) {
-      console.error('Erro ao carregar chats:', error);
+      console.error("Erro ao carregar chats:", error);
     } finally {
       setLoadingChats(false);
     }
@@ -88,48 +92,55 @@ export function ChatSidebar({
     // Chama a função original passando os dados do diagnóstico e protocolo
     const newThread = await onStartNewThread(formData);
     setShowNewChatDialog(false);
-    
+
     toast({
-      title: 'Nova conversa iniciada',
-      description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`
+      title: "Nova conversa iniciada",
+      description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`,
     });
   };
 
   const handleDeleteChat = async (chatId, e) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (!confirm('Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.')) {
+
+    if (
+      !confirm(
+        "Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.",
+      )
+    ) {
       return;
     }
 
     try {
       // Delete from Supabase
       await supabaseService.deleteUserChat(user.id, chatId);
-      
+
       // Update local state
-      setUserChats(prev => prev.filter(chat => chat.chat_id !== chatId));
-      setChatReviews(prev => {
+      setUserChats((prev) => prev.filter((chat) => chat.chat_id !== chatId));
+      setChatReviews((prev) => {
         const newReviews = { ...prev };
         delete newReviews[chatId];
         return newReviews;
       });
 
       // If this was the current chat, redirect to home page
-      if (currentThread?.id === chatId || currentThread?.openaiChatId === chatId) {
-        window.location.href = '/';
+      if (
+        currentThread?.id === chatId ||
+        currentThread?.openaiChatId === chatId
+      ) {
+        window.location.href = "/";
       }
 
       toast({
-        title: 'Conversa excluída',
-        description: 'A conversa foi removida com sucesso'
+        title: "Conversa excluída",
+        description: "A conversa foi removida com sucesso",
       });
     } catch (error) {
-      console.error('Erro ao excluir chat:', error);
+      console.error("Erro ao excluir chat:", error);
       toast({
-        title: 'Erro ao excluir',
-        description: 'Não foi possível excluir a conversa',
-        variant: 'destructive'
+        title: "Erro ao excluir",
+        description: "Não foi possível excluir a conversa",
+        variant: "destructive",
       });
     }
   };
@@ -144,11 +155,26 @@ export function ChatSidebar({
     return ChatService.formatTimestamp(thread.updatedAt || new Date());
   };
 
+  // LOG para depuração do Sidebar
+  console.log("Sidebar userChats:", userChats);
+
+  // Agrupa por chat_id, mantendo apenas a sessão mais alta
+  const latestChats = {};
+  userChats.forEach((chat) => {
+    if (
+      !latestChats[chat.chat_id] ||
+      chat.sessao > latestChats[chat.chat_id].sessao
+    ) {
+      latestChats[chat.chat_id] = chat;
+    }
+  });
+  const chatsToShow = Object.values(latestChats);
+
   return (
     <>
       {/* Sidebar Overlay for Mobile */}
       {isMobile && isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={onClose}
           data-testid="sidebar-overlay"
@@ -156,11 +182,14 @@ export function ChatSidebar({
       )}
 
       {/* Sidebar */}
-      <div className={`
+      <div
+        className={`
         fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        ${isOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0 lg:static lg:inset-0
-      `} data-testid="sidebar">
+      `}
+        data-testid="sidebar"
+      >
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -168,7 +197,9 @@ export function ChatSidebar({
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <i className="fas fa-robot text-white text-sm"></i>
               </div>
-              <h1 className="text-lg font-semibold text-gray-900">Landeiro Chat IA</h1>
+              <h1 className="text-lg font-semibold text-gray-900">
+                Landeiro Chat IA
+              </h1>
             </div>
             {isMobile && (
               <Button
@@ -203,24 +234,36 @@ export function ChatSidebar({
                   Todas as Conversas
                 </div>
               )}
-              
+
               {loadingChats ? (
                 <div className="text-center py-4">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mx-auto"></div>
                   <p className="text-xs text-gray-500 mt-2">Carregando...</p>
                 </div>
               ) : (
-                userChats.map((chat) => {
-                  const isActive = currentThread?.id === chat.chat_id || currentThread?.openaiChatId === chat.chat_id;
-                  
+                chatsToShow.map((chat) => {
+                  const isActive =
+                    currentThread?.id === chat.chat_id ||
+                    currentThread?.openaiChatId === chat.chat_id;
+                  // LOG para cada card
+                  console.log("Sidebar card:", {
+                    chat_id: chat.chat_id,
+                    sessao: chat.sessao,
+                    status: chatReviews[chat.chat_id]
+                      ? "FINALIZADO"
+                      : "EM ANDAMENTO",
+                    chat,
+                  });
+
                   return (
                     <div
                       key={chat.chat_id}
                       className={`
                         group flex items-start px-3 py-3 rounded-lg cursor-pointer transition-colors duration-150 relative
-                        ${isActive 
-                          ? 'bg-indigo-50 border border-indigo-100' 
-                          : 'hover:bg-gray-100'
+                        ${
+                          isActive
+                            ? "bg-indigo-50 border border-indigo-100"
+                            : "hover:bg-gray-100"
                         }
                       `}
                       onClick={() => {
@@ -232,7 +275,7 @@ export function ChatSidebar({
                       {/* Status Tags and Delete Button */}
                       <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
                         <div className="flex items-center space-x-1">
-                          {chatReviews[chat.chat_id] ? (
+                          {chat.status === "finalizado" ? (
                             <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
                               FINALIZADO
                             </Badge>
@@ -241,7 +284,7 @@ export function ChatSidebar({
                               EM ANDAMENTO
                             </Badge>
                           )}
-                          
+
                           {/* Delete Button */}
                           <Button
                             variant="ghost"
@@ -254,34 +297,44 @@ export function ChatSidebar({
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
-                        
+
                         {/* Latest Session Badge - below status */}
                         {chat.sessao && (
-                          <Badge variant="default" className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5">
+                          <Badge
+                            variant="default"
+                            className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5"
+                          >
                             SESSÃO {chat.sessao} (ATUAL)
                           </Badge>
                         )}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0 pr-24">
                         <div className="flex flex-col space-y-1 mb-2">
                           <Badge variant="secondary" className="w-fit text-xs">
-                            {(chat.diagnostico || 'Diagnóstico').toUpperCase()}
+                            {(chat.diagnostico || "Diagnóstico").toUpperCase()}
                           </Badge>
                           <Badge variant="outline" className="w-fit text-xs">
-                            {(chat.protocolo || 'Protocolo').toUpperCase()}
+                            {(chat.protocolo || "Protocolo").toUpperCase()}
                           </Badge>
                         </div>
                         <div className="text-xs text-gray-500">
-                          {chat.thread_id ? `Thread: ${chat.thread_id.substring(7, 15)}...` : `ID: ${chat.chat_id.substring(0, 8)}...`}
+                          {chat.thread_id
+                            ? `Thread: ${chat.thread_id.substring(7, 15)}...`
+                            : `ID: ${chat.chat_id.substring(0, 8)}...`}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          {new Date(chat.created_at).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          {chat.last_message_at
+                            ? new Date(chat.last_message_at).toLocaleDateString(
+                                "pt-BR",
+                                {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )
+                            : "Sem mensagens"}
                         </div>
                       </div>
                     </div>
@@ -293,7 +346,9 @@ export function ChatSidebar({
                 <div className="text-center py-8 text-gray-500">
                   <i className="fas fa-comments text-3xl mb-3 text-gray-300"></i>
                   <p className="text-sm">Nenhuma conversa ainda</p>
-                  <p className="text-xs mt-1">Clique em "Nova Conversa" para começar</p>
+                  <p className="text-xs mt-1">
+                    Clique em "Nova Conversa" para começar
+                  </p>
                 </div>
               )}
             </div>
@@ -310,12 +365,12 @@ export function ChatSidebar({
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate">
-                    {user?.email || 'Usuário'}
+                    {user?.email || "Usuário"}
                   </div>
                   <div className="text-xs text-gray-500 flex items-center space-x-2">
                     <span>Conectado</span>
-                    {user?.email === 'admin@goflow.digital' && (
-                      <a 
+                    {user?.email === "admin@goflow.digital" && (
+                      <a
                         href="/admin-setup"
                         className="text-blue-500 hover:text-blue-600"
                         title="Configurações Admin"
@@ -342,7 +397,7 @@ export function ChatSidebar({
       </div>
 
       {/* New Chat Dialog */}
-      <NewChatDialog 
+      <NewChatDialog
         open={showNewChatDialog}
         onOpenChange={setShowNewChatDialog}
         onConfirm={handleNewChatConfirm}
