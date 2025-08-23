@@ -138,6 +138,23 @@ export class SupabaseService {
     }
   }
 
+  // Buscar dados completos do chat thread por chat_id
+  static async getChatThread(chatId) {
+    try {
+      const { data, error } = await supabase
+        .from('chat_threads')
+        .select('*')
+        .eq('chat_id', chatId)
+        .single()
+
+      if (error && error.code !== 'PGRST116') throw error // PGRST116 = not found
+      return data
+    } catch (error) {
+      console.error('Error getting chat thread:', error)
+      return null
+    }
+  }
+
   // Criar relação entre user_id e chat_id do OpenAI
   static async createUserChat(userId, openaiChatId, chatThreadsId = null) {
     try {

@@ -116,9 +116,16 @@ export class ChatService {
     };
   }
 
-  static async getMessageHistory(chatId) {
+  static async getMessageHistory(chatId, sessionNumber = null) {
     try {
-      // Use our chat_messages table instead of OpenAI Assistant messages
+      console.log('Loading chat history for:', chatId, 'session:', sessionNumber);
+      
+      // If we have session number, use thread+session filtering
+      if (sessionNumber !== null) {
+        return await this.getSessionMessages(chatId, sessionNumber);
+      }
+      
+      // Fallback to chat_id filtering for backward compatibility
       const response = await fetch(`/api/chat-messages/${chatId}`);
 
       if (!response.ok) {
