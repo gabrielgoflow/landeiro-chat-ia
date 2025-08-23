@@ -31,13 +31,13 @@ export class SupabaseService {
     }
   }
 
-  // Criar próxima sessão (novo chat_id com mesmo thread_id)
+  // Criar próxima sessão para um chat_id existente (incrementa apenas o número da sessão)
   static async createNextSession(threadId, diagnostico, protocolo) {
     try {
-      // Primeiro, buscar a última sessão deste thread
+      // Buscar a última sessão para este thread_id
       const { data: lastSession, error: lastSessionError } = await supabase
         .from('chat_threads')
-        .select('sessao')
+        .select('sessao, chat_id')
         .eq('thread_id', threadId)
         .order('sessao', { ascending: false })
         .limit(1)
@@ -48,13 +48,17 @@ export class SupabaseService {
       }
 
       const newSessionNumber = (lastSession?.sessao || 0) + 1
-      const newChatId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const chatId = lastSession?.chat_id // Usar o MESMO chat_id
 
-      // Criar novo chat_thread
+      if (!chatId) {
+        throw new Error('No existing chat_id found for this thread')
+      }
+
+      // Criar novo registro de sessão com o MESMO chat_id
       const { data: newThread, error: threadError } = await supabase
         .from('chat_threads')
         .insert({
-          chat_id: newChatId,
+          chat_id: chatId, // MESMO chat_id
           thread_id: threadId,
           diagnostico,
           protocolo,
@@ -65,24 +69,9 @@ export class SupabaseService {
 
       if (threadError) throw threadError
 
-      // Criar relação user_chat usando usuário padrão
-      const userId = await SupabaseService.getCurrentUserId()
-      if (userId) {
-        const { error: userChatError } = await supabase
-          .from('user_chats')
-          .insert({
-            user_id: userId,
-            chat_id: newChatId,
-            chat_threads_id: newThread.id
-          })
-
-        if (userChatError) console.warn('Warning: Could not create user_chat relation:', userChatError)
-      }
-
       return { 
         data: newThread, 
         error: null, 
-        newChatId,
         newSession: newSessionNumber 
       }
     } catch (error) {
@@ -90,7 +79,6 @@ export class SupabaseService {
       return { 
         data: null, 
         error: error.message, 
-        newChatId: null,
         newSession: null 
       }
     }
