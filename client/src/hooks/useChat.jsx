@@ -191,15 +191,11 @@ export function useChat() {
               `Loaded ${messages?.length || 0} messages from chat_messages table for session: ${chatId}`,
             );
 
-            // Transformar mensagens para o formato esperado
-            const transformedMessages = (messages || []).map((msg) => ({
-              id: msg.message_id || msg.id,
-              content: msg.content,
-              sender: msg.sender,
-              timestamp: new Date(msg.created_at),
-              messageType: msg.message_type || "text",
-              audioUrl: msg.audio_url || null,
-            }));
+            // Transformar mensagens para o formato esperado usando ChatService
+            const transformedMessages = ChatService.transformMessages(
+              messages || [],
+              chatId,
+            );
 
             console.log(
               `Transformed ${transformedMessages.length} messages for ${chatId}`,
@@ -258,15 +254,11 @@ export function useChat() {
                 `Loaded ${messages?.length || 0} messages from chat_messages table for session: ${chatId}`,
               );
 
-              // Transformar mensagens para o formato esperado
-              const transformedMessages = (messages || []).map((msg) => ({
-                id: msg.message_id || msg.id,
-                content: msg.content,
-                sender: msg.sender,
-                timestamp: new Date(msg.created_at),
-                messageType: msg.message_type || "text",
-                audioUrl: msg.audio_url || null,
-              }));
+              // Transformar mensagens para o formato esperado usando ChatService
+              const transformedMessages = ChatService.transformMessages(
+                messages || [],
+                chatId,
+              );
 
               console.log(
                 `Transformed ${transformedMessages.length} messages for ${chatId}`,
@@ -456,6 +448,14 @@ export function useChat() {
       // Create new thread if none exists
       if (!threadId) {
         const newThread = ChatService.createNewThread();
+        // Ensure the new thread has session data with default sessao = 1
+        if (!newThread.sessionData) {
+          newThread.sessionData = {
+            diagnostico: "Geral",
+            protocolo: "tcc",
+            sessao: 1,
+          };
+        }
         threadId = newThread.id;
 
         setChatHistory((prev) => ({
@@ -539,34 +539,53 @@ export function useChat() {
         // Handle audio or text response from AI
         let aiMessage;
         if (typeof aiResponse === "object" && aiResponse.type === "audio") {
+          // Handle both audioURL and base64 responses
+          let audioUrl = null;
+          let audioContent = {};
+
+          if (aiResponse.audioURL) {
+            // Server successfully uploaded to Object Storage
+            audioUrl = aiResponse.audioURL;
+            audioContent = {
+              type: "audio",
+              audioURL: aiResponse.audioURL,
+              mimeType: aiResponse.mimeType || "audio/mp3",
+              text: aiResponse.text || "Mensagem de áudio",
+            };
+          } else if (aiResponse.base64) {
+            // Server returned base64 (fallback case)
+            // Convert base64 to data URL for playback
+            audioUrl = `data:audio/mp3;base64,${aiResponse.base64}`;
+            audioContent = {
+              type: "audio",
+              audioBase64: aiResponse.base64,
+              mimeType: aiResponse.mimeType || "audio/mp3",
+              text: aiResponse.text || "Mensagem de áudio",
+            };
+          }
+
           // Create audio message from AI response
           aiMessage = {
             id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             sender: "assistant",
             type: "audio",
-            audioBase64: `data:audio/mp3;base64,${aiResponse.base64}`, // Add proper data URI format
-            audioUrl: null,
+            audioUrl: audioUrl,
             mimeType: aiResponse.mimeType || "audio/mp3",
             duration: 0,
             timestamp: new Date(),
             content: aiResponse.text || "Mensagem de áudio",
           };
 
-          // Save AI audio message to chat_messages table - save full response object in content
+          // Save AI audio message to chat_messages table
           await ChatMessageService.saveMessage({
             chatId: threadId,
             threadId: currentThread?.threadId || "",
             sessao: sessionData?.sessao || 1,
             messageId: aiMessage.id,
             sender: "assistant",
-            content: JSON.stringify({
-              type: "audio",
-              audioBase64: `data:audio/mp3;base64,${aiResponse.base64}`,
-              mimeType: aiResponse.mimeType || "audio/mp3",
-              text: aiResponse.text || "Mensagem de áudio",
-            }),
+            content: JSON.stringify(audioContent),
             messageType: "audio",
-            audioUrl: null,
+            audioUrl: audioUrl,
             metadata: {
               mimeType: aiResponse.mimeType,
               text: aiResponse.text || "Mensagem de áudio",

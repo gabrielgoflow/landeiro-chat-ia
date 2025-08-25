@@ -28,7 +28,6 @@ export function ChatMessage({ message }) {
           {parsedMessage.type === "audio" ? (
             <AudioMessage
               audioUrl={parsedMessage.audioUrl || parsedMessage.audioURL}
-              audioBase64={parsedMessage.audioBase64}
               mimeType={parsedMessage.mimeType}
               sender="user"
             />
@@ -64,7 +63,6 @@ export function ChatMessage({ message }) {
           <div>
             <AudioMessage
               audioUrl={parsedMessage.audioUrl || parsedMessage.audioURL}
-              audioBase64={parsedMessage.audioBase64}
               mimeType={parsedMessage.mimeType}
               sender="assistant"
             />

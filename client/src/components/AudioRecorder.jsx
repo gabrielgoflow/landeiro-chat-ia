@@ -79,20 +79,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
     try {
       setIsUploading(true);
 
-      // Convert audio blob to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise((resolve, reject) => {
-        reader.onloadend = () => {
-          const base64String = reader.result;
-          resolve(base64String);
-        };
-        reader.onerror = reject;
-      });
-
-      reader.readAsDataURL(audioBlob);
-      const base64Audio = await base64Promise;
-
-      // Also upload to get audioURL
+      // Upload audio to Object Storage first
       let audioURL = null;
       try {
         // Get upload URL
@@ -126,13 +113,18 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
           }
         }
       } catch (uploadError) {
-        console.warn("Upload failed, sending base64 only:", uploadError);
+        console.error("Upload failed:", uploadError);
+        toast({
+          title: "Erro no upload",
+          description: "Não foi possível fazer upload do áudio",
+          variant: "destructive",
+        });
+        return;
       }
 
-      // Call the callback with the audio message including base64 and URL
+      // Call the callback with the audio message (only URL, no base64)
       onAudioSent({
         type: "audio",
-        audioBase64: base64Audio,
         audioURL: audioURL,
         mimeType: recordingMimeType,
         duration: 0, // We could calculate this if needed
@@ -150,7 +142,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
     } finally {
       setIsUploading(false);
     }
-  }, [audioBlob, onAudioSent, toast]);
+  }, [audioBlob, onAudioSent, toast, recordingMimeType]);
 
   const cancelAudio = useCallback(() => {
     setAudioBlob(null);
