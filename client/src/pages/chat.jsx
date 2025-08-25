@@ -54,6 +54,15 @@ export default function Chat() {
     clearError,
   } = useChat();
 
+  // Debug logs
+  console.log("Chat component state:", {
+    chatId,
+    threads: threads.length,
+    currentThread: currentThread?.id,
+    showNewChatDialog,
+    user: user?.id,
+  });
+
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -68,6 +77,12 @@ export default function Chat() {
 
   // Initialize based on chatId parameter
   useEffect(() => {
+    // Aguarda o usuário estar autenticado antes de inicializar
+    if (!user) {
+      console.log("User not authenticated, waiting...");
+      return;
+    }
+
     // Permite re-inicialização quando lastChatIdRef foi limpo (nova conversa)
     if (lastChatIdRef.current === chatId && lastChatIdRef.current !== null) {
       return;
@@ -79,6 +94,8 @@ export default function Chat() {
         chatId,
         "| Last chatId:",
         lastChatIdRef.current,
+        "| User:",
+        user.id,
       );
       lastChatIdRef.current = chatId;
 
@@ -122,15 +139,15 @@ export default function Chat() {
             setShowNewChatDialog(true);
           }
         }
-      } else if (threads.length === 0 && !chatId) {
-        // Show dialog when no threads exist and no chatId
-        console.log("No threads found, showing new chat dialog");
+      } else if (!chatId) {
+        // Show dialog when no chatId is provided (including undefined)
+        console.log("No chatId provided, showing new chat dialog");
         setShowNewChatDialog(true);
       }
     };
 
     initializeChat();
-  }, [chatId]);
+  }, [chatId, threads.length, user]);
 
   // Extract threadId from current thread
   useEffect(() => {
@@ -489,8 +506,19 @@ export default function Chat() {
     }
   }, [currentThread?.id, currentThread?.sessionData?.sessao]);
 
+  // Verificação adicional para mostrar NewChatDialog quando não há threads
+  useEffect(() => {
+    if (user && threads.length === 0 && !chatId && !showNewChatDialog) {
+      console.log(
+        "User authenticated, no threads available and no chatId, showing new chat dialog",
+      );
+      setShowNewChatDialog(true);
+    }
+  }, [user, threads.length, chatId, showNewChatDialog]);
+
   // Proteção: só renderiza o conteúdo principal se currentThread estiver definido
-  if (!currentThread) {
+  // Mas permite renderizar o NewChatDialog mesmo sem currentThread
+  if (!currentThread && !showNewChatDialog) {
     return (
       <div className="flex items-center justify-center h-full min-h-screen">
         <span className="text-gray-500 text-lg">Carregando atendimento...</span>
@@ -499,6 +527,15 @@ export default function Chat() {
   }
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
+      {/* Render NewChatDialog first if it should be shown */}
+      {showNewChatDialog && (
+        <NewChatDialog
+          open={showNewChatDialog}
+          onOpenChange={setShowNewChatDialog}
+          onConfirm={handleNewChatConfirm}
+        />
+      )}
+
       <ChatSidebar
         currentThread={currentThread}
         onSelectThread={selectThread}
@@ -734,12 +771,6 @@ export default function Chat() {
           isFinalized={isCurrentSessionFinalized}
         />
       </div>
-
-      <NewChatDialog
-        open={showNewChatDialog}
-        onOpenChange={setShowNewChatDialog}
-        onConfirm={handleNewChatConfirm}
-      />
 
       <ReviewSidebar
         review={currentReview}
