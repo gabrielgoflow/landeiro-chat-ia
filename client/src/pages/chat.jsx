@@ -345,7 +345,7 @@ export default function Chat() {
           pontosNegativos: reviewOutput.pontosNegativos.map((item) =>
             Array.isArray(item) ? item[0] : item,
           ),
-          sessao: currentThread.sessionData?.sessao,
+          sessao: selectedSessaoNumber || currentThread.sessionData?.sessao,
         };
 
         // Save review to our database
@@ -386,7 +386,7 @@ export default function Chat() {
             pontos_negativos: reviewOutput.pontosNegativos.map((item) =>
               Array.isArray(item) ? item[0] : item,
             ),
-            sessao: currentThread.sessionData?.sessao,
+            sessao: selectedSessaoNumber || currentThread.sessionData?.sessao,
             created_at: new Date().toISOString(),
           };
 
