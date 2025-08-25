@@ -209,18 +209,23 @@ export class ObjectStorageService {
     }
 
     const entityId = parts.slice(1).join("/");
+
     let entityDir = this.getPrivateObjectDir();
     if (!entityDir.endsWith("/")) {
       entityDir = `${entityDir}/`;
     }
     const objectEntityPath = `${entityDir}${entityId}`;
+
     const { bucketName, objectName } = parseObjectPath(objectEntityPath);
+
     const bucket = objectStorageClient.bucket(bucketName);
     const objectFile = bucket.file(objectName);
     const [exists] = await objectFile.exists();
+
     if (!exists) {
       throw new ObjectNotFoundError();
     }
+
     return objectFile;
   }
 

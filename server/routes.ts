@@ -132,43 +132,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "Received base64 audio from AI service, length:",
           aiData.base64.length,
         );
-        try {
-          // Convert base64 to audio URL using Object Storage
-          const objectStorageService = new ObjectStorageService();
 
-          // Convert base64 to buffer
-          const audioBuffer = Buffer.from(aiData.base64, "base64");
-          console.log("Converted base64 to buffer, size:", audioBuffer.length);
-
-          // Upload to Object Storage
-          console.log("Uploading audio to Object Storage...");
-          const audioURL = await objectStorageService.uploadAudioFromBuffer(
-            audioBuffer,
-            "audio/mp3",
-          );
-          console.log("Audio uploaded successfully, URL:", audioURL);
-
-          // Return audio response with URL
-          res.json({
-            type: "audio",
-            audioURL: audioURL,
-            mimeType: "audio/mp3",
-            text: aiData.message || "", // Include text if available
-          });
-        } catch (uploadError) {
-          console.error(
-            "Error uploading audio to Object Storage:",
-            uploadError,
-          );
-          // Fallback to base64 if upload fails
-          console.log("Falling back to base64 response");
-          res.json({
-            type: "audio",
-            base64: aiData.base64,
-            mimeType: "audio/mp3",
-            text: aiData.message || "",
-          });
-        }
+        // Always return base64 for assistant audio - simpler and more reliable
+        res.json({
+          type: "audio",
+          base64: aiData.base64,
+          mimeType: "audio/mp3",
+          text: aiData.message || "",
+        });
       } else {
         // Return text response - handle multiple possible response formats
         const messageText =
