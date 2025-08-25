@@ -441,7 +441,14 @@ export default function Chat() {
   const handleSessionChange = async (sessionChatId, sessao) => {
     setSelectedSessionId(sessionChatId);
     setSelectedSessaoNumber(sessao);
+
+    // Atualizar o currentThread.sessionData.sessao imediatamente
+    if (currentThread && currentThread.sessionData) {
+      currentThread.sessionData.sessao = sessao;
+    }
+
     await selectThread(sessionChatId, sessao); // Passa o número da sessão
+
     // Verificar se há review para o chat_id e sessao selecionados
     const { data: review, error } = await supabase
       .from("chat_reviews")
