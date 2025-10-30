@@ -59,7 +59,7 @@ export function ChatSidebar({
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-secondary rounded-lg flex items-center justify-center">
-                <img src="/logo.svg" alt="Logo" className="w-4 h-4" />
+                <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
               </div>
               <h1 className="text-lg font-semibold text-gray-900">Chat IA</h1>
             </div>

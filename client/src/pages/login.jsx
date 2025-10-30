@@ -58,7 +58,7 @@ export default function Login() {
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
             <div className="w-12 h-12 bg-secondary rounded-lg flex items-center justify-center">
-              <img src="/logo.svg" alt="Logo" className="w-6 h-6" />
+              <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-6 h-6" />
             </div>
           </div>
           <CardTitle className="text-2xl text-center">Entrar na conta</CardTitle>
