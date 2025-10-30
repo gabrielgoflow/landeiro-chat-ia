@@ -209,7 +209,7 @@ export function ChatSidebar({
                 <i className="fas fa-robot text-white text-sm"></i>
               </div>
               <h1 className="text-lg font-semibold text-gray-900">
-                Landeiro Chat IA
+                Chat IA
               </h1>
             </div>
             {isMobile && (

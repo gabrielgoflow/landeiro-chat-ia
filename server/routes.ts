@@ -85,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Landeiro Chat IA endpoint - handles both text and audio responses
+  // Chat IA endpoint - handles both text and audio responses
   app.post("/api/landeiro-chat-ia", async (req, res) => {
     try {
       const { message, chat_id, email, user_email } = req.body;

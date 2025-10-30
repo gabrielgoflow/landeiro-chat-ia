@@ -61,7 +61,7 @@ export function ChatSidebar({
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <i className="fas fa-robot text-white text-sm"></i>
               </div>
-              <h1 className="text-lg font-semibold text-gray-900">Landeiro Chat IA</h1>
+              <h1 className="text-lg font-semibold text-gray-900">Chat IA</h1>
             </div>
             {isMobile && (
               <Button

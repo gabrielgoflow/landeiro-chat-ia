@@ -94,7 +94,7 @@ export default function Register() {
           </div>
           <CardTitle className="text-2xl text-center">Criar conta</CardTitle>
           <CardDescription className="text-center">
-            Crie sua conta para acessar o chat IA da Landeiro
+            Crie sua conta para acessar o chat IA
           </CardDescription>
           
           {/* Admin Seed Button */}
