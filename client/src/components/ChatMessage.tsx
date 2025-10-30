@@ -31,7 +31,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
     <div className="flex items-start space-x-3" data-testid={`message-${message.id}`}>
       <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
         <AvatarFallback className="bg-secondary text-white">
-          <i className="fas fa-robot text-sm"></i>
+          <img src="/logo.svg" alt="Logo" className="w-4 h-4" />
         </AvatarFallback>
       </Avatar>
       <div className="flex-1">

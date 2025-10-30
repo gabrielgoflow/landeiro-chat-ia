@@ -579,7 +579,7 @@ export default function Chat() {
             </Button>
             <Avatar className="w-8 h-8 bg-secondary">
               <AvatarFallback className="bg-secondary text-white">
-                <i className="fas fa-robot text-sm"></i>
+                <img src="/logo.svg" alt="Logo" className="w-4 h-4" />
               </AvatarFallback>
             </Avatar>
             <div>
@@ -683,7 +683,7 @@ export default function Chat() {
               <div className="flex items-start space-x-3">
                 <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
                   <AvatarFallback className="bg-secondary text-white">
-                    <i className="fas fa-robot text-sm"></i>
+                    <img src="/logo.svg" alt="Logo" className="w-4 h-4" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
@@ -712,7 +712,7 @@ export default function Chat() {
               >
                 <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
                   <AvatarFallback className="bg-secondary text-white">
-                    <i className="fas fa-robot text-sm"></i>
+                    <img src="/logo.svg" alt="Logo" className="w-4 h-4" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">

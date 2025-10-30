@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <style>
+      .fill-primary { fill: #F2C336; }
+    </style>
+  </defs>
+  <!-- Geometria simples em X estilizado para servir como logo padrão -->
+  <path class="fill-primary" d="M128 32h64l64 112c8 14 8 30 0 44l-9 16c-8 14-22 22-38 22H175c-22 0-42-12-53-31L96 147C74 110 95 64 136 48l-8 16z" transform="translate(32,16) rotate(45,224,224)"/>
+  <path class="fill-primary" d="M320 32h64c41 16 62 62 40 99l-26 44c-11 19-31 31-53 31h-34c-16 0-30-8-38-22l-9-16c-8-14-8-30 0-44l64-112z" transform="translate(32,16) rotate(135,224,224)"/>
+  <path class="fill-primary" d="M128 32h64l64 112c8 14 8 30 0 44l-9 16c-8 14-22 22-38 22H175c-22 0-42-12-53-31L96 147C74 110 95 64 136 48l-8 16z" transform="translate(32,16) rotate(225,224,224)"/>
+  <path class="fill-primary" d="M320 32h64c41 16 62 62 40 99l-26 44c-11 19-31 31-53 31h-34c-16 0-30-8-38-22l-9-16c-8-14-8-30 0-44l64-112z" transform="translate(32,16) rotate(315,224,224)"/>
+</svg>
+
