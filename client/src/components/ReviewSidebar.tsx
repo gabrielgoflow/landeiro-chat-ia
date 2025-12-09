@@ -29,16 +29,18 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
   return (
     <>
       {/* Overlay */}
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 z-40"
         onClick={onClose}
       />
-      
+
       {/* Sidebar */}
       <div className="fixed right-0 top-0 h-full w-96 bg-white shadow-lg z-50 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">Review do Atendimento</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Review do Atendimento
+          </h2>
           <Button
             variant="ghost"
             size="sm"
@@ -59,7 +61,13 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
                 Resumo do Atendimento
               </h3>
               <div className="bg-blue-50 p-3 rounded-lg">
+<<<<<<< HEAD
                 <p className="text-gray-700 text-sm leading-relaxed">{review.resumo_atendimento}</p>
+=======
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {review.resumo_atendimento}
+                </p>
+>>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
               </div>
             </div>
 
@@ -70,7 +78,13 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
                 Feedback Direto
               </h3>
               <div className="bg-purple-50 p-3 rounded-lg">
+<<<<<<< HEAD
                 <p className="text-gray-700 text-sm leading-relaxed">{review.feedback_direto}</p>
+=======
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {review.feedback_direto}
+                </p>
+>>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
               </div>
             </div>
 
@@ -82,7 +96,14 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
               </h3>
               <div className="space-y-2">
                 {(review.sinais_paciente || []).map((sinal, index) => (
+<<<<<<< HEAD
                   <div key={index} className="bg-orange-50 p-2 rounded border-l-4 border-orange-400">
+=======
+                  <div
+                    key={index}
+                    className="bg-orange-50 p-2 rounded border-l-4 border-orange-400"
+                  >
+>>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                     <p className="text-gray-700 text-sm">{sinal}</p>
                   </div>
                 ))}
@@ -97,7 +118,14 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
               </h3>
               <div className="space-y-2">
                 {(review.pontos_positivos || []).map((ponto, index) => (
+<<<<<<< HEAD
                   <div key={index} className="bg-green-50 p-2 rounded border-l-4 border-green-400">
+=======
+                  <div
+                    key={index}
+                    className="bg-green-50 p-2 rounded border-l-4 border-green-400"
+                  >
+>>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                     <p className="text-gray-700 text-sm">{ponto}</p>
                   </div>
                 ))}
@@ -112,7 +140,14 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
               </h3>
               <div className="space-y-2">
                 {(review.pontos_negativos || []).map((ponto, index) => (
+<<<<<<< HEAD
                   <div key={index} className="bg-red-50 p-2 rounded border-l-4 border-red-400">
+=======
+                  <div
+                    key={index}
+                    className="bg-red-50 p-2 rounded border-l-4 border-red-400"
+                  >
+>>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                     <p className="text-gray-700 text-sm">{ponto}</p>
                   </div>
                 ))}
@@ -123,10 +158,7 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
 
         {/* Footer */}
         <div className="p-4 border-t bg-gray-50">
-          <Button 
-            onClick={onClose}
-            className="w-full"
-          >
+          <Button onClick={onClose} className="w-full">
             Fechar Review
           </Button>
         </div>

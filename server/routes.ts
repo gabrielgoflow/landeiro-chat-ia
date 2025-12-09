@@ -1,7 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertChatReviewSchema, insertChatMessageSchema } from "@shared/schema";
+import {
+  insertChatReviewSchema,
+  insertChatMessageSchema,
+} from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage.js";
 import { ObjectPermission } from "./objectAcl.js";
 
@@ -29,7 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: error.message });
     }
   });
-  
+
   // Object Storage Routes for Audio Messages
   app.post("/api/objects/upload", async (req, res) => {
     try {
@@ -54,7 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           owner: "system", // For now, system owns all audio messages
           visibility: "private", // Audio messages are private
-        }
+        },
       );
 
       res.status(200).json({
@@ -82,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Landeiro Chat IA endpoint - handles both text and audio responses
+  // Chat IA endpoint - handles both text and audio responses
   app.post("/api/landeiro-chat-ia", async (req, res) => {
     try {
       const { message, chat_id, email, user_email } = req.body;
@@ -90,7 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Include all required fields for the external AI service
       const requestBody: any = {
         message,
-        email: user_email || email || 'gabriel@goflow.digital',
+        email: user_email || email || "gabriel@goflow.digital",
         chat_id: chat_id, // Use chat_id as sent from frontend
       };
 
@@ -98,52 +101,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.diagnostico) requestBody.diagnostico = req.body.diagnostico;
       if (req.body.protocolo) requestBody.protocolo = req.body.protocolo;
 
-      console.log('Sending request to external AI service:', requestBody);
+      console.log("Sending request to external AI service:", requestBody);
 
       // Make request to external AI service
-      const webhookUrl = process.env.LANDEIRO_WEBHOOK_URL || 'https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz';
+      const webhookUrl =
+        process.env.LANDEIRO_WEBHOOK_URL ||
+        "https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz";
       const aiResponse = await fetch(webhookUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
       });
 
       if (!aiResponse.ok) {
         const errorText = await aiResponse.text();
-        console.error('AI service error:', aiResponse.status, errorText);
-        throw new Error(`AI service responded with ${aiResponse.status}: ${errorText}`);
+        console.error("AI service error:", aiResponse.status, errorText);
+        throw new Error(
+          `AI service responded with ${aiResponse.status}: ${errorText}`,
+        );
       }
 
       const aiData = await aiResponse.json();
-      console.log('AI service response:', aiData);
+      console.log("AI service response:", aiData);
 
       // Check if response contains base64 audio
       if (aiData.base64) {
-        // Return audio response
+        console.log(
+          "Received base64 audio from AI service, length:",
+          aiData.base64.length,
+        );
+
+        // Always return base64 for assistant audio - simpler and more reliable
         res.json({
-          type: 'audio',
+          type: "audio",
           base64: aiData.base64,
-          mimeType: 'audio/mp3', // Assume MP3 for base64 responses
-          text: aiData.message || '', // Include text if available
+          mimeType: "audio/mp3",
+          text: aiData.message || "",
         });
       } else {
         // Return text response - handle multiple possible response formats
-        const messageText = aiData.output || aiData.response || aiData.message || aiData.text || 'No response';
+        const messageText =
+          aiData.output ||
+          aiData.response ||
+          aiData.message ||
+          aiData.text ||
+          "No response";
         res.json({
-          type: 'text',
+          type: "text",
           message: messageText,
         });
       }
-
     } catch (error: any) {
-      console.error('Error in landeiro-chat-ia:', error);
-      
+      console.error("Error in landeiro-chat-ia:", error);
+
       // For now, provide a fallback response until external API is fixed
       res.json({
-        type: 'text',
-        message: 'Entendo que você está tentando se comunicar comigo. No momento estou com dificuldades técnicas para processar sua mensagem adequadamente. Por favor, tente novamente em alguns instantes ou descreva em texto como posso ajudá-lo hoje.',
+        type: "text",
+        message:
+          "Entendo que você está tentando se comunicar comigo. No momento estou com dificuldades técnicas para processar sua mensagem adequadamente. Por favor, tente novamente em alguns instantes ou descreva em texto como posso ajudá-lo hoje.",
       });
     }
   });
@@ -175,7 +192,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { threadId, sessao } = req.params;
       const limit = parseInt(req.query.limit as string) || 100;
-      const messages = await storage.getSessionMessages(threadId, parseInt(sessao), limit);
+      const messages = await storage.getSessionMessages(
+        threadId,
+        parseInt(sessao),
+        limit,
+      );
       res.json(messages);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

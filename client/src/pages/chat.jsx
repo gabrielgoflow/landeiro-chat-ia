@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth.jsx";
 import { useChat } from "@/hooks/useChat.jsx";
 import { supabaseService } from "@/services/supabaseService.js";
 import { supabase } from "@/lib/supabase.js";
+import { supabase } from "@/lib/supabase.js";
 import { ChatMessage } from "@/components/ChatMessage.jsx";
 import { ChatSidebar } from "@/components/ChatSidebar.jsx";
 import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
@@ -34,9 +35,10 @@ export default function Chat() {
   const [selectedSessaoNumber, setSelectedSessaoNumber] = useState(null);
   const messagesEndRef = useRef(null);
   const lastChatIdRef = useRef(null);
+  const lastChatIdRef = useRef(null);
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  
+
   const {
     threads,
     allMessages,
@@ -50,8 +52,17 @@ export default function Chat() {
     sendMessage,
     createThreadFromSupabase,
     reloadThread,
-    clearError
+    clearError,
   } = useChat();
+
+  // Debug logs
+  console.log("Chat component state:", {
+    chatId,
+    threads: threads.length,
+    currentThread: currentThread?.id,
+    showNewChatDialog,
+    user: user?.id,
+  });
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -91,19 +102,25 @@ export default function Chat() {
         setShowNewChatDialog(false);
         
         // Load specific chat by ID
-        const existingThread = threads.find(t => t.id === chatId);
+        const existingThread = threads.find((t) => t.id === chatId);
         if (existingThread) {
           console.log('Found existing thread locally:', chatId);
           await selectThread(existingThread.id, 1); // Sempre seleciona a sessão 1 ao abrir
         } else {
           // Chat ID not found in current threads, try to load from Supabase
-          console.log('Thread not found locally, trying to load from Supabase:', chatId);
+          console.log(
+            "Thread not found locally, trying to load from Supabase:",
+            chatId,
+          );
           const createdThread = await createThreadFromSupabase(chatId);
           if (createdThread) {
             console.log('Thread created from Supabase, now selecting:', createdThread.chat_id || chatId);
             await selectThread(createdThread.chat_id || chatId, 1); // Sempre seleciona a sessão 1 ao abrir
           } else {
-            console.warn('Chat ID not found in Supabase, redirecting to new chat:', chatId);
+            console.warn(
+              "Chat ID not found in Supabase, redirecting to new chat:",
+              chatId,
+            );
             setShowNewChatDialog(true);
           }
         }
@@ -127,7 +144,9 @@ export default function Chat() {
       setCurrentSessionData(null);
     }
   }, [currentThread, chatId]);
+  }, [currentThread, chatId]);
 
+  // Check if current chat has a review - CONSOLIDADO e corrigido para usar sessão selecionada
   // Check if current chat has a review - CONSOLIDADO e corrigido para usar sessão selecionada
   useEffect(() => {
     const checkForReview = async () => {
@@ -207,13 +226,11 @@ export default function Chat() {
         console.log('No review found for selected session:', { chatId, sessao });
       }
     } catch (error) {
-      console.error('Error loading review:', error);
+      console.error("Error loading review:", error);
     } finally {
       setIsLoadingReview(false);
     }
   };
-
-
 
   const handleSendMessage = async (message) => {
     await sendMessage(message);
@@ -260,24 +277,27 @@ export default function Chat() {
 
   const handleFinalizeChat = async () => {
     if (!currentThread) return;
-    
+
     setIsFinalizingChat(true);
     try {
       // Get review from external service
-      const reviewResponse = await fetch('https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const reviewResponse = await fetch(
+        "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chat_id: currentThread.id,
+          }),
         },
-        body: JSON.stringify({
-          chat_id: currentThread.id
-        })
-      });
-      
+      );
+
       if (reviewResponse.ok) {
         const reviewData = await reviewResponse.json();
-        console.log('Review data received:', reviewData);
-        
+        console.log("Review data received:", reviewData);
+
         // Extract from output field and transform nested arrays to flat strings for storage
         const reviewOutput = reviewData.output;
         const transformedReview = {
@@ -289,16 +309,16 @@ export default function Chat() {
           pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item),
           sessao: currentThread.sessionData?.sessao
         };
-        
+
         // Save review to our database
         console.log('Payload being sent to /api/reviews:', JSON.stringify(transformedReview, null, 2));
         
         const saveResponse = await fetch('/api/reviews', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify(transformedReview)
+          body: JSON.stringify(transformedReview),
         });
         
         console.log('API response status:', saveResponse.status);
@@ -333,13 +353,13 @@ export default function Chat() {
           
           console.log('ReviewSidebar should now be visible with data');
         } else {
-          console.error('Error saving review:', saveResponse.status);
+          console.error("Error saving review:", saveResponse.status);
         }
       } else {
-        console.error('Error getting review:', reviewResponse.status);
+        console.error("Error getting review:", reviewResponse.status);
       }
     } catch (error) {
-      console.error('Error finalizing chat:', error);
+      console.error("Error finalizing chat:", error);
     } finally {
       setIsFinalizingChat(false);
     }
@@ -371,6 +391,8 @@ export default function Chat() {
         }
         // Refresh na URL atual
         window.location.reload();
+        // Refresh na URL atual
+        window.location.reload();
       } else {
         console.error('Erro ao criar nova sessão:', error);
       }
@@ -379,7 +401,7 @@ export default function Chat() {
     } finally {
       setIsStartingNextSession(false);
     }
-  }
+  };
 
   // Handler para trocar de sessão nas abas
   const handleSessionChange = async (sessionChatId, sessao) => {
@@ -401,6 +423,8 @@ export default function Chat() {
     navigate(`/chat/${sessionChatId}`);
   };
 
+  // REMOVIDO: useEffect duplicado que estava causando loops
+  // A verificação de review agora é feita apenas no useEffect consolidado acima
   // REMOVIDO: useEffect duplicado que estava causando loops
   // A verificação de review agora é feita apenas no useEffect consolidado acima
 
@@ -436,11 +460,21 @@ export default function Chat() {
   }
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
+      {/* Render NewChatDialog first if it should be shown */}
+      {showNewChatDialog && (
+        <NewChatDialog
+          open={showNewChatDialog}
+          onOpenChange={setShowNewChatDialog}
+          onConfirm={handleNewChatConfirm}
+        />
+      )}
+
       <ChatSidebar
         currentThread={currentThread}
         onSelectThread={selectThread}
         onDeleteThread={deleteThread}
         onStartNewThread={startNewThread}
+        onNewChatConfirm={handleNewChatConfirm}
         onNewChatConfirm={handleNewChatConfirm}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -464,6 +498,16 @@ export default function Chat() {
             <Button
               variant="ghost"
               size="sm"
+              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              data-testid="back-to-chats-button"
+              onClick={() => navigate("/chats")}
+            >
+              <i className="fas fa-arrow-left mr-2"></i>
+              Voltar
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setIsSidebarOpen(true)}
               className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
               data-testid="open-sidebar-button"
@@ -472,12 +516,16 @@ export default function Chat() {
             </Button>
             <Avatar className="w-8 h-8 bg-secondary">
               <AvatarFallback className="bg-secondary text-white">
-                <i className="fas fa-robot text-sm"></i>
+                <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
               </AvatarFallback>
             </Avatar>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Paciente IA</h2>
-              <p className="text-sm text-gray-500">Online • Responde instantaneamente</p>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Paciente IA
+              </h2>
+              <p className="text-sm text-gray-500">
+                Online • Responde instantaneamente
+              </p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -497,7 +545,7 @@ export default function Chat() {
                   )}
                   Ver Review
                 </Button>
-                
+
                 <Button
                   onClick={handleStartNextSession}
                   disabled={isStartingNextSession}
@@ -518,7 +566,7 @@ export default function Chat() {
                 </Button>
               </>
             )}
-            
+
             {currentThread && !hasReview && (
               <Button
                 onClick={handleFinalizeChat}
@@ -562,22 +610,28 @@ export default function Chat() {
         )}
 
         {/* Messages Container */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0" data-testid="messages-container">
+        <div
+          className="flex-1 overflow-y-auto px-4 py-6 min-h-0"
+          data-testid="messages-container"
+        >
           <div className="max-w-4xl mx-auto space-y-6">
-            
             {/* Welcome Message */}
             {currentMessages.length === 0 && (
               <div className="flex items-start space-x-3">
                 <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
                   <AvatarFallback className="bg-secondary text-white">
-                    <i className="fas fa-robot text-sm"></i>
+                    <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
-                    <p className="text-gray-800">Olá! Podemos iniciar nossa sessão?</p>
+                    <p className="text-gray-800">
+                      Olá! Podemos iniciar nossa sessão?
+                    </p>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 ml-1">Agora mesmo</div>
+                  <div className="text-xs text-gray-500 mt-1 ml-1">
+                    Agora mesmo
+                  </div>
                 </div>
               </div>
             )}
@@ -589,10 +643,13 @@ export default function Chat() {
 
             {/* Loading Message */}
             {isLoading && (
-              <div className="flex items-start space-x-3" data-testid="loading-message">
+              <div
+                className="flex items-start space-x-3"
+                data-testid="loading-message"
+              >
                 <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
                   <AvatarFallback className="bg-secondary text-white">
-                    <i className="fas fa-robot text-sm"></i>
+                    <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
@@ -600,10 +657,18 @@ export default function Chat() {
                     <div className="flex items-center space-x-2">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"
+                          style={{ animationDelay: "0.1s" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"
+                          style={{ animationDelay: "0.2s" }}
+                        ></div>
                       </div>
-                      <span className="text-sm text-gray-500">Digitando...</span>
+                      <span className="text-sm text-gray-500">
+                        Digitando...
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -615,7 +680,7 @@ export default function Chat() {
         </div>
 
         {/* Debug Info (Admin only) */}
-        {user?.email === 'admin@goflow.digital' && (
+        {user?.email === "admin@goflow.digital" && (
           <div className="px-4 pb-2">
             <Button
               variant="ghost"
@@ -624,12 +689,12 @@ export default function Chat() {
               className="text-xs text-gray-500 hover:text-gray-700"
             >
               <i className="fas fa-bug mr-1"></i>
-              {showDebug ? 'Ocultar Debug' : 'Mostrar Debug'}
+              {showDebug ? "Ocultar Debug" : "Mostrar Debug"}
             </Button>
           </div>
         )}
-        
-        <ChatDebugInfo 
+
+        <ChatDebugInfo
           currentThread={currentThread}
           sessionData={currentThread?.sessionData}
           visible={showDebug}
@@ -645,13 +710,7 @@ export default function Chat() {
           isFinalized={isCurrentSessionFinalized}
         />
       </div>
-      
-      <NewChatDialog
-        open={showNewChatDialog}
-        onOpenChange={setShowNewChatDialog}
-        onConfirm={handleNewChatConfirm}
-      />
-      
+
       <ReviewSidebar
         review={currentReview}
         isOpen={showReviewSidebar}

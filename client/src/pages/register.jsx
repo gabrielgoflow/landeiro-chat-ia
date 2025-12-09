@@ -88,13 +88,13 @@ export default function Register() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-              <i className="fas fa-robot text-white text-xl"></i>
+            <div className="w-12 h-12 bg-secondary rounded-lg flex items-center justify-center">
+              <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-6 h-6" />
             </div>
           </div>
           <CardTitle className="text-2xl text-center">Criar conta</CardTitle>
           <CardDescription className="text-center">
-            Crie sua conta para acessar o chat IA da Landeiro
+            Crie sua conta para acessar o chat IA
           </CardDescription>
           
           {/* Admin Seed Button */}

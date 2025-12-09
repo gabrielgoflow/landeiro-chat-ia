@@ -1,69 +1,67 @@
-import { useState, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Square, Send } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useRef, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Mic, MicOff, Square, Send } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export function AudioRecorder({ onAudioSent, disabled = false }) {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [recordingMimeType, setRecordingMimeType] = useState('audio/webm');
+  const [recordingMimeType, setRecordingMimeType] = useState("audio/webm");
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const { toast } = useToast();
 
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 44100
-        } 
+          sampleRate: 44100,
+        },
       });
-      
+
       // Try MP3 first, fallback to webm
-      let mimeType = 'audio/webm;codecs=opus';
-      let fileExtension = 'webm';
-      
-      if (MediaRecorder.isTypeSupported('audio/mpeg')) {
-        mimeType = 'audio/mpeg';
-        fileExtension = 'mp3';
-      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-        mimeType = 'audio/mp4';
-        fileExtension = 'm4a';
+      let mimeType = "audio/webm;codecs=opus";
+      let fileExtension = "webm";
+
+      if (MediaRecorder.isTypeSupported("audio/mpeg")) {
+        mimeType = "audio/mpeg";
+        fileExtension = "mp3";
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        mimeType = "audio/mp4";
+        fileExtension = "m4a";
       }
-      
+
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       setRecordingMimeType(mimeType);
-      
+
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
-      
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
-      
+
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType });
         setAudioBlob(blob);
-        
+
         // Stop all tracks to release the microphone
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       };
-      
+
       mediaRecorder.start();
       setIsRecording(true);
-      
-
     } catch (error) {
-      console.error('Error starting recording:', error);
+      console.error("Error starting recording:", error);
       toast({
-        title: 'Erro ao gravar',
-        description: 'Não foi possível acessar o microfone',
-        variant: 'destructive'
+        title: "Erro ao gravar",
+        description: "Não foi possível acessar o microfone",
+        variant: "destructive",
       });
     }
   }, [toast]);
@@ -72,7 +70,10 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+<<<<<<< HEAD
   
+=======
+>>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
     }
   }, [isRecording]);
 
@@ -82,26 +83,13 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
     try {
       setIsUploading(true);
 
-      // Convert audio blob to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise((resolve, reject) => {
-        reader.onloadend = () => {
-          const base64String = reader.result;
-          resolve(base64String);
-        };
-        reader.onerror = reject;
-      });
-      
-      reader.readAsDataURL(audioBlob);
-      const base64Audio = await base64Promise;
-
-      // Also upload to get audioURL
+      // Upload audio to Object Storage first
       let audioURL = null;
       try {
         // Get upload URL
-        const uploadResponse = await fetch('/api/objects/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+        const uploadResponse = await fetch("/api/objects/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
         });
 
         if (uploadResponse.ok) {
@@ -109,17 +97,17 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
 
           // Upload audio file
           const uploadResult = await fetch(uploadURL, {
-            method: 'PUT',
+            method: "PUT",
             body: audioBlob,
-            headers: { 'Content-Type': recordingMimeType }
+            headers: { "Content-Type": recordingMimeType },
           });
 
           if (uploadResult.ok) {
             // Set ACL policy for the uploaded audio
-            const aclResponse = await fetch('/api/audio-messages', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ audioURL: uploadURL })
+            const aclResponse = await fetch("/api/audio-messages", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ audioURL: uploadURL }),
             });
 
             if (aclResponse.ok) {
@@ -129,40 +117,42 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
           }
         }
       } catch (uploadError) {
-        console.warn('Upload failed, sending base64 only:', uploadError);
+        console.error("Upload failed:", uploadError);
+        toast({
+          title: "Erro no upload",
+          description: "Não foi possível fazer upload do áudio",
+          variant: "destructive",
+        });
+        return;
       }
 
-      // Call the callback with the audio message including base64 and URL
+      // Call the callback with the audio message (only URL, no base64)
       onAudioSent({
-        type: 'audio',
-        audioBase64: base64Audio,
+        type: "audio",
         audioURL: audioURL,
         mimeType: recordingMimeType,
-        duration: 0 // We could calculate this if needed
+        duration: 0, // We could calculate this if needed
       });
 
       // Reset state
       setAudioBlob(null);
-      
-
-
     } catch (error) {
-      console.error('Error sending audio:', error);
+      console.error("Error sending audio:", error);
       toast({
-        title: 'Erro ao enviar',
-        description: 'Não foi possível enviar o áudio',
-        variant: 'destructive'
+        title: "Erro ao enviar",
+        description: "Não foi possível enviar o áudio",
+        variant: "destructive",
       });
     } finally {
       setIsUploading(false);
     }
-  }, [audioBlob, onAudioSent, toast]);
+  }, [audioBlob, onAudioSent, toast, recordingMimeType]);
 
   const cancelAudio = useCallback(() => {
     setAudioBlob(null);
     toast({
-      title: 'Áudio cancelado',
-      description: 'Gravação descartada'
+      title: "Áudio cancelado",
+      description: "Gravação descartada",
     });
   }, [toast]);
 
@@ -191,7 +181,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
             <MicOff className="h-3 w-3 text-blue-600" />
             <span className="text-xs text-blue-600">Áudio gravado</span>
           </div>
-          
+
           <Button
             type="button"
             variant="outline"
@@ -204,7 +194,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
           >
             ✕
           </Button>
-          
+
           <Button
             type="button"
             variant="default"

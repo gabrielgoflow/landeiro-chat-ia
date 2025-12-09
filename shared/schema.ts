@@ -106,8 +106,6 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatReview = typeof chatReviews.$inferSelect;
 export type InsertChatReview = z.infer<typeof insertChatReviewSchema>;
-export type ChatReview = typeof chatReviews.$inferSelect;
-export type InsertChatReview = z.infer<typeof insertChatReviewSchema>;
 
 // Frontend-only types for localStorage
 export type ChatThreadExtended = ChatThread & {
