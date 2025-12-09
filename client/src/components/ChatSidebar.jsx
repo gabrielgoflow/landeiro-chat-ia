@@ -15,6 +15,7 @@ export function ChatSidebar({
   onSelectThread,
   onDeleteThread,
   onStartNewThread,
+  onNewChatConfirm,
   isOpen,
   onClose
 }) {
@@ -55,11 +56,15 @@ export function ChatSidebar({
       const reviewStatuses = {};
       for (const chat of chats) {
         try {
-          // Check if the latest session has a review (thread is finalized)
-          const response = await fetch(`/api/reviews/${chat.chat_id}`);
-          reviewStatuses[chat.chat_id] = response.ok;
+          // Verifica review para o par chat_id + última sessão
+          const { data: review, error } = await supabaseService.supabase
+            .from('chat_reviews')
+            .select('*')
+            .eq('chat_id', chat.chat_id)
+            .eq('sessao', chat.sessao)
+            .single();
+          reviewStatuses[chat.chat_id] = !!review && !error;
         } catch (error) {
-          console.error(`Error checking review for chat ${chat.chat_id}:`, error);
           reviewStatuses[chat.chat_id] = false;
         }
       }
@@ -85,14 +90,24 @@ export function ChatSidebar({
   }, [user]);
 
   const handleNewChatConfirm = async (formData) => {
-    // Chama a função original passando os dados do diagnóstico e protocolo
-    const newThread = await onStartNewThread(formData);
-    setShowNewChatDialog(false);
-    
-    toast({
-      title: 'Nova conversa iniciada',
-      description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`
-    });
+    // Se temos a função de confirmação do chat principal, usa ela (com redirecionamento)
+    if (onNewChatConfirm) {
+      await onNewChatConfirm(formData);
+      
+      toast({
+        title: 'Nova conversa iniciada',
+        description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`
+      });
+    } else {
+      // Fallback para compatibilidade
+      const newThread = await onStartNewThread(formData);
+      setShowNewChatDialog(false);
+      
+      toast({
+        title: 'Nova conversa iniciada',
+        description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`
+      });
+    }
   };
 
   const handleDeleteChat = async (chatId, e) => {
@@ -143,6 +158,18 @@ export function ChatSidebar({
   const getFormattedTime = (thread) => {
     return ChatService.formatTimestamp(thread.updatedAt || new Date());
   };
+
+  // LOG para depuração do Sidebar
+  console.log('Sidebar userChats:', userChats);
+
+  // Agrupa por chat_id, mantendo apenas a sessão mais alta
+  const latestChats = {};
+  userChats.forEach(chat => {
+    if (!latestChats[chat.chat_id] || chat.sessao > latestChats[chat.chat_id].sessao) {
+      latestChats[chat.chat_id] = chat;
+    }
+  });
+  const chatsToShow = Object.values(latestChats);
 
   return (
     <>
@@ -210,8 +237,15 @@ export function ChatSidebar({
                   <p className="text-xs text-gray-500 mt-2">Carregando...</p>
                 </div>
               ) : (
-                userChats.map((chat) => {
+                chatsToShow.map((chat) => {
                   const isActive = currentThread?.id === chat.chat_id || currentThread?.openaiChatId === chat.chat_id;
+                  // LOG para cada card
+                  console.log('Sidebar card:', {
+                    chat_id: chat.chat_id,
+                    sessao: chat.sessao,
+                    status: chatReviews[chat.chat_id] ? 'FINALIZADO' : 'EM ANDAMENTO',
+                    chat
+                  });
                   
                   return (
                     <div
@@ -232,7 +266,7 @@ export function ChatSidebar({
                       {/* Status Tags and Delete Button */}
                       <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
                         <div className="flex items-center space-x-1">
-                          {chatReviews[chat.chat_id] ? (
+                          {chat.status === 'finalizado' ? (
                             <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
                               FINALIZADO
                             </Badge>
@@ -276,12 +310,14 @@ export function ChatSidebar({
                           {chat.thread_id ? `Thread: ${chat.thread_id.substring(7, 15)}...` : `ID: ${chat.chat_id.substring(0, 8)}...`}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
-                          {new Date(chat.created_at).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          {chat.last_message_at
+                            ? new Date(chat.last_message_at).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'Sem mensagens'}
                         </div>
                       </div>
                     </div>

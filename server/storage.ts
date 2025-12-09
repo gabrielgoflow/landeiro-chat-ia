@@ -264,21 +264,19 @@ export class DatabaseStorage implements IStorage {
 
   async getThreadSessions(threadId: string): Promise<any[]> {
     if (!db) throw new Error("Database not connected");
-    
     // Get all sessions for a thread_id with their review status
     const result = await db.execute(sql`
       SELECT 
-        ct.*,
-        cr.id as review_id,
-        cr.resumo_atendimento,
-        cr.created_at as review_created,
+        ct.*, 
+        cr.id as review_id, 
+        cr.resumo_atendimento, 
+        cr.created_at as review_created, 
         CASE WHEN cr.id IS NOT NULL THEN 'finalizado' ELSE 'em_andamento' END as status
       FROM chat_threads ct
-      LEFT JOIN chat_reviews cr ON ct.chat_id = cr.chat_id
+      LEFT JOIN chat_reviews cr ON ct.chat_id = cr.chat_id AND ct.sessao = cr.sessao
       WHERE ct.thread_id = ${threadId}
       ORDER BY ct.sessao ASC
     `);
-
     return result as any[];
   }
 }

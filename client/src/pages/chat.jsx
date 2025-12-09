@@ -6,6 +6,7 @@ import { useIsMobile } from "@/hooks/use-mobile.jsx";
 import { useAuth } from "@/hooks/useAuth.jsx";
 import { useChat } from "@/hooks/useChat.jsx";
 import { supabaseService } from "@/services/supabaseService.js";
+import { supabase } from "@/lib/supabase.js";
 import { ChatMessage } from "@/components/ChatMessage.jsx";
 import { ChatSidebar } from "@/components/ChatSidebar.jsx";
 import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
@@ -29,8 +30,10 @@ export default function Chat() {
   const [currentSessionData, setCurrentSessionData] = useState(null);
   const [threadId, setThreadId] = useState(null);
   const [isCurrentSessionFinalized, setIsCurrentSessionFinalized] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState(null);
+  const [selectedSessaoNumber, setSelectedSessaoNumber] = useState(null);
   const messagesEndRef = useRef(null);
-  const initializedRef = useRef(false);
+  const lastChatIdRef = useRef(null);
   const isMobile = useIsMobile();
   const { user } = useAuth();
   
@@ -64,39 +67,55 @@ export default function Chat() {
 
   // Initialize based on chatId parameter
   useEffect(() => {
+    // Permite re-inicialização quando lastChatIdRef foi limpo (nova conversa)
+    if (lastChatIdRef.current === chatId && lastChatIdRef.current !== null) {
+      return;
+    }
+    
     const initializeChat = async () => {
+      console.log('Initializing chat with chatId:', chatId, '| Last chatId:', lastChatIdRef.current);
+      lastChatIdRef.current = chatId;
+      
       // Reset session finalized state when navigating
       setIsCurrentSessionFinalized(false);
       
+      if (chatId === 'new') {
+        // Always show dialog for /chat/new
+        console.log('Opening new chat dialog for /chat/new');
+        setShowNewChatDialog(true);
+        return;
+      }
+      
       if (chatId && chatId !== 'new') {
+        // Close any open dialog when loading specific chat
+        setShowNewChatDialog(false);
+        
         // Load specific chat by ID
         const existingThread = threads.find(t => t.id === chatId);
         if (existingThread) {
           console.log('Found existing thread locally:', chatId);
-          selectThread(existingThread.id);
+          await selectThread(existingThread.id, 1); // Sempre seleciona a sessão 1 ao abrir
         } else {
           // Chat ID not found in current threads, try to load from Supabase
           console.log('Thread not found locally, trying to load from Supabase:', chatId);
           const createdThread = await createThreadFromSupabase(chatId);
           if (createdThread) {
-            console.log('Thread created from Supabase, now selecting:', chatId);
-            selectThread(chatId);
+            console.log('Thread created from Supabase, now selecting:', createdThread.chat_id || chatId);
+            await selectThread(createdThread.chat_id || chatId, 1); // Sempre seleciona a sessão 1 ao abrir
           } else {
             console.warn('Chat ID not found in Supabase, redirecting to new chat:', chatId);
             setShowNewChatDialog(true);
           }
         }
-      } else if (chatId === 'new' || (threads.length === 0 && !chatId)) {
-        // Create new thread for /chat/new or when no threads exist
+      } else if (threads.length === 0 && !chatId) {
+        // Show dialog when no threads exist and no chatId
+        console.log('No threads found, showing new chat dialog');
         setShowNewChatDialog(true);
       }
     };
 
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      initializeChat();
-    }
-  }, [chatId, threads, selectThread, startNewThread, createThreadFromSupabase]);
+    initializeChat();
+  }, [chatId]);
 
   // Extract threadId from current thread
   useEffect(() => {
@@ -107,62 +126,85 @@ export default function Chat() {
       setThreadId(null);
       setCurrentSessionData(null);
     }
-  }, [currentThread]);
+  }, [currentThread, chatId]);
 
-  // Check if current chat has a review
+  // Check if current chat has a review - CONSOLIDADO e corrigido para usar sessão selecionada
   useEffect(() => {
     const checkForReview = async () => {
-      if (currentThread?.openaiChatId || currentThread?.id) {
-        const chatId = currentThread.openaiChatId || currentThread.id;
-        console.log('Checking review for chatId:', chatId);
-        try {
-          const response = await fetch(`/api/reviews/${chatId}`);
-          console.log('Review check response:', response.status);
-          const reviewExists = response.ok;
-          setHasReview(reviewExists);
+      // Reset estados primeiro
+      setHasReview(false);
+      setIsCurrentSessionFinalized(false);
+      setCurrentReview(null);
+      
+      // Usa selectedSessionId e selectedSessaoNumber para verificar a sessão correta
+      if (!selectedSessionId || !selectedSessaoNumber) {
+        return;
+      }
+
+      const chatId = selectedSessionId;
+      const sessao = selectedSessaoNumber;
+      
+      console.log('Checking review for SELECTED session:', { chatId, sessao });
+      
+      try {
+        // Usa Supabase diretamente em vez de API dupla
+        const { data: review, error } = await supabase
+          .from('chat_reviews')
+          .select('*')
+          .eq('chat_id', chatId)
+          .eq('sessao', sessao)
+          .single();
           
-          // Se há review, garante que os estados estão corretos
-          if (reviewExists) {
-            console.log('Review found - setting chat as finalized');
-            setIsFinalizingChat(false); // Garantir que não está em processo de finalização
-          }
-        } catch (error) {
-          console.error('Error checking review:', error);
-          setHasReview(false);
+        const hasReview = !!review && !error;
+        
+        if (hasReview) {
+          console.log('Review found for selected session:', { chatId, sessao });
+          setHasReview(true);
+          setIsCurrentSessionFinalized(true);
+          setCurrentReview(review);
+          setIsFinalizingChat(false);
+        } else {
+          console.log('No review found for selected session:', { chatId, sessao });
         }
-      } else {
-        console.log('No chatId found in currentThread:', currentThread);
-        setHasReview(false);
+      } catch (error) {
+        console.error('Error checking review:', error);
       }
     };
     
-    checkForReview();
-  }, [currentThread?.openaiChatId, currentThread?.id]);
+    // Debounce para evitar execuções excessivas
+    const timeoutId = setTimeout(checkForReview, 200);
+    
+    return () => clearTimeout(timeoutId);
+  }, [selectedSessionId, selectedSessaoNumber]);
 
-  // Function to load review for current chat
+  // Function to load review for current chat - CORRIGIDO para usar sessão selecionada
   const loadReview = async () => {
-    const chatId = currentThread?.openaiChatId || currentThread?.id || 'thread_1755278578584_qwcovo1vb';
-    console.log('Trying to load review for chatId:', chatId);
+    // Usa selectedSessionId e selectedSessaoNumber em vez de currentThread
+    if (!selectedSessionId || !selectedSessaoNumber) {
+      console.log('No selected session or session number:', { selectedSessionId, selectedSessaoNumber });
+      return;
+    }
+
+    const chatId = selectedSessionId;
+    const sessao = selectedSessaoNumber;
+    console.log('Loading review for SELECTED session:', { chatId, sessao });
     
     setIsLoadingReview(true);
     try {
-      const response = await fetch(`/api/reviews/${chatId}`);
-      console.log('Review response status:', response.status);
-      if (response.ok) {
-        const review = await response.json();
-        console.log('Review loaded:', review);
+      // Usa apenas Supabase, sem requisições duplicadas
+      const { data: review, error } = await supabase
+        .from('chat_reviews')
+        .select('*')
+        .eq('chat_id', chatId)
+        .eq('sessao', sessao)
+        .single();
+
+      if (review && !error) {
+        console.log('Review loaded for selected session and showing sidebar:', review);
         setCurrentReview(review);
         setShowReviewSidebar(true);
       } else {
-        console.log('No review found for chat ID:', chatId);
-        // Try with test ID
-        const testResponse = await fetch('/api/reviews/thread_1755278578584_qwcovo1vb');
-        if (testResponse.ok) {
-          const testReview = await testResponse.json();
-          console.log('Test review loaded:', testReview);
-          setCurrentReview(testReview);
-          setShowReviewSidebar(true);
-        }
+        console.log('No review found for selected session:', { chatId, sessao });
       }
     } catch (error) {
       console.error('Error loading review:', error);
@@ -178,16 +220,41 @@ export default function Chat() {
   };
 
   const handleNewChatConfirm = async (formData) => {
-    const newThread = await startNewThread(formData);
-    setShowNewChatDialog(false);
+    console.log('Creating new chat with formData:', formData);
     
-    // Redirect to the new chat URL and refresh sidebar
-    if (newThread && newThread.id) {
-      navigate(`/chat/${newThread.id}`);
-      // Refresh sidebar to show new chat immediately
-      if (window.refreshSidebar) {
-        await window.refreshSidebar();
+    try {
+      const newThread = await startNewThread(formData);
+      setShowNewChatDialog(false);
+      
+      // Assim que tivermos o chatId, redirecionamos para a URL desse chat
+      if (newThread && newThread.id) {
+        const newChatId = newThread.id;
+        console.log('New thread created with chatId:', newChatId, '- Redirecting to URL');
+        
+        // Limpa o estado anterior para permitir re-inicialização
+        lastChatIdRef.current = null;
+        
+        // Redireciona IMEDIATAMENTE para a URL do novo chat
+        navigate(`/chat/${newChatId}`);
+        
+        // Força atualização da URL se necessário (backup)
+        setTimeout(() => {
+          const expectedPath = `/chat/${newChatId}`;
+          if (window.location.pathname !== expectedPath) {
+            console.log('URL não atualizada, forçando:', expectedPath);
+            window.history.replaceState(null, '', expectedPath);
+            // Força re-render se necessário
+            window.location.reload();
+          }
+        }, 200);
+        
+        console.log('Redirecionamento concluído para:', `/chat/${newChatId}`);
+      } else {
+        console.error('Erro: Nova conversa criada mas sem chatId válido:', newThread);
       }
+    } catch (error) {
+      console.error('Erro ao criar nova conversa:', error);
+      setShowNewChatDialog(false);
     }
   };
 
@@ -214,15 +281,18 @@ export default function Chat() {
         // Extract from output field and transform nested arrays to flat strings for storage
         const reviewOutput = reviewData.output;
         const transformedReview = {
-          chatId: currentThread.id,
+          chatId: currentThread.id,  // API espera camelCase
           resumoAtendimento: reviewOutput.resumoAtendimento,
           feedbackDireto: reviewOutput.feedbackDireto,
           sinaisPaciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
           pontosPositivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
-          pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item)
+          pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item),
+          sessao: currentThread.sessionData?.sessao
         };
         
         // Save review to our database
+        console.log('Payload being sent to /api/reviews:', JSON.stringify(transformedReview, null, 2));
+        
         const saveResponse = await fetch('/api/reviews', {
           method: 'POST',
           headers: {
@@ -231,11 +301,37 @@ export default function Chat() {
           body: JSON.stringify(transformedReview)
         });
         
+        console.log('API response status:', saveResponse.status);
+        if (!saveResponse.ok) {
+          const errorText = await saveResponse.text();
+          console.log('API error response:', errorText);
+        }
+        
         if (saveResponse.ok) {
           console.log('Review saved successfully');
-          setCurrentReview(transformedReview);
+          
+          // Cria objeto com formato correto para o ReviewSidebar (snake_case)
+          const reviewForSidebar = {
+            id: null,
+            chat_id: currentThread.id,
+            resumo_atendimento: reviewOutput.resumoAtendimento,
+            feedback_direto: reviewOutput.feedbackDireto,
+            sinais_paciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
+            pontos_positivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
+            pontos_negativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item),
+            sessao: currentThread.sessionData?.sessao,
+            created_at: new Date().toISOString()
+          };
+          
+          console.log('Setting currentReview with sidebar format:', reviewForSidebar);
+          
+          // Atualiza estados imediatamente
+          setCurrentReview(reviewForSidebar);
+          setHasReview(true);
+          setIsCurrentSessionFinalized(true);
           setShowReviewSidebar(true);
-          setHasReview(true); // Atualizar estado para indicar que tem review
+          
+          console.log('ReviewSidebar should now be visible with data');
         } else {
           console.error('Error saving review:', saveResponse.status);
         }
@@ -251,106 +347,93 @@ export default function Chat() {
 
   const handleStartNextSession = async () => {
     if (!currentThread) return;
-    
     setIsStartingNextSession(true);
     try {
-      // Criar uma nova sessão com um novo chat_id
-      const { data, error, newChatId, newSession } = await supabaseService.createNextSession(
-        currentThread.threadId, // thread_id do OpenAI
-        currentThread.sessionData.diagnostico,
-        currentThread.sessionData.protocolo
-      );
+      // Inserir nova sessão para o mesmo chat_id
+      const { data, error, newSession } = await supabaseService.incrementChatSession(currentThread.id);
       
-      if (!error && newChatId && newSession) {
-        console.log(`New session ${newSession} created with chat_id: ${newChatId}`);
-        
-        // Criar novo thread local
-        const newThread = {
-          id: newChatId,
-          title: `${currentThread.sessionData.diagnostico} - ${currentThread.sessionData.protocolo.toUpperCase()}`,
-          threadId: currentThread.threadId, // Mesmo thread_id do OpenAI
-          openaiChatId: newChatId,
-          sessionData: {
-            ...currentThread.sessionData,
-            sessao: newSession
-          },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        
-        // Limpar estado local primeiro
+      if (!error && newSession) {
+        console.log(`Nova sessão criada: ${newSession} para chat_id: ${currentThread.id}`);
+        // Atualizar o estado local da sessão
+        setCurrentSessionData((prev) => ({
+          ...prev,
+          sessao: newSession
+        }));
+        if (currentThread.sessionData) {
+          currentThread.sessionData.sessao = newSession;
+        }
         setHasReview(false);
         setCurrentReview(null);
         setShowReviewSidebar(false);
         setIsCurrentSessionFinalized(false); // Nova sessão não está finalizada
-        
-        // Navegar para o novo chat
-        navigate(`/chat/${newChatId}`);
-        
-        // Refresh sidebar to show new session immediately
         if (window.refreshSidebar) {
           await window.refreshSidebar();
         }
-        
+        // Refresh na URL atual
+        window.location.reload();
       } else {
-        console.error('Error starting next session:', error);
+        console.error('Erro ao criar nova sessão:', error);
       }
     } catch (error) {
-      console.error('Error starting next session:', error);
+      console.error('Erro ao criar nova sessão:', error);
     } finally {
       setIsStartingNextSession(false);
     }
   }
 
   // Handler para trocar de sessão nas abas
-  const handleSessionChange = (sessionChatId) => {
-    console.log('Changing to session:', sessionChatId);
+  const handleSessionChange = async (sessionChatId, sessao) => {
+    setSelectedSessionId(sessionChatId);
+    setSelectedSessaoNumber(sessao);
+    await selectThread(sessionChatId, sessao); // Passa o número da sessão
+    // Verificar se há review para o chat_id e sessao selecionados
+    const { data: review, error } = await supabase
+      .from('chat_reviews')
+      .select('*')
+      .eq('chat_id', sessionChatId)
+      .eq('sessao', sessao)
+      .single();
+    const hasReviewForSession = !!review && !error;
+    setIsCurrentSessionFinalized(hasReviewForSession);
+    setHasReview(hasReviewForSession);
+    setCurrentReview(hasReviewForSession ? review : null);
+    
     navigate(`/chat/${sessionChatId}`);
   };
 
-  // Detect if current session is finalized based on review
-  useEffect(() => {
-    const checkSessionStatus = async () => {
-      if (!chatId || chatId === 'new') {
-        setIsCurrentSessionFinalized(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/reviews/${chatId}`);
-        if (response.ok) {
-          const reviewData = await response.json();
-          console.log('Review found - setting chat as finalized');
-          setIsCurrentSessionFinalized(!!reviewData);
-          setHasReview(!!reviewData);
-          if (reviewData) {
-            setCurrentReview(reviewData);
-          }
-        } else if (response.status === 404) {
-          setIsCurrentSessionFinalized(false);
-          setHasReview(false);
-          setCurrentReview(null);
-        }
-      } catch (error) {
-        console.error('Error checking session status:', error);
-        setIsCurrentSessionFinalized(false);
-      }
-    };
-
-    // Initial check
-    checkSessionStatus();
-
-    // Set up periodic checking every 5 seconds to detect async review creation
-    const interval = setInterval(checkSessionStatus, 5000);
-
-    return () => clearInterval(interval);
-  }, [chatId]);
+  // REMOVIDO: useEffect duplicado que estava causando loops
+  // A verificação de review agora é feita apenas no useEffect consolidado acima
 
   // Handler para criar nova sessão das abas
   const handleNewSessionFromTabs = () => {
     handleStartNextSession();
   };
 
+  // LOG DE DEPURAÇÃO - Inicializa selectedSessionId e selectedSessaoNumber ao carregar currentThread
+  // IMPORTANTE: Este useEffect DEVE estar antes de qualquer return condicional
+  useEffect(() => {
+    console.log('[DEBUG] useEffect currentThread:', currentThread);
+    if (currentThread?.id && currentThread?.sessionData?.sessao) {
+      const newSessionId = currentThread.id;
+      const newSessaoNumber = currentThread.sessionData.sessao;
+      
+      // Só atualiza se realmente mudou para evitar loops
+      if (selectedSessionId !== newSessionId || selectedSessaoNumber !== newSessaoNumber) {
+        console.log('[DEBUG] Setando selectedSessionId e selectedSessaoNumber ao carregar currentThread:', newSessionId, newSessaoNumber);
+        setSelectedSessionId(newSessionId);
+        setSelectedSessaoNumber(newSessaoNumber);
+      }
+    }
+  }, [currentThread?.id, currentThread?.sessionData?.sessao]);
+
+  // Proteção: só renderiza o conteúdo principal se currentThread estiver definido
+  if (!currentThread) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-screen">
+        <span className="text-gray-500 text-lg">Carregando atendimento...</span>
+      </div>
+    );
+  }
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
       <ChatSidebar
@@ -358,6 +441,7 @@ export default function Chat() {
         onSelectThread={selectThread}
         onDeleteThread={deleteThread}
         onStartNewThread={startNewThread}
+        onNewChatConfirm={handleNewChatConfirm}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
@@ -367,17 +451,16 @@ export default function Chat() {
         {/* Chat Header */}
         <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Link href="/">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                data-testid="back-to-chats-button"
-              >
-                <i className="fas fa-arrow-left mr-2"></i>
-                Voltar
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              data-testid="back-to-chats-button"
+              onClick={() => navigate("/chats")}
+            >
+              <i className="fas fa-arrow-left mr-2"></i>
+              Voltar
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -553,6 +636,7 @@ export default function Chat() {
         />
 
         {/* Message Input */}
+        {console.log('DEBUG: isCurrentSessionFinalized:', isCurrentSessionFinalized, '| Sessão atual:', currentThread?.sessionData?.sessao)}
         <MessageInput
           onSendMessage={handleSendMessage}
           isLoading={isLoading}

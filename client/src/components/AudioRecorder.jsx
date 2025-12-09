@@ -72,13 +72,9 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      
-      toast({
-        title: 'Gravação finalizada',
-        description: 'Clique em enviar para mandar o áudio'
-      });
+  
     }
-  }, [isRecording, toast]);
+  }, [isRecording]);
 
   const sendAudio = useCallback(async () => {
     if (!audioBlob) return;

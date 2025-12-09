@@ -4,30 +4,37 @@ export class SupabaseService {
   // Incrementar sessão de um chat existente (para "Iniciar Próxima Sessão")
   static async incrementChatSession(chatId) {
     try {
-      // Buscar sessão atual do chat
-      const { data: currentData, error: selectError } = await supabase
+      // Buscar o último registro desse chat_id
+      const { data: lastSession, error: selectError } = await supabase
         .from('chat_threads')
-        .select('sessao')
+        .select('*')
         .eq('chat_id', chatId)
-        .single()
+        .order('sessao', { ascending: false })
+        .limit(1)
+        .single();
 
-      if (selectError) throw selectError
+      if (selectError) throw selectError;
 
-      const nextSession = (currentData.sessao || 1) + 1
+      const nextSession = (lastSession?.sessao || 0) + 1;
 
-      // Atualizar para próxima sessão
-      const { data, error } = await supabase
+      // Inserir novo registro com mesmo chat_id, mas sessao incrementada
+      const { data: newThread, error: insertError } = await supabase
         .from('chat_threads')
-        .update({ sessao: nextSession })
-        .eq('chat_id', chatId)
+        .insert({
+          chat_id: chatId,
+          thread_id: lastSession.thread_id,
+          diagnostico: lastSession.diagnostico,
+          protocolo: lastSession.protocolo,
+          sessao: nextSession
+        })
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
-      return { data, error: null, newSession: nextSession }
+      if (insertError) throw insertError;
+      return { data: newThread, error: null, newSession: nextSession };
     } catch (error) {
-      console.error('Error incrementing chat session:', error)
-      return { data: null, error: error.message, newSession: null }
+      console.error('Error incrementing chat session:', error);
+      return { data: null, error: error.message, newSession: null };
     }
   }
 
@@ -164,58 +171,33 @@ export class SupabaseService {
   // Buscar chats do usuário agrupados por thread_id (apenas sessão mais recente)
   static async getUserChats(userId) {
     try {
-      const { data, error } = await supabase
+      // 1. Buscar todos os chat_id do usuário
+      const { data: userChats, error: userChatsError } = await supabase
         .from('user_chats')
-        .select(`
-          *,
-          chat_threads (
-            chat_id,
-            thread_id,
-            diagnostico,
-            protocolo,
-            sessao,
-            created_at,
-            updated_at
-          )
-        `)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
+        .select('chat_id')
+        .eq('user_id', userId);
 
-      if (error) throw error
-      
-      // Transform and group by thread_id, keeping only the latest session per thread
-      const transformedData = data?.map(userChat => ({
-        ...userChat,
-        chat_id: userChat.chat_threads?.chat_id || userChat.chat_id,
-        thread_id: userChat.chat_threads?.thread_id,
-        diagnostico: userChat.chat_threads?.diagnostico,
-        protocolo: userChat.chat_threads?.protocolo,
-        sessao: userChat.chat_threads?.sessao,
-        created_at: userChat.chat_threads?.created_at || userChat.created_at
-      })) || []
-      
-      // Group by thread_id and keep only the latest session for each thread
-      const threadGroups = {};
-      transformedData.forEach(chat => {
-        const threadId = chat.thread_id;
-        if (!threadId) {
-          // If no thread_id, treat as individual chat
-          threadGroups[chat.chat_id] = chat;
-        } else {
-          // If thread_id exists, keep only the latest session
-          if (!threadGroups[threadId] || chat.sessao > threadGroups[threadId].sessao) {
-            threadGroups[threadId] = chat;
-          }
-        }
-      });
-      
-      // Convert back to array and sort by created_at
-      return Object.values(threadGroups).sort((a, b) => 
-        new Date(b.created_at) - new Date(a.created_at)
-      );
+      if (userChatsError) throw userChatsError;
+      const chatIds = userChats.map(uc => uc.chat_id);
+
+      // 2. Buscar os dados na view chat_overview
+      let chats = [];
+      if (chatIds.length > 0) {
+        const { data: overviewData, error: overviewError } = await supabase
+          .from('v_chat_overview')
+          .select('*')
+          .in('chat_id', chatIds);
+
+        if (overviewError) throw overviewError;
+        chats = overviewData || [];
+      }
+
+      // 3. Ordenar por data da última mensagem
+      chats.sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at));
+      return chats;
     } catch (error) {
-      console.error('Error getting user chats:', error)
-      return []
+      console.error('Error getting user chats from chat_overview:', error);
+      return [];
     }
   }
 
