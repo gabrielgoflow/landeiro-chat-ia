@@ -324,6 +324,7 @@ export default function Chat() {
         console.log('API response status:', saveResponse.status);
         if (!saveResponse.ok) {
           const errorText = await saveResponse.text();
+          
           console.log('API error response:', errorText);
         }
         
