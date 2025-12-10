@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabaseService } from "@/services/supabaseService";
 import { Plus, MessageSquare, Calendar, User, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { DiagnosticFilterSidebar } from "@/components/DiagnosticFilterSidebar.jsx";
 
 export default function ChatsPage() {
   const { user, signOut } = useAuth();
@@ -23,6 +24,7 @@ export default function ChatsPage() {
   const [userChats, setUserChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [chatReviews, setChatReviews] = useState({});
+  const [selectedDiagnostico, setSelectedDiagnostico] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -98,20 +100,36 @@ export default function ChatsPage() {
       latestThreads[chat.thread_id] = chat;
     }
   });
-  const chatsToShow = Object.values(latestThreads);
+  let chatsToShow = Object.values(latestThreads);
+
+  // Filtrar por diagnóstico selecionado
+  if (selectedDiagnostico) {
+    chatsToShow = chatsToShow.filter(
+      (chat) => chat.diagnostico === selectedDiagnostico
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar de Filtro */}
+      <DiagnosticFilterSidebar
+        selectedDiagnostico={selectedDiagnostico}
+        onSelectDiagnostico={setSelectedDiagnostico}
+        userChats={userChats}
+      />
+
+      {/* Conteúdo Principal */}
+      <div className="flex-1 flex flex-col">
       {/* Header */}
       <div className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="w-full mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <User className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900">
                   Seus Atendimentos
-                </h1>
+                </h2>
                 <p className="text-gray-600">
                   Gerencie suas conversas de terapia
                 </p>
@@ -157,17 +175,13 @@ export default function ChatsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="w-full mx-auto px-4 py-8 overflow-y-auto h-[80vh]">
         {/* Header with New Chat Button */}
         <div className="flex justify-end mb-6">
           <Button
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
             data-testid="button-new-chat"
-<<<<<<< HEAD
-            onClick={() => navigate('/chat/new')}
-=======
             onClick={() => navigate("/chat/new")}
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
           >
             <Plus className="h-5 w-5 mr-2" />
             Nova Conversa
@@ -279,6 +293,7 @@ export default function ChatsPage() {
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

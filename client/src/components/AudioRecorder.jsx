@@ -7,6 +7,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [recordingMimeType, setRecordingMimeType] = useState("audio/webm");
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -70,10 +71,6 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-<<<<<<< HEAD
-  
-=======
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
     }
   }, [isRecording]);
 
@@ -83,55 +80,124 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
     try {
       setIsUploading(true);
 
-      // Upload audio to Object Storage first
+      // Upload audio to Storage (Supabase or Replit Object Storage)
       let audioURL = null;
       try {
-        // Get upload URL
+        // Get upload configuration
         const uploadResponse = await fetch("/api/objects/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         });
 
         if (uploadResponse.ok) {
-          const { uploadURL } = await uploadResponse.json();
+          const uploadConfig = await uploadResponse.json();
 
-          // Upload audio file
-          const uploadResult = await fetch(uploadURL, {
-            method: "PUT",
-            body: audioBlob,
-            headers: { "Content-Type": recordingMimeType },
-          });
+          // Check if we should use Supabase Storage
+          if (uploadConfig.useSupabase) {
+            // Convert blob to base64 for Supabase upload
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const base64Audio = btoa(
+              String.fromCharCode(...new Uint8Array(arrayBuffer))
+            );
 
-          if (uploadResult.ok) {
-            // Set ACL policy for the uploaded audio
-            const aclResponse = await fetch("/api/audio-messages", {
+            // Upload directly to Supabase via backend
+            const supabaseUploadResponse = await fetch("/api/audio/upload", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ audioURL: uploadURL }),
+              body: JSON.stringify({
+                audioBlob: base64Audio,
+                mimeType: recordingMimeType,
+              }),
             });
 
-            if (aclResponse.ok) {
-              const { objectPath } = await aclResponse.json();
-              audioURL = `${window.location.origin}${objectPath}`;
+            if (supabaseUploadResponse.ok) {
+              const { audioURL: uploadedURL, objectPath } = await supabaseUploadResponse.json();
+              audioURL = uploadedURL || objectPath;
+            } else {
+              throw new Error("Falha ao fazer upload para Supabase");
+            }
+          } else {
+            // Use Replit Object Storage (legacy)
+            const { uploadURL } = uploadConfig;
+
+            // Upload audio file
+            const uploadResult = await fetch(uploadURL, {
+              method: "PUT",
+              body: audioBlob,
+              headers: { "Content-Type": recordingMimeType },
+            });
+
+            if (uploadResult.ok) {
+              // Set ACL policy for the uploaded audio
+              const aclResponse = await fetch("/api/audio-messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ audioURL: uploadURL }),
+              });
+
+              if (aclResponse.ok) {
+                const { objectPath } = await aclResponse.json();
+                audioURL = `${window.location.origin}${objectPath}`;
+              }
             }
           }
         }
       } catch (uploadError) {
         console.error("Upload failed:", uploadError);
+        const errorMessage = uploadError?.message || "Não foi possível fazer upload do áudio";
         toast({
           title: "Erro no upload",
-          description: "Não foi possível fazer upload do áudio",
+          description: errorMessage.includes("STORAGE_NOT_CONFIGURED") 
+            ? "Armazenamento de objetos não configurado. Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no servidor."
+            : errorMessage,
           variant: "destructive",
         });
+        setIsUploading(false);
         return;
       }
 
-      // Call the callback with the audio message (only URL, no base64)
+      // Transcribe audio after successful upload (only if upload was successful)
+      let transcription = "";
+      if (audioURL) {
+        try {
+          setIsTranscribing(true);
+          const transcribeResponse = await fetch("/api/transcribe-audio", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ audioURL }),
+          });
+
+          if (transcribeResponse.ok) {
+            const { transcription: transcribedText } = await transcribeResponse.json();
+            transcription = transcribedText || "";
+          } else {
+            console.warn("Transcription failed, continuing without transcription");
+          }
+        } catch (transcribeError) {
+          console.error("Error transcribing audio:", transcribeError);
+          // Don't block message sending if transcription fails
+        } finally {
+          setIsTranscribing(false);
+        }
+      } else {
+        // If upload failed, don't try to send the message
+        console.error("Cannot send audio: upload failed");
+        toast({
+          title: "Erro ao enviar",
+          description: "Não foi possível fazer upload do áudio. Verifique a configuração do servidor.",
+          variant: "destructive",
+        });
+        setIsUploading(false);
+        return;
+      }
+
+      // Call the callback with the audio message including transcription
       onAudioSent({
         type: "audio",
         audioURL: audioURL,
         mimeType: recordingMimeType,
         duration: 0, // We could calculate this if needed
+        transcription: transcription,
       });
 
       // Reset state
@@ -187,7 +253,7 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
             variant="outline"
             size="sm"
             onClick={cancelAudio}
-            disabled={isUploading}
+            disabled={isUploading || isTranscribing}
             className="p-1 h-7"
             data-testid="cancel-audio-button"
             title="Cancelar áudio"
@@ -200,12 +266,12 @@ export function AudioRecorder({ onAudioSent, disabled = false }) {
             variant="default"
             size="sm"
             onClick={sendAudio}
-            disabled={isUploading}
+            disabled={isUploading || isTranscribing}
             className="p-1 h-7"
             data-testid="send-audio-button"
-            title="Enviar áudio"
+            title={isTranscribing ? "Transcrevendo áudio..." : "Enviar áudio"}
           >
-            {isUploading ? (
+            {isUploading || isTranscribing ? (
               <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
             ) : (
               <Send className="h-3 w-3" />

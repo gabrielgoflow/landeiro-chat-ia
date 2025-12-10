@@ -1,12 +1,3 @@
-<<<<<<< HEAD
-import { useState, useEffect } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { supabaseService } from '@/services/supabaseService'
-import { Plus } from 'lucide-react'
-import { supabase } from '@/lib/supabase.js'
-=======
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { supabaseService } from "@/services/supabaseService";
 import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase.js";
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
 
 export function SessionTabs({
   threadId,
@@ -35,20 +25,6 @@ export function SessionTabs({
 
   const loadSessions = async () => {
     try {
-<<<<<<< HEAD
-      setLoading(true)
-      console.log('Loading sessions for threadId:', threadId)
-      
-      // Buscar sessões diretamente das tabelas
-      const { data: chatThreads, error: threadsError } = await supabase
-        .from('chat_threads')
-        .select('*')
-        .eq('thread_id', threadId)
-        .order('sessao', { ascending: true });
-
-      if (threadsError) {
-        console.error('Erro ao buscar chat_threads:', threadsError);
-=======
       setLoading(true);
       console.log("Loading sessions for threadId:", threadId);
 
@@ -61,33 +37,21 @@ export function SessionTabs({
 
       if (threadsError) {
         console.error("Erro ao buscar chat_threads:", threadsError);
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
         setSessions([]);
         return;
       }
 
-<<<<<<< HEAD
-      console.log('Chat threads data:', chatThreads);
-=======
       console.log("Chat threads data:", chatThreads);
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
 
       // Para cada sessão, verificar se existe review
       const sessionsWithStatus = await Promise.all(
         (chatThreads || []).map(async (thread) => {
           // Verificar se existe review para este chat_id e sessao
           const { data: review, error: reviewError } = await supabase
-<<<<<<< HEAD
-            .from('chat_reviews')
-            .select('*')
-            .eq('chat_id', thread.chat_id)
-            .eq('sessao', thread.sessao)
-=======
             .from("chat_reviews")
             .select("*")
             .eq("chat_id", thread.chat_id)
             .eq("sessao", thread.sessao)
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
             .single();
 
           const hasReview = !reviewError && review;
@@ -100,27 +64,6 @@ export function SessionTabs({
             protocolo: thread.protocolo,
             sessao: thread.sessao,
             created_at: thread.created_at,
-<<<<<<< HEAD
-            status: hasReview ? 'finalizado' : 'em_andamento',
-            chat_reviews: hasReview ? [{
-              id: review.id,
-              resumo_atendimento: review.resumo_atendimento || '',
-              created_at: review.created_at
-            }] : []
-          };
-        })
-      );
-
-      console.log('Sessions with status:', sessionsWithStatus);
-      setSessions(sessionsWithStatus);
-      
-      // Encontrar a sessão atual baseada no currentChatId
-      const currentSession = sessionsWithStatus.find(s => s.chat_id === currentChatId)
-      if (currentSession) {
-        setActiveSession(currentSession.sessao.toString())
-      } else if (sessionsWithStatus.length > 0) {
-        setActiveSession(sessionsWithStatus[0].sessao.toString())
-=======
             status: hasReview ? "finalizado" : "em_andamento",
             chat_reviews: hasReview
               ? [
@@ -146,16 +89,10 @@ export function SessionTabs({
         setActiveSession(currentSession.sessao.toString());
       } else if (sessionsWithStatus.length > 0) {
         setActiveSession(sessionsWithStatus[0].sessao.toString());
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
       }
     } catch (error) {
-<<<<<<< HEAD
-      console.error('Error loading sessions:', error)
-      setSessions([])
-=======
       console.error("Error loading sessions:", error);
       setSessions([]);
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
     } finally {
       setLoading(false);
     }
@@ -164,13 +101,8 @@ export function SessionTabs({
   const handleSessionSelect = (sessionNumber) => {
     const session = sessions.find((s) => s.sessao.toString() === sessionNumber);
     if (session) {
-<<<<<<< HEAD
-      setActiveSession(sessionNumber)
-      onSessionChange?.(session.chat_id, session.sessao)
-=======
       setActiveSession(sessionNumber);
       onSessionChange?.(session.chat_id, session.sessao);
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
     }
   };
 
@@ -204,27 +136,16 @@ export function SessionTabs({
         <div className="flex items-center justify-between px-4 py-2">
           <TabsList className="flex-1 justify-start bg-gray-50">
             {sessions.map((session) => {
-<<<<<<< HEAD
-              console.log('SessionTab:', session, 'Status:', session.status);
-              return (
-                <TabsTrigger 
-                  key={session.sessao} 
-=======
               console.log("SessionTab:", session, "Status:", session.status);
               return (
                 <TabsTrigger
                   key={session.sessao}
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                   value={session.sessao.toString()}
                   className="relative flex items-center gap-2"
                   data-testid={`session-tab-${session.sessao}`}
                 >
                   <span>SESSÃO {session.sessao}</span>
-<<<<<<< HEAD
-                  {session.status === 'finalizado' ? (
-=======
                   {session.status === "finalizado" ? (
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                     <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-1 py-0">
                       FINALIZADA
                     </Badge>

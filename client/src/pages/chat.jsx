@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/useAuth.jsx";
 import { useChat } from "@/hooks/useChat.jsx";
 import { supabaseService } from "@/services/supabaseService.js";
 import { supabase } from "@/lib/supabase.js";
-import { supabase } from "@/lib/supabase.js";
 import { ChatMessage } from "@/components/ChatMessage.jsx";
 import { ChatSidebar } from "@/components/ChatSidebar.jsx";
 import { ChatDebugInfo } from "@/components/ChatDebugInfo.jsx";
@@ -15,6 +14,9 @@ import { MessageInput } from "@/components/MessageInput.jsx";
 import { NewChatDialog } from "@/components/NewChatDialog.jsx";
 import { ReviewSidebar } from "@/components/ReviewSidebar";
 import { SessionTabs } from "@/components/SessionTabs.jsx";
+import { useToast } from "@/hooks/use-toast";
+import { useSessionTimer } from "@/hooks/useSessionTimer";
+import { SessionTimer } from "@/components/SessionTimer";
 
 export default function Chat() {
   const { chatId } = useParams();
@@ -35,9 +37,9 @@ export default function Chat() {
   const [selectedSessaoNumber, setSelectedSessaoNumber] = useState(null);
   const messagesEndRef = useRef(null);
   const lastChatIdRef = useRef(null);
-  const lastChatIdRef = useRef(null);
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const {
     threads,
@@ -54,6 +56,25 @@ export default function Chat() {
     reloadThread,
     clearError,
   } = useChat();
+
+  // Timer da sessão - buscar session_started_at da sessão atual
+  const getSessionStartedAt = () => {
+    if (selectedSessionId && currentThread?.sessionData?.sessionStartedAt) {
+      return currentThread.sessionData.sessionStartedAt;
+    }
+    // Se não tem no currentThread, buscar diretamente do Supabase
+    return null;
+  };
+
+  const sessionStartedAt = getSessionStartedAt();
+  const currentChatId = selectedSessionId || currentThread?.id;
+  const currentSessao = selectedSessaoNumber || currentThread?.sessionData?.sessao;
+  
+  const { timeRemaining, isExpired: isSessionExpired } = useSessionTimer(
+    currentChatId,
+    sessionStartedAt,
+    currentSessao
+  );
 
   // Debug logs
   console.log("Chat component state:", {
@@ -143,7 +164,6 @@ export default function Chat() {
       setThreadId(null);
       setCurrentSessionData(null);
     }
-  }, [currentThread, chatId]);
   }, [currentThread, chatId]);
 
   // Check if current chat has a review - CONSOLIDADO e corrigido para usar sessão selecionada
@@ -373,7 +393,16 @@ export default function Chat() {
       // Inserir nova sessão para o mesmo chat_id
       const { data, error, newSession } = await supabaseService.incrementChatSession(currentThread.id);
       
-      if (!error && newSession) {
+      if (error) {
+        toast({
+          title: "Erro",
+          description: error || "Erro ao criar nova sessão",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (newSession) {
         console.log(`Nova sessão criada: ${newSession} para chat_id: ${currentThread.id}`);
         // Atualizar o estado local da sessão
         setCurrentSessionData((prev) => ({
@@ -392,13 +421,16 @@ export default function Chat() {
         }
         // Refresh na URL atual
         window.location.reload();
-        // Refresh na URL atual
-        window.location.reload();
       } else {
-        console.error('Erro ao criar nova sessão:', error);
+        console.error('Erro ao criar nova sessão: sem newSession');
       }
     } catch (error) {
       console.error('Erro ao criar nova sessão:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar nova sessão. Tente novamente.",
+        variant: "destructive",
+      });
     } finally {
       setIsStartingNextSession(false);
     }
@@ -452,7 +484,8 @@ export default function Chat() {
   }, [currentThread?.id, currentThread?.sessionData?.sessao]);
 
   // Proteção: só renderiza o conteúdo principal se currentThread estiver definido
-  if (!currentThread) {
+  // Mas permite renderização quando é uma nova conversa ou dialog está aberto
+  if (!currentThread && chatId !== 'new' && !showNewChatDialog) {
     return (
       <div className="flex items-center justify-center h-full min-h-screen">
         <span className="text-gray-500 text-lg">Carregando atendimento...</span>
@@ -476,7 +509,6 @@ export default function Chat() {
         onDeleteThread={deleteThread}
         onStartNewThread={startNewThread}
         onNewChatConfirm={handleNewChatConfirm}
-        onNewChatConfirm={handleNewChatConfirm}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
@@ -496,16 +528,7 @@ export default function Chat() {
               <i className="fas fa-arrow-left mr-2"></i>
               Voltar
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              data-testid="back-to-chats-button"
-              onClick={() => navigate("/chats")}
-            >
-              <i className="fas fa-arrow-left mr-2"></i>
-              Voltar
-            </Button>
+
             <Button
               variant="ghost"
               size="sm"
@@ -530,6 +553,13 @@ export default function Chat() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Session Timer */}
+            {selectedSessionId && timeRemaining !== null && (
+              <SessionTimer 
+                timeRemaining={timeRemaining} 
+                isExpired={isSessionExpired} 
+              />
+            )}
             {/* Conditional review button - only shows when review exists */}
             {hasReview && (
               <>
@@ -657,18 +687,19 @@ export default function Chat() {
                   <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
                     <div className="flex items-center space-x-2">
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
                         <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"
-                          style={{ animationDelay: "0.1s" }}
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.15s" }}
                         ></div>
                         <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"
-                          style={{ animationDelay: "0.2s" }}
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.3s" }}
                         ></div>
                       </div>
-                      <span className="text-sm text-gray-500">
-                        Digitando...
+                      <span className="text-sm text-gray-500 flex items-center">
+                        <i className="fas fa-keyboard mr-2 text-xs"></i>
+                        Paciente está digitando...
                       </span>
                     </div>
                   </div>
@@ -709,6 +740,7 @@ export default function Chat() {
           error={error}
           onClearError={clearError}
           isFinalized={isCurrentSessionFinalized}
+          isSessionExpired={isSessionExpired}
         />
       </div>
 

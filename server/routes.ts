@@ -4,9 +4,18 @@ import { storage } from "./storage";
 import {
   insertChatReviewSchema,
   insertChatMessageSchema,
+  insertSessionCostSchema,
+  insertUserMetadataSchema,
 } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage.js";
 import { ObjectPermission } from "./objectAcl.js";
+import { SupabaseStorageService } from "./supabaseStorage.js";
+import { isAdmin } from "./adminMiddleware.js";
+import { AdminService } from "./adminService.js";
+import { AccessValidator } from "./accessValidator.js";
+import { trackChatCost } from "./costTracker.js";
+import OpenAI from "openai";
+import { Readable } from "stream";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Chat Reviews
@@ -33,15 +42,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Object Storage Routes for Audio Messages
-  app.post("/api/objects/upload", async (req, res) => {
+  // Access Validation
+  app.get("/api/access/validate", async (req, res) => {
     try {
+      const { userId, diagnosticoCodigo } = req.query;
+      if (!userId || !diagnosticoCodigo) {
+        return res.status(400).json({ error: "userId and diagnosticoCodigo are required" });
+      }
+      const result = await AccessValidator.canUserAccessDiagnostico(
+        userId as string,
+        diagnosticoCodigo as string
+      );
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Object Storage Routes for Audio Messages
+  // Try Supabase Storage first, fallback to Replit Object Storage
+  app.post("/api/objects/upload", async (req, res) => {
+    // Check Supabase Storage configuration first
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (supabaseUrl && supabaseServiceKey) {
+      try {
+        const supabaseStorage = new SupabaseStorageService();
+        
+        if (supabaseStorage.isConfigured()) {
+          console.log("Using Supabase Storage for audio upload");
+          // For Supabase, we return a special indicator that the client should upload directly
+          // The client will upload the file and we'll return the URL
+          res.json({ 
+            useSupabase: true,
+            bucket: 'audios'
+          });
+          return;
+        }
+      } catch (error: any) {
+        console.error("Error checking Supabase Storage:", error);
+      }
+    } else {
+      console.log("Supabase Storage not configured. SUPABASE_URL:", supabaseUrl ? "set" : "not set", "SUPABASE_SERVICE_ROLE_KEY:", supabaseServiceKey ? "set" : "not set");
+    }
+    
+    // Fallback to Replit Object Storage (only works in Replit environment)
+    try {
+      // Check if we're in a Replit environment
+      const replitSidecar = process.env.REPLIT_SIDECAR_ENDPOINT || "http://127.0.0.1:1106";
+      const privateObjectDir = process.env.PRIVATE_OBJECT_DIR;
+      
+      if (!privateObjectDir) {
+        throw new Error("PRIVATE_OBJECT_DIR not set");
+      }
+      
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      res.json({ uploadURL });
+      console.log("Using Replit Object Storage for audio upload");
+      res.json({ uploadURL, useSupabase: false });
+    } catch (fallbackError: any) {
+      console.error("Error getting upload URL from Replit Object Storage:", fallbackError);
+      const errorMessage = fallbackError.message || "Failed to get upload URL";
+      
+      // Check if it's a configuration error or fetch failed (not in Replit)
+      if (errorMessage.includes("PRIVATE_OBJECT_DIR") || 
+          errorMessage.includes("fetch failed") || 
+          errorMessage.includes("not in Replit") ||
+          errorMessage.includes("Failed to sign object URL")) {
+        res.status(500).json({ 
+          error: "Object Storage não configurado. Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no arquivo .env para usar Supabase Storage.",
+          code: "STORAGE_NOT_CONFIGURED",
+          details: errorMessage,
+          suggestion: "Adicione as seguintes variáveis ao arquivo .env na raiz do projeto:\nSUPABASE_URL=https://fnprdocklfpmndailkoo.supabase.co\nSUPABASE_SERVICE_ROLE_KEY=sua_service_role_key"
+        });
+      } else {
+        res.status(500).json({ 
+          error: errorMessage,
+          code: "UPLOAD_ERROR"
+        });
+      }
+    }
+  });
+
+  // New endpoint for Supabase direct upload
+  app.post("/api/audio/upload", async (req, res) => {
+    try {
+      if (!req.body.audioBlob || !req.body.mimeType) {
+        return res.status(400).json({ error: "audioBlob and mimeType are required" });
+      }
+
+      const supabaseStorage = new SupabaseStorageService();
+      
+      // Convert base64 to Buffer if needed
+      let audioBuffer: Buffer;
+      if (typeof req.body.audioBlob === 'string') {
+        // Base64 string
+        audioBuffer = Buffer.from(req.body.audioBlob, 'base64');
+      } else {
+        // Already a buffer
+        audioBuffer = Buffer.from(req.body.audioBlob);
+      }
+
+      const publicUrl = await supabaseStorage.uploadAudio(
+        audioBuffer,
+        req.body.mimeType
+      );
+
+      res.json({ audioURL: publicUrl, objectPath: publicUrl });
     } catch (error: any) {
-      console.error("Error getting upload URL:", error);
-      res.status(500).json({ error: "Failed to get upload URL" });
+      console.error("Error uploading audio to Supabase:", error);
+      res.status(500).json({ error: error.message || "Failed to upload audio" });
     }
   });
 
@@ -51,6 +162,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      // If it's a Supabase URL, just return it
+      if (req.body.audioURL.includes('supabase.co') || req.body.audioURL.includes('supabase')) {
+        res.status(200).json({
+          objectPath: req.body.audioURL,
+        });
+        return;
+      }
+
+      // Otherwise, try Replit Object Storage
       const objectStorageService = new ObjectStorageService();
       const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
         req.body.audioURL,
@@ -65,7 +185,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Error setting audio message ACL:", error);
-      res.status(500).json({ error: "Internal server error" });
+      // If it's a Supabase URL, return it anyway
+      if (req.body.audioURL.includes('supabase.co') || req.body.audioURL.includes('supabase')) {
+        res.status(200).json({
+          objectPath: req.body.audioURL,
+        });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+
+  // Audio Transcription endpoint using OpenAI Whisper
+  app.post("/api/transcribe-audio", async (req, res) => {
+    try {
+      const { audioURL } = req.body;
+
+      if (!audioURL) {
+        return res.status(400).json({ error: "audioURL is required" });
+      }
+
+      // Check if OpenAI API key is configured
+      if (!process.env.OPENAI_API_KEY) {
+        console.error("OPENAI_API_KEY not configured");
+        return res.json({
+          transcription: "",
+          error: "Transcription service not configured",
+        });
+      }
+
+      // Initialize OpenAI client
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+
+      let audioBuffer: Buffer;
+      let fileExtension: string;
+
+      // Check if it's a Supabase URL
+      if (audioURL.includes('supabase.co') || audioURL.includes('supabase')) {
+        try {
+          const supabaseStorage = new SupabaseStorageService();
+          const arrayBuffer = await supabaseStorage.getAudio(audioURL);
+          audioBuffer = Buffer.from(arrayBuffer);
+          
+          // Determine file extension from URL
+          const url = new URL(audioURL);
+          const fileName = url.pathname.split('/').pop() || 'audio.webm';
+          fileExtension = fileName.split('.').pop() || 'webm';
+        } catch (supabaseError: any) {
+          console.error("Error getting audio from Supabase:", supabaseError);
+          return res.json({
+            transcription: "",
+            error: supabaseError.message || "Could not access audio file from Supabase",
+          });
+        }
+      } else {
+        // Use Replit Object Storage
+        const objectStorageService = new ObjectStorageService();
+        
+        // Normalize the audio URL to get the object path
+        let objectPath: string;
+        if (audioURL.startsWith("http")) {
+          // If it's a full URL, extract the path
+          const url = new URL(audioURL);
+          objectPath = url.pathname;
+        } else {
+          objectPath = audioURL;
+        }
+
+        // Get the file from object storage
+        let objectFile;
+        try {
+          objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+        } catch (storageError: any) {
+          console.error("Error accessing object storage:", storageError);
+          // Return empty transcription instead of error to not block message sending
+          return res.json({
+            transcription: "",
+            error: storageError.message || "Could not access audio file",
+          });
+        }
+
+        // Download the file to a buffer
+        const [buffer] = await objectFile.download();
+        audioBuffer = buffer;
+        
+        // Determine file extension from object path or use default
+        fileExtension = objectPath.includes(".mp3") ? "mp3" : 
+                         objectPath.includes(".m4a") ? "m4a" : 
+                         objectPath.includes(".webm") ? "webm" : "webm";
+      }
+      
+      // For OpenAI Whisper API, we need to pass the file correctly
+      // The SDK accepts File, Blob, Buffer, or Readable stream
+      // Try using File constructor first, fallback to buffer if needed
+      
+      let audioFile: any;
+      
+      try {
+        // Convert buffer to Uint8Array for File constructor
+        const uint8Array = new Uint8Array(audioBuffer);
+        
+        // Create a File object (available in Node.js 18+)
+        audioFile = new File(
+          [uint8Array],
+          `audio.${fileExtension}`,
+          {
+            type: `audio/${fileExtension === 'm4a' ? 'mp4' : fileExtension}`,
+          }
+        );
+        
+        console.log("Created File object:", {
+          name: audioFile.name,
+          type: audioFile.type,
+          size: audioFile.size,
+        });
+      } catch (fileError) {
+        console.error("Error creating File object, using buffer directly:", fileError);
+        // Fallback: use buffer directly with metadata
+        audioFile = audioBuffer;
+      }
+
+      // Transcribe using Whisper
+      const transcription = await openai.audio.transcriptions.create({
+        file: audioFile,
+        model: "whisper-1",
+        language: "pt", // Portuguese
+      });
+
+      res.json({
+        transcription: transcription.text,
+      });
+    } catch (error: any) {
+      console.error("Error transcribing audio:", error);
+      
+      // Don't fail completely - return empty transcription so message can still be sent
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ error: "Audio file not found" });
+      }
+      
+      // Return empty transcription instead of error to not block message sending
+      res.json({
+        transcription: "",
+        error: error.message,
+      });
     }
   });
 
@@ -106,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Make request to external AI service
       const webhookUrl =
         process.env.LANDEIRO_WEBHOOK_URL ||
-        "https://hook.us2.make.com/o4kzajwfvqy7zpcgk54gxpkfj77nklbz";
+        "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia";
       const aiResponse = await fetch(webhookUrl, {
         method: "POST",
         headers: {
@@ -123,8 +387,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
-      const aiData = await aiResponse.json();
+      // Check if response has content
+      const responseText = await aiResponse.text();
+      if (!responseText || responseText.trim().length === 0) {
+        throw new Error("Empty response from AI service");
+      }
+
+      let aiData;
+      try {
+        aiData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Error parsing AI response:", parseError, "Response:", responseText);
+        throw new Error("Invalid JSON response from AI service");
+      }
       console.log("AI service response:", aiData);
+
+      // Track cost for this interaction
+      const userMessage = typeof message === "string" ? message : JSON.stringify(message);
+      const aiResponseText = aiData.output || aiData.response || aiData.message || aiData.text || "";
+      
+      // Track cost asynchronously (don't wait for it)
+      if (chat_id) {
+        trackChatCost(
+          chat_id,
+          userMessage,
+          aiResponseText,
+          aiData.cost, // Use actual cost if provided by API
+          aiData.tokens_input, // Use actual input tokens if provided
+          aiData.tokens_output // Use actual output tokens if provided
+        ).catch((error) => {
+          console.error("Error tracking cost:", error);
+        });
+      }
 
       // Check if response contains base64 audio
       if (aiData.base64) {
@@ -242,6 +536,418 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { threadId } = req.params;
       const sessions = await storage.getThreadSessions(threadId);
       res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ===========================================
+  // ADMIN ROUTES
+  // ===========================================
+
+  // Users Management
+  app.get("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      console.log("[Admin API] GET /api/admin/users", req.query);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const search = req.query.search as string | undefined;
+      const result = await AdminService.getUsers(page, limit, search);
+      console.log("[Admin API] Returning", result.users?.length || 0, "users");
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Admin API] Error getting users:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/users/:userId", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const userDetails = await AdminService.getUserDetails(userId);
+      res.json(userDetails);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/admin/users/:userId", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const metadata = insertUserMetadataSchema.parse(req.body);
+      const updated = await AdminService.updateUserMetadata(userId, metadata);
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "update_user",
+        targetUserId: userId,
+        details: { metadata },
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/users/:userId/sessions", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const result = await AdminService.getSessions(page, limit, { userId });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/users/:userId/messages", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const messages = await AdminService.exportMessages(userId);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/users/:userId/diagnosticos", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const userDiagnosticos = await AdminService.getUserDiagnosticos(userId);
+      res.json(userDiagnosticos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/diagnosticos", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { diagnosticoId } = req.body;
+      if (!diagnosticoId) {
+        return res.status(400).json({ error: "diagnosticoId is required" });
+      }
+      const result = await AdminService.liberarDiagnostico(userId, diagnosticoId);
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "liberate_diagnostico",
+        targetUserId: userId,
+        details: { diagnosticoId },
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/admin/users/:userId/access-date", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { dataFinalAcesso } = req.body;
+      if (!dataFinalAcesso) {
+        return res.status(400).json({ error: "dataFinalAcesso is required" });
+      }
+      const result = await AdminService.updateUserAccessDate(userId, new Date(dataFinalAcesso));
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "update_user_access_date",
+        targetUserId: userId,
+        details: { dataFinalAcesso },
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Diagnosticos Management
+  app.get("/api/admin/diagnosticos", isAdmin, async (req, res) => {
+    try {
+      const diagnosticos = await AdminService.getDiagnosticos();
+      res.json(diagnosticos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/diagnosticos/stats", isAdmin, async (req, res) => {
+    try {
+      const stats = await AdminService.getDiagnosticoStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/admin/diagnosticos/:id", isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { ativo } = req.body;
+      const updated = await AdminService.updateDiagnostico(id, { ativo });
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "update_diagnostico",
+        details: { diagnosticoId: id, ativo },
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Sessions Management
+  app.get("/api/admin/sessions", isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const filters: any = {};
+      
+      if (req.query.userId) filters.userId = req.query.userId as string;
+      if (req.query.diagnostico) filters.diagnostico = req.query.diagnostico as string;
+      if (req.query.userEmail) filters.userEmail = req.query.userEmail as string;
+      if (req.query.startDate) filters.startDate = req.query.startDate as string;
+      if (req.query.endDate) filters.endDate = req.query.endDate as string;
+      
+      const result = await AdminService.getSessions(page, limit, filters);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/sessions/:chatId", isAdmin, async (req, res) => {
+    try {
+      const { chatId } = req.params;
+      const sessionDetails = await AdminService.getSessionDetails(chatId);
+      if (!sessionDetails) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json(sessionDetails);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/sessions/:chatId/messages", isAdmin, async (req, res) => {
+    try {
+      const { chatId } = req.params;
+      const messages = await AdminService.getSessionMessages(chatId);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Costs Management
+  app.post("/api/admin/costs", isAdmin, async (req, res) => {
+    try {
+      const costData = insertSessionCostSchema.parse(req.body);
+      const cost = await AdminService.createSessionCost(costData);
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "create_cost",
+        targetUserId: costData.userId,
+        details: { costId: cost.id },
+      });
+      res.status(201).json(cost);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/costs", isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const userId = req.query.userId as string | undefined;
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const result = await AdminService.getCosts(page, limit, userId, startDate, endDate);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/costs/user/:userId", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const costs = await AdminService.getCosts(1, 1000, userId, startDate, endDate);
+      res.json(costs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/costs/session/:chatId", isAdmin, async (req, res) => {
+    try {
+      const { chatId } = req.params;
+      const sessionDetails = await AdminService.getSessionDetails(chatId);
+      res.json({ cost: sessionDetails?.cost || null });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/costs/summary", isAdmin, async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const summary = await AdminService.getCostSummary(userId, startDate, endDate);
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Statistics
+  app.get("/api/admin/stats", isAdmin, async (req, res) => {
+    try {
+      const stats = await AdminService.getSystemStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/stats/users/:userId", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const stats = await AdminService.getUserStats(userId);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/usage", isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const userId = req.query.userId as string | undefined;
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const result = await AdminService.getUsageHistory(page, limit, userId, startDate, endDate);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Export
+  app.get("/api/admin/export/messages", isAdmin, async (req, res) => {
+    try {
+      const userId = req.query.userId as string | undefined;
+      const chatId = req.query.chatId as string | undefined;
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const format = (req.query.format as string) || "json";
+
+      const messages = await AdminService.exportMessages(userId, chatId, startDate, endDate);
+
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "export_messages",
+        targetUserId: userId,
+        details: { format, count: messages.length, filters: { chatId, startDate, endDate } },
+      });
+
+      if (format === "csv") {
+        // Convert to CSV
+        const headers = ["Data", "Usuário", "Sessão", "Remetente", "Mensagem", "Tipo"];
+        const rows = messages.map((msg) => [
+          new Date(msg.createdAt).toISOString(),
+          msg.userId,
+          msg.sessao.toString(),
+          msg.sender,
+          msg.content.substring(0, 1000), // Limit content length
+          msg.messageType || "text",
+        ]);
+
+        const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
+
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader("Content-Disposition", `attachment; filename=messages-${Date.now()}.csv`);
+        res.send(csv);
+      } else {
+        res.json(messages);
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/export/user/:userId/messages", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const format = (req.query.format as string) || "json";
+      const messages = await AdminService.exportMessages(userId);
+
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "export_user_messages",
+        targetUserId: userId,
+        details: { format, count: messages.length },
+      });
+
+      if (format === "csv") {
+        const headers = ["Data", "Usuário", "Sessão", "Remetente", "Mensagem", "Tipo"];
+        const rows = messages.map((msg) => [
+          new Date(msg.createdAt).toISOString(),
+          msg.userId,
+          msg.sessao.toString(),
+          msg.sender,
+          msg.content.substring(0, 1000),
+          msg.messageType || "text",
+        ]);
+
+        const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
+
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader("Content-Disposition", `attachment; filename=user-${userId}-messages-${Date.now()}.csv`);
+        res.send(csv);
+      } else {
+        res.json(messages);
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/export/session/:chatId/messages", isAdmin, async (req, res) => {
+    try {
+      const { chatId } = req.params;
+      const format = (req.query.format as string) || "json";
+      const messages = await AdminService.exportMessages(undefined, chatId);
+
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "export_session_messages",
+        details: { chatId, format, count: messages.length },
+      });
+
+      if (format === "csv") {
+        const headers = ["Data", "Usuário", "Sessão", "Remetente", "Mensagem", "Tipo"];
+        const rows = messages.map((msg) => [
+          new Date(msg.createdAt).toISOString(),
+          msg.userId,
+          msg.sessao.toString(),
+          msg.sender,
+          msg.content.substring(0, 1000),
+          msg.messageType || "text",
+        ]);
+
+        const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
+
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader("Content-Disposition", `attachment; filename=session-${chatId}-messages-${Date.now()}.csv`);
+        res.send(csv);
+      } else {
+        res.json(messages);
+      }
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

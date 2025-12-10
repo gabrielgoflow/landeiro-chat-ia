@@ -10,6 +10,12 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import AdminSetup from "@/pages/admin-setup";
 import NotFound from "@/pages/not-found";
+import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
+import AdminUsersPage from "@/pages/admin/AdminUsersPage";
+import AdminSessionsPage from "@/pages/admin/AdminSessionsPage";
+import AdminUsagePage from "@/pages/admin/AdminUsagePage";
+import AdminCostsPage from "@/pages/admin/AdminCostsPage";
+import AdminExportPage from "@/pages/admin/AdminExportPage";
 
 function Router() {
   return (
@@ -21,6 +27,13 @@ function Router() {
       <Route path="/admin-setup" component={AdminSetup} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      {/* Admin Routes - specific routes first */}
+      <Route path="/admin/users" component={AdminUsersPage} />
+      <Route path="/admin/sessions" component={AdminSessionsPage} />
+      <Route path="/admin/usage" component={AdminUsagePage} />
+      <Route path="/admin/costs" component={AdminCostsPage} />
+      <Route path="/admin/export" component={AdminExportPage} />
+      <Route path="/admin" component={AdminDashboardPage} />
       <Route component={NotFound} />
     </Switch>
   );

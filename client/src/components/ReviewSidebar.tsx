@@ -61,13 +61,9 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
                 Resumo do Atendimento
               </h3>
               <div className="bg-blue-50 p-3 rounded-lg">
-<<<<<<< HEAD
-                <p className="text-gray-700 text-sm leading-relaxed">{review.resumo_atendimento}</p>
-=======
                 <p className="text-gray-700 text-sm leading-relaxed">
                   {review.resumo_atendimento}
                 </p>
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
               </div>
             </div>
 
@@ -78,13 +74,9 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
                 Feedback Direto
               </h3>
               <div className="bg-purple-50 p-3 rounded-lg">
-<<<<<<< HEAD
-                <p className="text-gray-700 text-sm leading-relaxed">{review.feedback_direto}</p>
-=======
                 <p className="text-gray-700 text-sm leading-relaxed">
                   {review.feedback_direto}
                 </p>
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
               </div>
             </div>
 
@@ -96,14 +88,10 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
               </h3>
               <div className="space-y-2">
                 {(review.sinais_paciente || []).map((sinal, index) => (
-<<<<<<< HEAD
-                  <div key={index} className="bg-orange-50 p-2 rounded border-l-4 border-orange-400">
-=======
                   <div
                     key={index}
                     className="bg-orange-50 p-2 rounded border-l-4 border-orange-400"
                   >
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                     <p className="text-gray-700 text-sm">{sinal}</p>
                   </div>
                 ))}
@@ -118,14 +106,10 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
               </h3>
               <div className="space-y-2">
                 {(review.pontos_positivos || []).map((ponto, index) => (
-<<<<<<< HEAD
-                  <div key={index} className="bg-green-50 p-2 rounded border-l-4 border-green-400">
-=======
                   <div
                     key={index}
                     className="bg-green-50 p-2 rounded border-l-4 border-green-400"
                   >
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                     <p className="text-gray-700 text-sm">{ponto}</p>
                   </div>
                 ))}
@@ -140,14 +124,10 @@ export function ReviewSidebar({ review, isOpen, onClose }: ReviewSidebarProps) {
               </h3>
               <div className="space-y-2">
                 {(review.pontos_negativos || []).map((ponto, index) => (
-<<<<<<< HEAD
-                  <div key={index} className="bg-red-50 p-2 rounded border-l-4 border-red-400">
-=======
                   <div
                     key={index}
                     className="bg-red-50 p-2 rounded border-l-4 border-red-400"
                   >
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                     <p className="text-gray-700 text-sm">{ponto}</p>
                   </div>
                 ))}

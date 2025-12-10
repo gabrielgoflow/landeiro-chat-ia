@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, uuid, smallint, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, uuid, smallint, integer, decimal, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -16,6 +16,16 @@ export const chatThreads = pgTable("chat_threads", {
   diagnostico: varchar("diagnostico"),
   protocolo: varchar("protocolo"),
   sessao: smallint("sessao"),
+  sessionStartedAt: timestamp("session_started_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userChats = pgTable("user_chats", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull(),
+  chatId: varchar("chat_id").notNull(),
+  chatThreadsId: uuid("chat_threads_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -53,6 +63,56 @@ export const chatReviews = pgTable("chat_reviews", {
   pontosNegativos: text("pontos_negativos").array().notNull(),
   sessao: smallint("sessao"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const sessionCosts = pgTable("session_costs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  chatId: varchar("chat_id").notNull(),
+  userId: uuid("user_id").notNull(),
+  sessao: integer("sessao").notNull(),
+  costAmount: decimal("cost_amount", { precision: 10, scale: 2 }),
+  tokensInput: integer("tokens_input"),
+  tokensOutput: integer("tokens_output"),
+  apiCalls: integer("api_calls").default(0),
+  costBreakdown: jsonb("cost_breakdown").default(sql`'{}'`),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userMetadata = pgTable("user_metadata", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().unique(),
+  fullName: varchar("full_name"),
+  role: varchar("role").default("user"),
+  dataFinalAcesso: timestamp("data_final_acesso"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const diagnosticos = pgTable("diagnosticos", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: varchar("nome").notNull(),
+  codigo: varchar("codigo").notNull().unique(),
+  ativo: boolean("ativo").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userDiagnosticos = pgTable("user_diagnosticos", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull(),
+  diagnosticoId: uuid("diagnostico_id").notNull(),
+  liberadoEm: timestamp("liberado_em").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminUserId: uuid("admin_user_id").notNull(),
+  action: varchar("action").notNull(),
+  targetUserId: uuid("target_user_id"),
+  details: jsonb("details").default(sql`'{}'`),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -96,6 +156,42 @@ export const insertChatReviewSchema = createInsertSchema(chatReviews).pick({
   sessao: true,
 });
 
+export const insertSessionCostSchema = createInsertSchema(sessionCosts).pick({
+  chatId: true,
+  userId: true,
+  sessao: true,
+  costAmount: true,
+  tokensInput: true,
+  tokensOutput: true,
+  apiCalls: true,
+  costBreakdown: true,
+});
+
+export const insertUserMetadataSchema = createInsertSchema(userMetadata).pick({
+  userId: true,
+  fullName: true,
+  role: true,
+  dataFinalAcesso: true,
+});
+
+export const insertDiagnosticoSchema = createInsertSchema(diagnosticos).pick({
+  nome: true,
+  codigo: true,
+  ativo: true,
+});
+
+export const insertUserDiagnosticoSchema = createInsertSchema(userDiagnosticos).pick({
+  userId: true,
+  diagnosticoId: true,
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).pick({
+  adminUserId: true,
+  action: true,
+  targetUserId: true,
+  details: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type ChatThread = typeof chatThreads.$inferSelect;
@@ -106,6 +202,16 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatReview = typeof chatReviews.$inferSelect;
 export type InsertChatReview = z.infer<typeof insertChatReviewSchema>;
+export type SessionCost = typeof sessionCosts.$inferSelect;
+export type InsertSessionCost = z.infer<typeof insertSessionCostSchema>;
+export type UserMetadata = typeof userMetadata.$inferSelect;
+export type InsertUserMetadata = z.infer<typeof insertUserMetadataSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type Diagnostico = typeof diagnosticos.$inferSelect;
+export type InsertDiagnostico = z.infer<typeof insertDiagnosticoSchema>;
+export type UserDiagnostico = typeof userDiagnosticos.$inferSelect;
+export type InsertUserDiagnostico = z.infer<typeof insertUserDiagnosticoSchema>;
 
 // Frontend-only types for localStorage
 export type ChatThreadExtended = ChatThread & {

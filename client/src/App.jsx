@@ -11,6 +11,13 @@ import Login from "@/pages/login.jsx";
 import Register from "@/pages/register.jsx";
 import AdminSetup from "@/pages/admin-setup.jsx";
 import NotFound from "@/pages/not-found.jsx";
+import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
+import AdminUsersPage from "@/pages/admin/AdminUsersPage";
+import AdminDiagnosticosPage from "@/pages/admin/AdminDiagnosticosPage";
+import AdminSessionsPage from "@/pages/admin/AdminSessionsPage";
+import AdminUsagePage from "@/pages/admin/AdminUsagePage";
+import AdminCostsPage from "@/pages/admin/AdminCostsPage";
+import AdminExportPage from "@/pages/admin/AdminExportPage";
 
 function Router() {
   const [, navigate] = useLocation();
@@ -33,16 +40,24 @@ function Router() {
           <Chat />
         </ProtectedRoute>
       </Route>
+      {/* Admin Routes - must come before "/" route */}
+      <Route path="/admin/users" component={AdminUsersPage} />
+      <Route path="/admin/diagnosticos" component={AdminDiagnosticosPage} />
+      <Route path="/admin/sessions" component={AdminSessionsPage} />
+      <Route path="/admin/usage" component={AdminUsagePage} />
+      <Route path="/admin/costs" component={AdminCostsPage} />
+      <Route path="/admin/export" component={AdminExportPage} />
+      <Route path="/admin" component={AdminDashboardPage} />
+      <Route path="/chats">
+        <ProtectedRoute>
+          <ChatsPage />
+        </ProtectedRoute>
+      </Route>
       <Route path="/">
         {() => {
           navigate("/chats");
           return null;
         }}
-      </Route>
-      <Route path="/chats">
-        <ProtectedRoute>
-          <ChatsPage />
-        </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
     </Switch>

@@ -14,27 +14,14 @@ export function ChatMessage({ message }) {
     }
   }
   const isUser = parsedMessage.sender === "user";
-<<<<<<< HEAD
-  const timestamp = ChatService.formatTimestamp(parsedMessage.timestamp || new Date());
-
-  if (isUser) {
-    return (
-      <div className="flex items-start justify-end space-x-3" data-testid={`message-${parsedMessage.id}`}>
-        <div className="flex-1 flex justify-end">
-          {parsedMessage.type === 'audio' ? (
-            <AudioMessage 
-              audioUrl={parsedMessage.audioUrl || parsedMessage.audioURL} 
-              audioBase64={parsedMessage.audioBase64}
-              mimeType={parsedMessage.mimeType}
-              sender="user" 
-            />
-          ) : (
-            <div className="bg-primary text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-md">
-              <p className="whitespace-pre-wrap">{parsedMessage.text || parsedMessage.content}</p>
-=======
   const timestamp = ChatService.formatTimestamp(
     parsedMessage.timestamp || new Date(),
   );
+  
+  // Debug: log transcription for audio messages
+  if (parsedMessage.type === "audio" && isUser) {
+    console.log("Audio message transcription:", parsedMessage.transcription);
+  }
 
   if (isUser) {
     return (
@@ -44,17 +31,38 @@ export function ChatMessage({ message }) {
       >
         <div className="flex-1 flex justify-end">
           {parsedMessage.type === "audio" ? (
-            <AudioMessage
-              audioUrl={parsedMessage.audioUrl || parsedMessage.audioURL}
-              mimeType={parsedMessage.mimeType}
-              sender="user"
-            />
+            <div className="flex flex-col items-end space-y-2 max-w-md">
+              <AudioMessage
+                audioUrl={parsedMessage.audioUrl || parsedMessage.audioURL}
+                audioBase64={parsedMessage.audioBase64}
+                mimeType={parsedMessage.mimeType}
+                sender="user"
+              />
+              {parsedMessage.transcription && parsedMessage.transcription.trim() ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 max-w-full shadow-sm">
+                  <div className="flex items-center space-x-1 mb-1">
+                    <i className="fas fa-text-width text-xs text-gray-500"></i>
+                    <span className="text-xs font-medium text-gray-600">Transcrição:</span>
+                  </div>
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                    {parsedMessage.transcription}
+                  </p>
+                </div>
+              ) : (
+                parsedMessage.transcription === "" && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 max-w-full">
+                    <p className="text-xs text-yellow-700 italic">
+                      Transcrição não disponível
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
           ) : (
             <div className="bg-primary text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-md">
               <p className="whitespace-pre-wrap">
                 {parsedMessage.text || parsedMessage.content}
               </p>
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
             </div>
           )}
         </div>
@@ -68,49 +76,32 @@ export function ChatMessage({ message }) {
   }
 
   return (
-<<<<<<< HEAD
-    <div className="flex items-start space-x-3" data-testid={`message-${parsedMessage.id}`}>
-=======
     <div
       className="flex items-start space-x-3"
       data-testid={`message-${parsedMessage.id}`}
     >
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
       <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
         <AvatarFallback className="bg-secondary text-white">
           <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
         </AvatarFallback>
       </Avatar>
       <div className="flex-1">
-<<<<<<< HEAD
-        {parsedMessage.type === 'audio' ? (
-          <div>
-            <AudioMessage 
-              audioUrl={parsedMessage.audioUrl || parsedMessage.audioURL} 
-              audioBase64={parsedMessage.audioBase64}
-              mimeType={parsedMessage.mimeType}
-              sender="assistant" 
-=======
         {parsedMessage.type === "audio" ? (
           <div>
             <AudioMessage
               audioUrl={parsedMessage.audioUrl || parsedMessage.audioURL}
+              audioBase64={parsedMessage.audioBase64}
               mimeType={parsedMessage.mimeType}
               sender="assistant"
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
             />
             <div className="text-xs text-gray-500 mt-1 ml-1">{timestamp}</div>
           </div>
         ) : (
           <div>
             <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
-<<<<<<< HEAD
-              <p className="text-gray-800 whitespace-pre-wrap">{parsedMessage.text || parsedMessage.content}</p>
-=======
               <p className="text-gray-800 whitespace-pre-wrap">
                 {parsedMessage.text || parsedMessage.content}
               </p>
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
             </div>
             <div className="text-xs text-gray-500 mt-1 ml-1">{timestamp}</div>
           </div>

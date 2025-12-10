@@ -58,17 +58,10 @@ export function ChatSidebar({
         try {
           // Verifica review para o par chat_id + última sessão
           const { data: review, error } = await supabaseService.supabase
-<<<<<<< HEAD
-            .from('chat_reviews')
-            .select('*')
-            .eq('chat_id', chat.chat_id)
-            .eq('sessao', chat.sessao)
-=======
             .from("chat_reviews")
             .select("*")
             .eq("chat_id", chat.chat_id)
             .eq("sessao", chat.sessao)
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
             .single();
           reviewStatuses[chat.chat_id] = !!review && !error;
         } catch (error) {
@@ -100,33 +93,19 @@ export function ChatSidebar({
     // Se temos a função de confirmação do chat principal, usa ela (com redirecionamento)
     if (onNewChatConfirm) {
       await onNewChatConfirm(formData);
-<<<<<<< HEAD
-      
-      toast({
-        title: 'Nova conversa iniciada',
-        description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`
-=======
 
       toast({
         title: "Nova conversa iniciada",
         description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`,
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
       });
     } else {
       // Fallback para compatibilidade
       const newThread = await onStartNewThread(formData);
       setShowNewChatDialog(false);
-<<<<<<< HEAD
-      
-      toast({
-        title: 'Nova conversa iniciada',
-        description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`
-=======
 
       toast({
         title: "Nova conversa iniciada",
         description: `Diagnóstico: ${formData.diagnostico} | Protocolo: TCC`,
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
       });
     }
   };
@@ -188,14 +167,6 @@ export function ChatSidebar({
   };
 
   // LOG para depuração do Sidebar
-<<<<<<< HEAD
-  console.log('Sidebar userChats:', userChats);
-
-  // Agrupa por chat_id, mantendo apenas a sessão mais alta
-  const latestChats = {};
-  userChats.forEach(chat => {
-    if (!latestChats[chat.chat_id] || chat.sessao > latestChats[chat.chat_id].sessao) {
-=======
   console.log("Sidebar userChats:", userChats);
 
   // Agrupa por chat_id, mantendo apenas a sessão mais alta
@@ -205,7 +176,6 @@ export function ChatSidebar({
       !latestChats[chat.chat_id] ||
       chat.sessao > latestChats[chat.chat_id].sessao
     ) {
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
       latestChats[chat.chat_id] = chat;
     }
   });
@@ -283,17 +253,6 @@ export function ChatSidebar({
                 </div>
               ) : (
                 chatsToShow.map((chat) => {
-<<<<<<< HEAD
-                  const isActive = currentThread?.id === chat.chat_id || currentThread?.openaiChatId === chat.chat_id;
-                  // LOG para cada card
-                  console.log('Sidebar card:', {
-                    chat_id: chat.chat_id,
-                    sessao: chat.sessao,
-                    status: chatReviews[chat.chat_id] ? 'FINALIZADO' : 'EM ANDAMENTO',
-                    chat
-                  });
-                  
-=======
                   const isActive =
                     currentThread?.id === chat.chat_id ||
                     currentThread?.openaiChatId === chat.chat_id;
@@ -307,7 +266,6 @@ export function ChatSidebar({
                     chat,
                   });
 
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                   return (
                     <div
                       key={chat.chat_id}
@@ -328,11 +286,7 @@ export function ChatSidebar({
                       {/* Status Tags and Delete Button */}
                       <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
                         <div className="flex items-center space-x-1">
-<<<<<<< HEAD
-                          {chat.status === 'finalizado' ? (
-=======
                           {chat.status === "finalizado" ? (
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                             <Badge className="bg-green-100 text-green-800 border-green-200 text-xs font-medium px-1.5 py-0.5">
                               FINALIZADO
                             </Badge>
@@ -382,15 +336,6 @@ export function ChatSidebar({
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
                           {chat.last_message_at
-<<<<<<< HEAD
-                            ? new Date(chat.last_message_at).toLocaleDateString('pt-BR', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })
-                            : 'Sem mensagens'}
-=======
                             ? new Date(chat.last_message_at).toLocaleDateString(
                                 "pt-BR",
                                 {
@@ -401,7 +346,6 @@ export function ChatSidebar({
                                 },
                               )
                             : "Sem mensagens"}
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
                         </div>
                       </div>
                     </div>

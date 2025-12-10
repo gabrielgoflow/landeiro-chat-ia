@@ -214,6 +214,26 @@ export class ChatService {
           finalAudioUrl = `data:audio/mp3;base64,${audioData.audioBase64}`;
         }
 
+        // Extract transcription from metadata if available
+        let transcription = null;
+        if (msg.metadata && typeof msg.metadata === "object") {
+          transcription = msg.metadata.transcription || null;
+          console.log("Transcription from metadata (object):", transcription);
+        } else if (msg.metadata && typeof msg.metadata === "string") {
+          try {
+            const parsedMetadata = JSON.parse(msg.metadata);
+            transcription = parsedMetadata.transcription || null;
+            console.log("Transcription from metadata (string):", transcription);
+          } catch (e) {
+            // Metadata is not valid JSON, ignore
+            console.log("Metadata is not valid JSON:", msg.metadata);
+          }
+        } else {
+          console.log("No metadata found for audio message:", msg.message_id || msg.messageId);
+        }
+
+        console.log("Final transcription for message:", transcription);
+
         return {
           ...baseMessage,
           type: "audio",
@@ -221,6 +241,7 @@ export class ChatService {
           mimeType: audioData.mimeType || "audio/mp3",
           duration: msg.duration || 0,
           content: audioData.text || "Mensagem de áudio",
+          transcription: transcription,
         };
       }
 

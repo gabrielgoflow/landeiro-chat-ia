@@ -6,41 +6,38 @@ export class SupabaseService {
     try {
       // Buscar o último registro desse chat_id
       const { data: lastSession, error: selectError } = await supabase
-<<<<<<< HEAD
-        .from('chat_threads')
-        .select('*')
-        .eq('chat_id', chatId)
-        .order('sessao', { ascending: false })
-=======
         .from("chat_threads")
         .select("*")
         .eq("chat_id", chatId)
         .order("sessao", { ascending: false })
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
         .limit(1)
         .single();
 
       if (selectError) throw selectError;
 
-      const nextSession = (lastSession?.sessao || 0) + 1;
+      const currentSession = lastSession?.sessao || 0;
+      const nextSession = currentSession + 1;
+
+      // Verificar se já atingiu o limite de 10 sessões
+      if (currentSession >= 10) {
+        return {
+          data: null,
+          error: "Limite de 10 sessões atingido para este diagnóstico",
+          newSession: null,
+        };
+      }
 
       // Inserir novo registro com mesmo chat_id, mas sessao incrementada
+      const now = new Date().toISOString();
       const { data: newThread, error: insertError } = await supabase
-<<<<<<< HEAD
-        .from('chat_threads')
-=======
         .from("chat_threads")
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
         .insert({
           chat_id: chatId,
           thread_id: lastSession.thread_id,
           diagnostico: lastSession.diagnostico,
           protocolo: lastSession.protocolo,
-<<<<<<< HEAD
-          sessao: nextSession
-=======
           sessao: nextSession,
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
+          session_started_at: now,
         })
         .select()
         .single();
@@ -48,11 +45,7 @@ export class SupabaseService {
       if (insertError) throw insertError;
       return { data: newThread, error: null, newSession: nextSession };
     } catch (error) {
-<<<<<<< HEAD
-      console.error('Error incrementing chat session:', error);
-=======
       console.error("Error incrementing chat session:", error);
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
       return { data: null, error: error.message, newSession: null };
     }
   }
@@ -77,6 +70,7 @@ export class SupabaseService {
       const newChatId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Criar novo chat_thread
+      const now = new Date().toISOString();
       const { data: newThread, error: threadError } = await supabase
         .from("chat_threads")
         .insert({
@@ -85,6 +79,7 @@ export class SupabaseService {
           diagnostico,
           protocolo,
           sessao: newSessionNumber,
+          session_started_at: now,
         })
         .select()
         .single();
@@ -126,6 +121,43 @@ export class SupabaseService {
     }
   }
 
+  // Iniciar timer da sessão (atualizar session_started_at se não existir)
+  static async startSessionTimer(chatId) {
+    try {
+      // Verificar se já tem session_started_at
+      const { data: existing, error: selectError } = await supabase
+        .from("chat_threads")
+        .select("session_started_at")
+        .eq("chat_id", chatId)
+        .single();
+
+      if (selectError && selectError.code !== "PGRST116") {
+        throw selectError;
+      }
+
+      // Se já tem session_started_at, retornar
+      if (existing?.session_started_at) {
+        return existing.session_started_at;
+      }
+
+      // Se não tem, atualizar com timestamp atual
+      const now = new Date().toISOString();
+      const { data, error: updateError } = await supabase
+        .from("chat_threads")
+        .update({ session_started_at: now })
+        .eq("chat_id", chatId)
+        .select("session_started_at")
+        .single();
+
+      if (updateError) throw updateError;
+      return data?.session_started_at || now;
+    } catch (error) {
+      console.error("Error starting session timer:", error);
+      // Retornar timestamp atual como fallback
+      return new Date().toISOString();
+    }
+  }
+
   // Criar relação entre chat interno e thread_id do OpenAI
   static async createChatThread(
     chatId,
@@ -135,6 +167,7 @@ export class SupabaseService {
     sessao = 1,
   ) {
     try {
+      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from("chat_threads")
         .insert([
@@ -144,6 +177,7 @@ export class SupabaseService {
             diagnostico,
             protocolo,
             sessao: sessao, // Sempre começa com sessão 1 para novos chats
+            session_started_at: now,
           },
         ])
         .select()
@@ -162,7 +196,7 @@ export class SupabaseService {
     try {
       const { data, error } = await supabase
         .from("chat_threads")
-        .select("thread_id, diagnostico, protocolo, sessao")
+        .select("thread_id, diagnostico, protocolo, sessao, session_started_at")
         .eq("chat_id", chatId)
         .single();
 
@@ -202,54 +236,32 @@ export class SupabaseService {
     try {
       // 1. Buscar todos os chat_id do usuário
       const { data: userChats, error: userChatsError } = await supabase
-<<<<<<< HEAD
-        .from('user_chats')
-        .select('chat_id')
-        .eq('user_id', userId);
-
-      if (userChatsError) throw userChatsError;
-      const chatIds = userChats.map(uc => uc.chat_id);
-=======
         .from("user_chats")
         .select("chat_id")
         .eq("user_id", userId);
 
       if (userChatsError) throw userChatsError;
       const chatIds = userChats.map((uc) => uc.chat_id);
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
 
       // 2. Buscar os dados na view chat_overview
       let chats = [];
       if (chatIds.length > 0) {
         const { data: overviewData, error: overviewError } = await supabase
-<<<<<<< HEAD
-          .from('v_chat_overview')
-          .select('*')
-          .in('chat_id', chatIds);
-=======
           .from("v_chat_overview")
           .select("*")
           .in("chat_id", chatIds);
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
 
         if (overviewError) throw overviewError;
         chats = overviewData || [];
       }
 
       // 3. Ordenar por data da última mensagem
-<<<<<<< HEAD
-      chats.sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at));
-      return chats;
-    } catch (error) {
-      console.error('Error getting user chats from chat_overview:', error);
-=======
       chats.sort(
         (a, b) => new Date(b.last_message_at) - new Date(a.last_message_at),
       );
       return chats;
     } catch (error) {
       console.error("Error getting user chats from chat_overview:", error);
->>>>>>> 69c3d0b503524c30ad76e469052811a1c79f7321
       return [];
     }
   }

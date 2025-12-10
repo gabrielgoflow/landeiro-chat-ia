@@ -497,13 +497,14 @@ export default function Chat() {
   }, [currentThread?.id, currentThread?.sessionData?.sessao]);
 
   // Proteção: só renderiza o conteúdo principal se currentThread estiver definido
-  // if (!currentThread) {
-  //   return (
-  //     <div className="flex items-center justify-center h-full min-h-screen">
-  //       <span className="text-gray-500 text-lg">Carregando atendimento...</span>
-  //     </div>
-  //   );
-  // }
+  // Mas permite renderização quando é uma nova conversa ou dialog está aberto
+  if (!currentThread && chatId !== "new" && !showNewChatDialog) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-screen">
+        <span className="text-gray-500 text-lg">Carregando atendimento...</span>
+      </div>
+    );
+  }
   return (
     <div className="flex h-screen overflow-hidden" data-testid="chat-page">
       <ChatSidebar
