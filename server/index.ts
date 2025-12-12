@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite.js";
 
@@ -14,7 +15,7 @@ app.use(express.raw({ type: "application/octet-stream", limit: "10mb" }));
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
+  const requestPath = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -25,8 +26,8 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+    if (requestPath.startsWith("/api")) {
+      let logLine = `${req.method} ${requestPath} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -72,8 +73,22 @@ async function initializeApp() {
     } else if (!isVercel) {
       // Only serve static files if not on Vercel (Vercel serves them automatically)
       serveStatic(app);
+    } else {
+      // On Vercel, we need to serve index.html for SPA routes
+      // Static assets are served automatically, but we need to handle SPA routing
+      const distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+      app.use(express.static(distPath));
+      
+      // Serve index.html for all non-API routes (SPA routing)
+      app.get("*", (req, res, next) => {
+        // Skip API routes
+        if (req.path.startsWith("/api")) {
+          return next();
+        }
+        // Serve index.html for SPA routes
+        res.sendFile(path.resolve(distPath, "index.html"));
+      });
     }
-    // On Vercel, static files are served automatically by the platform
 
     // Only start HTTP server if not running on Vercel (serverless)
     if (!isVercel) {
