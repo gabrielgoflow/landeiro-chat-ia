@@ -1,14 +1,13 @@
 import { build } from 'esbuild';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { copyFileSync, mkdirSync, existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const isVercel = process.env.VERCEL === '1';
-// For Vercel, we need to build to a location that the api function can import from
-// Vercel's serverless functions are in .vercel/output/functions/api
-// But we can build the server code to dist and api/index.ts will import from there
+// Build to dist for local use
 const outdir = 'dist';
 
 // Resolve the shared directory path
@@ -27,6 +26,22 @@ build({
   },
   resolveExtensions: ['.ts', '.js', '.json'],
   logLevel: 'info',
+}).then(() => {
+  // For Vercel, also copy the compiled file to api/ so it's available
+  // This ensures the api/index.ts can import it
+  if (isVercel || process.env.NODE_ENV === 'production') {
+    const distFile = path.join(__dirname, 'dist', 'index.js');
+    const apiDir = path.join(__dirname, 'api');
+    
+    if (existsSync(distFile)) {
+      if (!existsSync(apiDir)) {
+        mkdirSync(apiDir, { recursive: true });
+      }
+      // Copy to api/ so it's available for import
+      copyFileSync(distFile, path.join(apiDir, 'server.js'));
+      console.log('Copied compiled server to api/server.js');
+    }
+  }
 }).catch((error) => {
   console.error('Build failed:', error);
   process.exit(1);
