@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { diagnosticos, userMetadata, chatThreads, userChats } from "@shared/schema";
+import { diagnosticos, userMetadata, chatThreads, userChats, type UserMetadata, type Diagnostico } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 export class AccessValidator {
@@ -20,7 +20,7 @@ export class AccessValidator {
 
     try {
       // 1. Verificar se o diagnóstico existe e está ativo
-      let diagnostico;
+      let diagnostico: Diagnostico[] = [];
       try {
         diagnostico = await db
           .select()
@@ -68,7 +68,7 @@ export class AccessValidator {
       // 2. Verificar data final de acesso do usuário
       // Se o transtorno está ativo, ele já está liberado para todos
       // A única validação necessária é a data final de acesso
-      let metadata;
+      let metadata: UserMetadata[] = [];
       try {
         metadata = await db
           .select()
@@ -113,7 +113,7 @@ export class AccessValidator {
 
       // 3. Verificar se o usuário já possui um chat para este diagnóstico
       // Buscar threads do usuário com este diagnóstico
-      let existingChats;
+      let existingChats: Array<{ threadId: string; maxSessao: number | null }> = [];
       try {
         existingChats = await db
           .select({
