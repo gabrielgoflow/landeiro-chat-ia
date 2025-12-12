@@ -69,9 +69,11 @@ async function initializeApp() {
     // doesn't interfere with the other routes
     if (app.get("env") === "development") {
       await setupVite(app, server);
-    } else {
+    } else if (!isVercel) {
+      // Only serve static files if not on Vercel (Vercel serves them automatically)
       serveStatic(app);
     }
+    // On Vercel, static files are served automatically by the platform
 
     // Only start HTTP server if not running on Vercel (serverless)
     if (!isVercel) {
@@ -101,11 +103,14 @@ if (!isVercel) {
 
 // Export handler for Vercel serverless
 // Vercel will use this as the serverless function handler
-export default async (req: Request, res: Response, next?: NextFunction) => {
-  await initializeApp();
-  if (next) {
-    return app(req, res, next);
-  } else {
-    return app(req, res);
+export default async (req: Request, res: Response) => {
+  try {
+    await initializeApp();
+    app(req, res);
+  } catch (error) {
+    console.error('Error in Vercel handler:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
