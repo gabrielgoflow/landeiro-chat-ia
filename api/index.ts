@@ -1,7 +1,8 @@
 // Vercel serverless function wrapper for Express app
-// Import directly from server - Vercel will compile both files
-// The alias @shared will be resolved by the build process
-import serverHandler from '../server/index.js';
+// Import from the compiled server code in dist/
+// The build script (build-server.js) compiles server/index.ts to dist/index.js
+// with all aliases (@shared) already resolved
+import serverHandler from '../dist/index.js';
 
 // Re-export as default for Vercel
 export default serverHandler;

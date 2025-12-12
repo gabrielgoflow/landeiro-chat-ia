@@ -3,7 +3,7 @@ node_modules
 .env.local
 .env.development
 .env.test
-dist
+dist/public
 *.log
 .DS_Store
 *.swp
