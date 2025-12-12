@@ -756,7 +756,7 @@ export default function Chat() {
         </div>
 
         {/* Debug Info (Admin only) */}
-        {user?.email === "admin@goflow.digital" && (
+        {user?.email && ["admin@goflow.digital", "admin@nexialab.com.br"].includes(user.email) && (
           <div className="px-4 pb-2">
             <Button
               variant="ghost"

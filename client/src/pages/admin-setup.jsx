@@ -12,7 +12,8 @@ export default function AdminSetup() {
   const [sqlScript, setSqlScript] = useState('')
   const [fixRlsScript, setFixRlsScript] = useState('')
 
-  const isAdmin = user?.email === 'admin@goflow.digital'
+  const ADMIN_EMAILS = ['admin@goflow.digital', 'admin@nexialab.com.br']
+  const isAdmin = user?.email && ADMIN_EMAILS.includes(user.email)
 
   useEffect(() => {
     // Carregar o script SQL principal

@@ -380,7 +380,7 @@ export function ChatSidebar({
                   </div>
                   <div className="text-xs text-gray-500 flex items-center space-x-2">
                     <span>Conectado</span>
-                    {user?.email === "admin@goflow.digital" && (
+                    {user?.email && ["admin@goflow.digital", "admin@nexialab.com.br"].includes(user.email) && (
                       <a
                         href="/admin-setup"
                         className="text-blue-500 hover:text-blue-600"

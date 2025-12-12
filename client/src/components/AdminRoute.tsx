@@ -5,7 +5,11 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-const ADMIN_EMAIL = "admin@goflow.digital";
+const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br"];
+
+const isAdminEmail = (email: string | undefined): boolean => {
+  return email ? ADMIN_EMAILS.includes(email) : false;
+};
 
 export default function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
@@ -23,7 +27,7 @@ export default function AdminRoute({ children }: { children: React.ReactNode }) 
       }
 
       // Check if user is admin by email
-      if (user.email === ADMIN_EMAIL) {
+      if (isAdminEmail(user.email)) {
         setIsAdmin(true);
         setCheckingAdmin(false);
         return;

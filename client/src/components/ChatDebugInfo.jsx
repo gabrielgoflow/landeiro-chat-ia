@@ -30,7 +30,8 @@ export function ChatDebugInfo({ currentThread, sessionData, visible = false }) {
     }
   }, [visible, currentThread, user])
 
-  if (!visible || !user || user.email !== 'admin@goflow.digital') {
+  const ADMIN_EMAILS = ['admin@goflow.digital', 'admin@nexialab.com.br']
+  if (!visible || !user || !ADMIN_EMAILS.includes(user.email)) {
     return null
   }
 

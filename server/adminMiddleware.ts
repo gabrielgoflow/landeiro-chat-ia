@@ -4,8 +4,8 @@ import { db } from "./db";
 import { userMetadata } from "../shared/schema";
 import { eq } from "drizzle-orm";
 
-// Admin email (fallback if user_metadata doesn't exist)
-const ADMIN_EMAIL = "admin@goflow.digital";
+// Admin emails (fallback if user_metadata doesn't exist)
+const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br"];
 
 /**
  * Get Supabase client for auth verification
@@ -41,8 +41,8 @@ function extractToken(req: Request): string | null {
  * Verify if user is admin
  */
 async function isUserAdmin(userId: string, userEmail?: string): Promise<boolean> {
-  // Check if email matches admin email
-  if (userEmail === ADMIN_EMAIL) {
+  // Check if email matches any admin email
+  if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
     return true;
   }
 
