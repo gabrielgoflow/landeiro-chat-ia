@@ -1,6 +1,6 @@
 import { AdminService } from "./adminService.js";
 import { db } from "./db";
-import { userChats, chatThreads, sessionCosts } from "@shared/schema";
+import { userChats, chatThreads, sessionCosts } from "../shared/schema";
 import { eq } from "drizzle-orm";
 
 /**

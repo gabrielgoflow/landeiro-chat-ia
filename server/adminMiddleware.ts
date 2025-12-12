@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { createClient } from "@supabase/supabase-js";
 import { db } from "./db";
-import { userMetadata } from "@shared/schema";
+import { userMetadata } from "../shared/schema";
 import { eq } from "drizzle-orm";
 
 // Admin email (fallback if user_metadata doesn't exist)

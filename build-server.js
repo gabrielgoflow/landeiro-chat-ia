@@ -10,20 +10,14 @@ const isVercel = process.env.VERCEL === '1';
 // Build to dist for local use
 const outdir = 'dist';
 
-// Resolve the shared directory path
-const sharedPath = path.resolve(__dirname, 'shared');
-
 build({
   entryPoints: ['server/index.ts'],
   bundle: true,
   platform: 'node',
   format: 'esm',
   outdir,
-  // Keep node_modules external, but bundle local code including @shared
+  // Keep node_modules external, but bundle local code
   packages: 'external',
-  alias: {
-    '@shared': sharedPath,
-  },
   resolveExtensions: ['.ts', '.js', '.json'],
   logLevel: 'info',
 }).then(() => {

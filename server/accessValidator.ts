@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { diagnosticos, userMetadata, chatThreads, userChats, type UserMetadata, type Diagnostico } from "@shared/schema";
+import { diagnosticos, userMetadata, chatThreads, userChats, type UserMetadata, type Diagnostico } from "../shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 export class AccessValidator {

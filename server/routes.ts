@@ -6,7 +6,7 @@ import {
   insertChatMessageSchema,
   insertSessionCostSchema,
   insertUserMetadataSchema,
-} from "@shared/schema";
+} from "../shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage.js";
 import { ObjectPermission } from "./objectAcl.js";
 import { SupabaseStorageService } from "./supabaseStorage.js";

@@ -8,7 +8,7 @@ import {
   users,
   chatReviews,
   chatMessages,
-} from "@shared/schema";
+} from "../shared/schema";
 import { randomUUID } from "crypto";
 import { eq, sql, and } from "drizzle-orm";
 import { db } from "./db";

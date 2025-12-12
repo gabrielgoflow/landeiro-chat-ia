@@ -15,8 +15,8 @@ import {
   InsertUserMetadata,
   InsertDiagnostico,
   InsertUserDiagnostico,
-} from "@shared/schema";
-import type { UserMetadata, SessionCost, AuditLog, Diagnostico, UserDiagnostico } from "@shared/schema";
+} from "../shared/schema";
+import type { UserMetadata, SessionCost, AuditLog, Diagnostico, UserDiagnostico } from "../shared/schema";
 import { createClient } from "@supabase/supabase-js";
 
 /**
