@@ -1,6 +1,6 @@
 // Vercel serverless function wrapper for Express app
-// Import the default export from the server
-// Note: Use .js extension as TypeScript expects compiled output
+// Import directly from server - Vercel will compile both files
+// The alias @shared will be resolved by the build process
 import serverHandler from '../server/index.js';
 
 // Re-export as default for Vercel
