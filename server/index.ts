@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { registerRoutes } from "./routes.js";
-import { setupVite, serveStatic, log } from "./vite.js";
+import { log } from "./logger.js";
 
 const app = express();
 
@@ -69,9 +69,13 @@ async function initializeApp() {
     // setting up all the other routes so the catch-all route
     // doesn't interfere with the other routes
     if (app.get("env") === "development") {
+      // Dynamic import to avoid loading vite/rollup in production/Vercel
+      const { setupVite } = await import("./vite.js");
       await setupVite(app, server);
     } else if (!isVercel) {
       // Only serve static files if not on Vercel (Vercel serves them automatically)
+      // Dynamic import to avoid loading vite/rollup in Vercel
+      const { serveStatic } = await import("./vite.js");
       serveStatic(app);
     } else {
       // On Vercel, we need to serve index.html for SPA routes
