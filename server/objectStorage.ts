@@ -59,7 +59,7 @@ export class ObjectStorageService {
           "tool and set PUBLIC_OBJECT_SEARCH_PATHS env var (comma-separated paths).",
       );
     } 
-    return paths;
+    return paths; 
   }
 
   // Gets the private object directory.
