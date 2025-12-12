@@ -1,11 +1,21 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/public",
   "builds": [
     {
       "src": "server/index.ts",
       "use": "@vercel/node"
     }
   ],
+  "functions": {
+    "server/index.ts": {
+      "includeFiles": [
+        "server/**",
+        "shared/**"
+      ]
+    }
+  },
   "routes": [
     {
       "src": "/api/(.*)",
