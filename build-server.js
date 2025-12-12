@@ -10,6 +10,19 @@ const isVercel = process.env.VERCEL === '1';
 // Build to dist for local use
 const outdir = 'dist';
 
+// Plugin to exclude vite.ts from bundle when not needed
+const excludeVitePlugin = {
+  name: 'exclude-vite',
+  setup(build) {
+    // Mark vite.ts as external when building for production/Vercel
+    if (isVercel || process.env.NODE_ENV === 'production') {
+      build.onResolve({ filter: /^\.\/vite\.js$/ }, () => {
+        return { external: true, path: './vite.js' };
+      });
+    }
+  },
+};
+
 build({
   entryPoints: ['server/index.ts'],
   bundle: true,
@@ -18,6 +31,10 @@ build({
   outdir,
   // Keep node_modules external, but bundle local code
   packages: 'external',
+  // Explicitly mark vite and rollup as external to avoid bundling them
+  // This prevents rollup from being loaded in Vercel serverless functions
+  external: ['vite', 'rollup', '@rollup/*'],
+  plugins: [excludeVitePlugin],
   resolveExtensions: ['.ts', '.js', '.json'],
   logLevel: 'info',
 }).then(() => {

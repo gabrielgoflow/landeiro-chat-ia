@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
+import fs from "fs";
 import { registerRoutes } from "./routes.js";
 import { log } from "./logger.js";
 
@@ -68,15 +69,31 @@ async function initializeApp() {
     // importantly only setup vite in development and after
     // setting up all the other routes so the catch-all route
     // doesn't interfere with the other routes
-    if (app.get("env") === "development") {
+    if (app.get("env") === "development" && !isVercel) {
       // Dynamic import to avoid loading vite/rollup in production/Vercel
-      const { setupVite } = await import("./vite.js");
-      await setupVite(app, server);
+      // Only load vite in development and not on Vercel
+      try {
+        const { setupVite } = await import("./vite.js");
+        await setupVite(app, server);
+      } catch (error) {
+        console.warn("Failed to load Vite (this is expected in production):", error);
+      }
     } else if (!isVercel) {
       // Only serve static files if not on Vercel (Vercel serves them automatically)
-      // Dynamic import to avoid loading vite/rollup in Vercel
-      const { serveStatic } = await import("./vite.js");
-      serveStatic(app);
+      // Serve static files directly without importing vite
+      const distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+      
+      if (!fs.existsSync(distPath)) {
+        throw new Error(
+          `Could not find the build directory: ${distPath}, make sure to build the client first`,
+        );
+      }
+
+      app.use(express.static(distPath));
+      // fall through to index.html if the file doesn't exist
+      app.use("*", (_req, res) => {
+        res.sendFile(path.resolve(distPath, "index.html"));
+      });
     } else {
       // On Vercel, we need to serve index.html for SPA routes
       // Static assets are served automatically, but we need to handle SPA routing
