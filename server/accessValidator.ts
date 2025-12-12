@@ -12,16 +12,44 @@ export class AccessValidator {
     diagnosticoCodigo: string
   ): Promise<{ canAccess: boolean; reason?: string }> {
     if (!db) {
-      throw new Error("Database not connected");
+      return {
+        canAccess: false,
+        reason: "Banco de dados não conectado",
+      };
     }
 
     try {
       // 1. Verificar se o diagnóstico existe e está ativo
-      const diagnostico = await db
-        .select()
-        .from(diagnosticos)
-        .where(eq(diagnosticos.codigo, diagnosticoCodigo))
-        .limit(1);
+      let diagnostico;
+      try {
+        diagnostico = await db
+          .select()
+          .from(diagnosticos)
+          .where(eq(diagnosticos.codigo, diagnosticoCodigo))
+          .limit(1);
+      } catch (dbError: any) {
+        const dbErrorMessage = dbError?.message || dbError?.toString() || "";
+        console.error("Erro ao buscar diagnóstico:", {
+          diagnosticoCodigo,
+          error: dbErrorMessage,
+          errorType: dbError?.name || "Unknown"
+        });
+        
+        // Para erros de autenticação transitórios ou circuit breaker, retornar erro específico sem bloquear
+        if (dbErrorMessage.includes("authentication") ||
+            dbErrorMessage.includes("password authentication failed") ||
+            dbErrorMessage.includes("JWT") ||
+            dbErrorMessage.includes("too many") ||
+            dbErrorMessage.includes("Circuit breaker") ||
+            dbErrorMessage.includes("circuit breaker open")) {
+          return {
+            canAccess: false,
+            reason: "Erro temporário de conexão com o banco de dados. Por favor, aguarde alguns instantes e tente novamente.",
+          };
+        }
+        // Para outros erros, propagar normalmente
+        throw dbError;
+      }
 
       if (!diagnostico || diagnostico.length === 0) {
         return {
@@ -40,11 +68,36 @@ export class AccessValidator {
       // 2. Verificar data final de acesso do usuário
       // Se o transtorno está ativo, ele já está liberado para todos
       // A única validação necessária é a data final de acesso
-      const metadata = await db
-        .select()
-        .from(userMetadata)
-        .where(eq(userMetadata.userId, userId))
-        .limit(1);
+      let metadata;
+      try {
+        metadata = await db
+          .select()
+          .from(userMetadata)
+          .where(eq(userMetadata.userId, userId))
+          .limit(1);
+      } catch (dbError: any) {
+        const dbErrorMessage = dbError?.message || dbError?.toString() || "";
+        console.error("Erro ao buscar metadata do usuário:", {
+          userId,
+          error: dbErrorMessage,
+          errorType: dbError?.name || "Unknown"
+        });
+        
+        // Para erros de autenticação transitórios ou circuit breaker, permitir acesso (fallback tolerante)
+        // pois a validação de data não é crítica se o diagnóstico está ativo
+        if (dbErrorMessage.includes("authentication") ||
+            dbErrorMessage.includes("password authentication failed") ||
+            dbErrorMessage.includes("JWT") ||
+            dbErrorMessage.includes("too many") ||
+            dbErrorMessage.includes("Circuit breaker") ||
+            dbErrorMessage.includes("circuit breaker open")) {
+          console.warn("Erro transitório ao buscar metadata, permitindo acesso como fallback");
+          // Continuar sem validar data final - o diagnóstico já está ativo
+          metadata = [];
+        } else {
+          throw dbError;
+        }
+      }
 
       if (metadata && metadata.length > 0 && metadata[0].dataFinalAcesso) {
         const dataFinal = new Date(metadata[0].dataFinalAcesso);
@@ -60,20 +113,46 @@ export class AccessValidator {
 
       // 3. Verificar se o usuário já possui um chat para este diagnóstico
       // Buscar threads do usuário com este diagnóstico
-      const existingChats = await db
-        .select({
-          threadId: chatThreads.threadId,
-          maxSessao: sql<number>`max(${chatThreads.sessao})`,
-        })
-        .from(chatThreads)
-        .innerJoin(userChats, eq(chatThreads.chatId, userChats.chatId))
-        .where(
-          and(
-            eq(userChats.userId, userId),
-            eq(chatThreads.diagnostico, diagnosticoCodigo)
+      let existingChats;
+      try {
+        existingChats = await db
+          .select({
+            threadId: chatThreads.threadId,
+            maxSessao: sql<number>`max(${chatThreads.sessao})`,
+          })
+          .from(chatThreads)
+          .innerJoin(userChats, eq(chatThreads.chatId, userChats.chatId))
+          .where(
+            and(
+              eq(userChats.userId, userId),
+              eq(chatThreads.diagnostico, diagnosticoCodigo)
+            )
           )
-        )
-        .groupBy(chatThreads.threadId);
+          .groupBy(chatThreads.threadId);
+      } catch (dbError: any) {
+        const dbErrorMessage = dbError?.message || dbError?.toString() || "";
+        console.error("Erro ao verificar chats existentes:", {
+          userId,
+          diagnosticoCodigo,
+          error: dbErrorMessage,
+          errorType: dbError?.name || "Unknown"
+        });
+        
+        // Para erros de autenticação transitórios ou circuit breaker, permitir acesso (fallback tolerante)
+        // A validação de chat existente não deve bloquear completamente
+        if (dbErrorMessage.includes("authentication") ||
+            dbErrorMessage.includes("password authentication failed") ||
+            dbErrorMessage.includes("JWT") ||
+            dbErrorMessage.includes("too many") ||
+            dbErrorMessage.includes("Circuit breaker") ||
+            dbErrorMessage.includes("circuit breaker open")) {
+          console.warn("Erro transitório ao verificar chats, permitindo acesso como fallback");
+          // Continuar sem validar chats existentes - permitir tentativa de criação
+          existingChats = [];
+        } else {
+          throw dbError;
+        }
+      }
 
       // Se já existe um chat para este diagnóstico
       if (existingChats && existingChats.length > 0) {
@@ -95,10 +174,34 @@ export class AccessValidator {
       // Se chegou aqui, o transtorno está ativo, a data de acesso é válida e não existe chat para este diagnóstico
       return { canAccess: true };
     } catch (error: any) {
-      console.error("Error validating access:", error);
+      console.error("Error validating access:", {
+        userId,
+        diagnosticoCodigo,
+        error: error?.message || error?.toString(),
+        stack: error?.stack,
+        errorType: error?.name || "Unknown"
+      });
+      
+      // Detectar erros de autenticação, conexão ou circuit breaker
+      const errorMessage = error?.message || error?.toString() || "";
+      if (errorMessage.includes("authentication") ||
+          errorMessage.includes("password authentication failed") ||
+          errorMessage.includes("JWT") ||
+          errorMessage.includes("too many") ||
+          errorMessage.includes("connection") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("timeout") ||
+          errorMessage.includes("Circuit breaker") ||
+          errorMessage.includes("circuit breaker open")) {
+        return {
+          canAccess: false,
+          reason: "Erro temporário de conexão com o banco de dados. Por favor, aguarde alguns instantes e tente novamente.",
+        };
+      }
+      
       return {
         canAccess: false,
-        reason: `Erro ao validar acesso: ${error.message}`,
+        reason: `Erro ao validar acesso: ${errorMessage}`,
       };
     }
   }

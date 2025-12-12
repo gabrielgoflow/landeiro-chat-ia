@@ -275,7 +275,10 @@ export class ChatService {
       if (sessionData) {
         payload.diagnostico = sessionData.diagnostico;
         payload.protocolo = sessionData.protocolo || "tcc";
-        payload.sessao = sessionData.sessao;
+        // Always include sessao if sessionData exists, default to 1 if not set
+        payload.sessao = sessionData.sessao !== undefined && sessionData.sessao !== null 
+          ? sessionData.sessao 
+          : 1;
       }
 
       // Handle audio content

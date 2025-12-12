@@ -122,18 +122,49 @@ export class SupabaseService {
   }
 
   // Iniciar timer da sessão (atualizar session_started_at se não existir)
-  static async startSessionTimer(chatId) {
+  static async startSessionTimer(chatId, sessao = null) {
     try {
-      // Verificar se já tem session_started_at
-      const { data: existing, error: selectError } = await supabase
-        .from("chat_threads")
-        .select("session_started_at")
-        .eq("chat_id", chatId)
-        .single();
-
-      if (selectError && selectError.code !== "PGRST116") {
-        throw selectError;
+      // Verificar se há erro de autenticação antes de continuar
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error("No active session found");
+        // Retornar timestamp atual como fallback, mas não tentar atualizar o banco
+        return new Date().toISOString();
       }
+
+      // Construir query baseada na sessão específica se fornecida
+      let selectQuery = supabase
+        .from("chat_threads")
+        .select("session_started_at, sessao")
+        .eq("chat_id", chatId);
+      
+      // Se temos o número da sessão, buscar essa sessão específica
+      if (sessao !== null && sessao !== undefined) {
+        selectQuery = selectQuery.eq("sessao", sessao);
+      } else {
+        // Se não temos sessão específica, buscar a mais recente
+        selectQuery = selectQuery.order("sessao", { ascending: false });
+      }
+      
+      const { data: existingList, error: selectError } = await selectQuery.limit(1);
+      
+      // Se for erro de autenticação ou conexão, não tentar novamente
+      if (selectError) {
+        if (selectError.code === "PGRST116") {
+          // Não encontrado - isso é OK, vamos criar
+        } else if (selectError.message?.includes("authentication") ||
+                   selectError.message?.includes("JWT") ||
+                   selectError.message?.includes("connection") ||
+                   selectError.message?.includes("timeout")) {
+          console.error("Erro de conexão ao buscar session timer:", selectError.message);
+          // Retornar timestamp atual como fallback, mas não tentar atualizar
+          return new Date().toISOString();
+        } else {
+          throw selectError;
+        }
+      }
+
+      const existing = existingList && existingList.length > 0 ? existingList[0] : null;
 
       // Se já tem session_started_at, retornar
       if (existing?.session_started_at) {
@@ -142,17 +173,72 @@ export class SupabaseService {
 
       // Se não tem, atualizar com timestamp atual
       const now = new Date().toISOString();
+      
+      // Determinar qual sessão atualizar
+      let sessaoToUpdate = sessao;
+      if (sessaoToUpdate === null || sessaoToUpdate === undefined) {
+        // Se não temos sessão específica mas encontramos uma, usar a encontrada
+        if (existing) {
+          sessaoToUpdate = existing.sessao;
+        } else {
+          // Se não encontramos nenhuma, buscar a mais recente primeiro
+          const { data: latestSession, error: latestError } = await supabase
+            .from("chat_threads")
+            .select("sessao")
+            .eq("chat_id", chatId)
+            .order("sessao", { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (latestError) {
+            if (latestError.message?.includes("authentication") ||
+                latestError.message?.includes("JWT") ||
+                latestError.message?.includes("connection") ||
+                latestError.message?.includes("timeout")) {
+              console.error("Erro de conexão ao buscar sessão mais recente:", latestError.message);
+              return now; // Retornar timestamp atual sem atualizar o banco
+            }
+            throw new Error("Não foi possível encontrar sessão para atualizar");
+          }
+          
+          if (!latestSession) {
+            throw new Error("Não foi possível encontrar sessão para atualizar");
+          }
+          
+          sessaoToUpdate = latestSession.sessao;
+        }
+      }
+      
+      // Atualizar a sessão específica
       const { data, error: updateError } = await supabase
         .from("chat_threads")
         .update({ session_started_at: now })
         .eq("chat_id", chatId)
+        .eq("sessao", sessaoToUpdate)
         .select("session_started_at")
         .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        // Se for erro de autenticação ou conexão, não propagar
+        if (updateError.message?.includes("authentication") ||
+            updateError.message?.includes("JWT") ||
+            updateError.message?.includes("connection") ||
+            updateError.message?.includes("timeout")) {
+          console.error("Erro de conexão ao atualizar session timer:", updateError.message);
+          return now; // Retornar timestamp atual sem atualizar o banco
+        }
+        throw updateError;
+      }
       return data?.session_started_at || now;
     } catch (error) {
       console.error("Error starting session timer:", error);
+      // Se for erro de autenticação ou conexão, retornar timestamp atual sem tentar novamente
+      if (error?.message?.includes("authentication") ||
+          error?.message?.includes("JWT") ||
+          error?.message?.includes("connection") ||
+          error?.message?.includes("timeout")) {
+        return new Date().toISOString();
+      }
       // Retornar timestamp atual como fallback
       return new Date().toISOString();
     }

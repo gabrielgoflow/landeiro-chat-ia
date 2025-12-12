@@ -3,7 +3,7 @@ import { ChatService } from "@/services/chatService.js";
 import { AudioMessage } from "./AudioMessage.jsx";
 
 export function ChatMessage({ message }) {
-  console.log("ChatMessage:", message);
+  // console.log("ChatMessage:", message); // Removido para evitar logs excessivos
   let parsedMessage = message;
   if (typeof message.content === "string" && message.content.startsWith("{")) {
     try {

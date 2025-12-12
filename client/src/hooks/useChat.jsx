@@ -39,16 +39,20 @@ export function useChat() {
 
         console.log("Creating thread from Supabase data for:", chatId);
         // Buscar dados diretamente da tabela chat_threads para ter session_started_at
-        const { data: threadData, error: threadError } = await supabase
+        // Buscar a sessão mais recente (maior número de sessão) para este chat_id
+        const { data: threadsData, error: threadError } = await supabase
           .from("chat_threads")
           .select("*")
           .eq("chat_id", chatId)
-          .single();
+          .order("sessao", { ascending: false })
+          .limit(1);
 
-        if (threadError || !threadData) {
-          console.warn("Chat not found in Supabase:", chatId);
+        if (threadError || !threadsData || threadsData.length === 0) {
+          console.warn("Chat not found in Supabase:", chatId, threadError);
           return null;
         }
+
+        const threadData = threadsData[0]; // Pega a sessão mais recente
 
         const newThread = {
           id: threadData.chat_id, // Força o id a ser igual ao chat_id

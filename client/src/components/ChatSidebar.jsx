@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -43,8 +43,8 @@ export function ChatSidebar({
     }
   };
 
-  // Function to load user chats from Supabase
-  const loadUserChats = async () => {
+  // Function to load user chats from Supabase - memoizada para evitar recriações
+  const loadUserChats = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -74,12 +74,12 @@ export function ChatSidebar({
     } finally {
       setLoadingChats(false);
     }
-  };
+  }, [user]);
 
   // Load user chats from Supabase on mount and when user changes
   useEffect(() => {
     loadUserChats();
-  }, [user]);
+  }, [loadUserChats]);
 
   // Expose refresh function globally for when new chats are created
   useEffect(() => {
@@ -87,7 +87,7 @@ export function ChatSidebar({
     return () => {
       delete window.refreshSidebar;
     };
-  }, [user]);
+  }, [loadUserChats]);
 
   const handleNewChatConfirm = async (formData) => {
     // Se temos a função de confirmação do chat principal, usa ela (com redirecionamento)
@@ -166,8 +166,8 @@ export function ChatSidebar({
     return ChatService.formatTimestamp(thread.updatedAt || new Date());
   };
 
-  // LOG para depuração do Sidebar
-  console.log("Sidebar userChats:", userChats);
+  // LOG para depuração do Sidebar - removido para evitar logs excessivos
+  // console.log("Sidebar userChats:", userChats);
 
   // Agrupa por chat_id, mantendo apenas a sessão mais alta
   const latestChats = {};
@@ -256,15 +256,15 @@ export function ChatSidebar({
                   const isActive =
                     currentThread?.id === chat.chat_id ||
                     currentThread?.openaiChatId === chat.chat_id;
-                  // LOG para cada card
-                  console.log("Sidebar card:", {
-                    chat_id: chat.chat_id,
-                    sessao: chat.sessao,
-                    status: chatReviews[chat.chat_id]
-                      ? "FINALIZADO"
-                      : "EM ANDAMENTO",
-                    chat,
-                  });
+                  // LOG para cada card - removido para evitar logs excessivos
+                  // console.log("Sidebar card:", {
+                  //   chat_id: chat.chat_id,
+                  //   sessao: chat.sessao,
+                  //   status: chatReviews[chat.chat_id]
+                  //     ? "FINALIZADO"
+                  //     : "EM ANDAMENTO",
+                  //   chat,
+                  // });
 
                   return (
                     <div

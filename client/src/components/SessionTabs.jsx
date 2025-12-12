@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,17 +16,177 @@ export function SessionTabs({
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSession, setActiveSession] = useState(null);
+  const lastThreadIdRef = useRef(null);
+  const lastChatIdRef = useRef(null);
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
-    if (threadId) {
-      loadSessions();
+    // Evitar chamadas duplicadas
+    if (isLoadingRef.current) {
+      console.log("SessionTabs: Já está carregando, ignorando chamada duplicada");
+      return;
     }
-  }, [threadId]);
+
+    // Verificar se realmente mudou
+    const threadIdChanged = lastThreadIdRef.current !== threadId;
+    const chatIdChanged = lastChatIdRef.current !== currentChatId;
+
+    if (!threadIdChanged && !chatIdChanged) {
+      console.log("SessionTabs: threadId e currentChatId não mudaram, ignorando");
+      return;
+    }
+
+    // Atualizar refs
+    lastThreadIdRef.current = threadId;
+    lastChatIdRef.current = currentChatId;
+
+    // Se temos threadId, usar ele. Se não, usar currentChatId para buscar por chat_id
+    if (threadId) {
+      console.log("SessionTabs: useEffect triggered, threadId:", threadId);
+      loadSessions();
+    } else if (currentChatId) {
+      console.log("SessionTabs: threadId não disponível, buscando por currentChatId:", currentChatId);
+      loadSessionsByChatId();
+    } else {
+      console.log("SessionTabs: threadId e currentChatId não disponíveis, clearing sessions");
+      setSessions([]);
+      setLoading(false);
+    }
+  }, [threadId, currentChatId]);
+
+  // Atualizar activeSession quando currentChatId mudar
+  const lastActiveSessionRef = useRef(null);
+  useEffect(() => {
+    if (currentChatId && sessions.length > 0) {
+      const currentSession = sessions.find(
+        (s) => s.chat_id === currentChatId,
+      );
+      if (currentSession) {
+        const newActiveSession = currentSession.sessao.toString();
+        // Só atualizar se realmente mudou para evitar loops
+        if (lastActiveSessionRef.current !== newActiveSession && activeSession !== newActiveSession) {
+          setActiveSession(newActiveSession);
+          lastActiveSessionRef.current = newActiveSession;
+        }
+      }
+    }
+  }, [currentChatId, sessions]); // Removido activeSession das dependências para evitar loop
+
+  // Buscar sessões por chat_id (quando thread_id está vazio)
+  const loadSessionsByChatId = async () => {
+    if (isLoadingRef.current) {
+      console.log("SessionTabs: loadSessionsByChatId já em execução, ignorando");
+      return;
+    }
+
+    try {
+      isLoadingRef.current = true;
+      setLoading(true);
+      console.log("SessionTabs: Loading sessions by chat_id:", currentChatId);
+
+      if (!currentChatId) {
+        console.warn("SessionTabs: currentChatId is null or undefined, cannot load sessions");
+        setSessions([]);
+        setLoading(false);
+        isLoadingRef.current = false;
+        return;
+      }
+
+      // Buscar todas as sessões com o mesmo chat_id
+      const { data: chatThreads, error: threadsError } = await supabase
+        .from("chat_threads")
+        .select("*")
+        .eq("chat_id", currentChatId)
+        .order("sessao", { ascending: true });
+
+      if (threadsError) {
+        console.error("SessionTabs: Erro ao buscar chat_threads por chat_id:", threadsError);
+        setSessions([]);
+        isLoadingRef.current = false;
+        return;
+      }
+
+      console.log("SessionTabs: Chat threads encontrados por chat_id:", chatThreads?.length || 0, "sessões", chatThreads);
+
+      // Processar sessões (mesma lógica do loadSessions)
+      await processSessions(chatThreads || []);
+    } catch (error) {
+      console.error("SessionTabs: Error loading sessions by chat_id:", error);
+      setSessions([]);
+    } finally {
+      setLoading(false);
+      isLoadingRef.current = false;
+    }
+  };
+
+  // Processar e enriquecer sessões com status de review
+  const processSessions = async (chatThreads) => {
+    const sessionsWithStatus = await Promise.all(
+      chatThreads.map(async (thread) => {
+        // Verificar se existe review para este chat_id e sessao
+        const { data: review, error: reviewError } = await supabase
+          .from("chat_reviews")
+          .select("*")
+          .eq("chat_id", thread.chat_id)
+          .eq("sessao", thread.sessao)
+          .single();
+
+        const hasReview = !reviewError && review;
+        console.log(`Session ${thread.sessao} - has review:`, hasReview);
+
+        return {
+          chat_id: thread.chat_id,
+          thread_id: thread.thread_id,
+          diagnostico: thread.diagnostico,
+          protocolo: thread.protocolo,
+          sessao: thread.sessao,
+          created_at: thread.created_at,
+          status: hasReview ? "finalizado" : "em_andamento",
+          chat_reviews: hasReview
+            ? [
+                {
+                  id: review.id,
+                  resumo_atendimento: review.resumo_atendimento || "",
+                  created_at: review.created_at,
+                },
+              ]
+            : [],
+        };
+      }),
+    );
+
+    console.log("SessionTabs: Sessions with status:", sessionsWithStatus);
+    setSessions(sessionsWithStatus);
+
+    // Encontrar a sessão atual baseada no currentChatId
+    const currentSession = sessionsWithStatus.find(
+      (s) => s.chat_id === currentChatId,
+    );
+    if (currentSession) {
+      setActiveSession(currentSession.sessao.toString());
+    } else if (sessionsWithStatus.length > 0) {
+      setActiveSession(sessionsWithStatus[0].sessao.toString());
+    }
+  };
 
   const loadSessions = async () => {
+    if (isLoadingRef.current) {
+      console.log("SessionTabs: loadSessions já em execução, ignorando");
+      return;
+    }
+
     try {
+      isLoadingRef.current = true;
       setLoading(true);
-      console.log("Loading sessions for threadId:", threadId);
+      console.log("SessionTabs: Loading sessions for threadId:", threadId);
+
+      if (!threadId) {
+        console.warn("SessionTabs: threadId is null or undefined, cannot load sessions");
+        setSessions([]);
+        setLoading(false);
+        isLoadingRef.current = false;
+        return;
+      }
 
       // Buscar sessões diretamente das tabelas
       const { data: chatThreads, error: threadsError } = await supabase
@@ -36,65 +196,22 @@ export function SessionTabs({
         .order("sessao", { ascending: true });
 
       if (threadsError) {
-        console.error("Erro ao buscar chat_threads:", threadsError);
+        console.error("SessionTabs: Erro ao buscar chat_threads:", threadsError);
         setSessions([]);
+        isLoadingRef.current = false;
         return;
       }
 
-      console.log("Chat threads data:", chatThreads);
+      console.log("SessionTabs: Chat threads data encontrados:", chatThreads?.length || 0, "sessões", chatThreads);
 
-      // Para cada sessão, verificar se existe review
-      const sessionsWithStatus = await Promise.all(
-        (chatThreads || []).map(async (thread) => {
-          // Verificar se existe review para este chat_id e sessao
-          const { data: review, error: reviewError } = await supabase
-            .from("chat_reviews")
-            .select("*")
-            .eq("chat_id", thread.chat_id)
-            .eq("sessao", thread.sessao)
-            .single();
-
-          const hasReview = !reviewError && review;
-          console.log(`Session ${thread.sessao} - has review:`, hasReview);
-
-          return {
-            chat_id: thread.chat_id,
-            thread_id: thread.thread_id,
-            diagnostico: thread.diagnostico,
-            protocolo: thread.protocolo,
-            sessao: thread.sessao,
-            created_at: thread.created_at,
-            status: hasReview ? "finalizado" : "em_andamento",
-            chat_reviews: hasReview
-              ? [
-                  {
-                    id: review.id,
-                    resumo_atendimento: review.resumo_atendimento || "",
-                    created_at: review.created_at,
-                  },
-                ]
-              : [],
-          };
-        }),
-      );
-
-      console.log("Sessions with status:", sessionsWithStatus);
-      setSessions(sessionsWithStatus);
-
-      // Encontrar a sessão atual baseada no currentChatId
-      const currentSession = sessionsWithStatus.find(
-        (s) => s.chat_id === currentChatId,
-      );
-      if (currentSession) {
-        setActiveSession(currentSession.sessao.toString());
-      } else if (sessionsWithStatus.length > 0) {
-        setActiveSession(sessionsWithStatus[0].sessao.toString());
-      }
+      // Processar sessões (reutiliza a função comum)
+      await processSessions(chatThreads || []);
     } catch (error) {
       console.error("Error loading sessions:", error);
       setSessions([]);
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   };
 
@@ -119,12 +236,22 @@ export function SessionTabs({
   }
 
   if (!sessions.length) {
+    console.warn("SessionTabs: Nenhuma sessão encontrada. threadId:", threadId, "currentChatId:", currentChatId);
     return (
       <div className={`flex items-center justify-center p-4 ${className}`}>
         <div className="text-sm text-gray-500">Nenhuma sessão encontrada</div>
       </div>
     );
   }
+
+  // Só mostrar as tabs se houver 2 ou mais sessões
+  // Se houver apenas 1 sessão, não há necessidade de mostrar tabs de navegação
+  if (sessions.length < 2) {
+    console.log("SessionTabs: Apenas 1 sessão encontrada, não mostrando tabs. sessions.length:", sessions.length, "sessions:", sessions);
+    return null;
+  }
+
+  // console.log("SessionTabs: ✅ Renderizando tabs com", sessions.length, "sessões", "threadId:", threadId, "currentChatId:", currentChatId, "sessions:", sessions); // Removido para evitar logs excessivos
 
   return (
     <div className={`border-b bg-white ${className}`}>
@@ -136,7 +263,7 @@ export function SessionTabs({
         <div className="flex items-center justify-between px-4 py-2">
           <TabsList className="flex-1 justify-start bg-gray-50">
             {sessions.map((session) => {
-              console.log("SessionTab:", session, "Status:", session.status);
+              // console.log("SessionTab:", session, "Status:", session.status); // Removido para evitar logs excessivos
               return (
                 <TabsTrigger
                   key={session.sessao}

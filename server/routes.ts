@@ -38,7 +38,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(review);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const errorMessage = error?.message || error?.toString() || "";
+      console.error("Error in /api/reviews/:chatId:", {
+        chatId: req.params.chatId,
+        error: errorMessage,
+        errorType: error?.name || "Unknown"
+      });
+      
+      // Detectar erros de autenticação, conexão ou circuit breaker transitórios
+      if (errorMessage.includes("authentication") ||
+          errorMessage.includes("password authentication failed") ||
+          errorMessage.includes("JWT") ||
+          errorMessage.includes("too many") ||
+          errorMessage.includes("connection") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("timeout") ||
+          errorMessage.includes("Circuit breaker") ||
+          errorMessage.includes("circuit breaker open")) {
+        // Retornar 503 (Service Unavailable) para erros transitórios
+        // Permitir que a UI continue funcionando sem o review
+        return res.status(503).json({ 
+          error: "Serviço temporariamente indisponível",
+          message: "Não foi possível buscar o review no momento. A navegação continua disponível.",
+          retryAfter: 60 // Sugerir retry após 60 segundos
+        });
+      }
+      
+      // Para outros erros, retornar 500
+      res.status(500).json({ error: errorMessage });
     }
   });
 
@@ -49,13 +76,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId || !diagnosticoCodigo) {
         return res.status(400).json({ error: "userId and diagnosticoCodigo are required" });
       }
+      
+      // Validar acesso (o AccessValidator já trata erros internamente)
       const result = await AccessValidator.canUserAccessDiagnostico(
         userId as string,
         diagnosticoCodigo as string
       );
+      
+      // Se houver erro temporário, retornar 503
+      if (!result.canAccess && 
+          result.reason?.includes("temporário") || 
+          result.reason?.includes("conexão")) {
+        return res.status(503).json({
+          canAccess: false,
+          reason: result.reason,
+          retryAfter: 60
+        });
+      }
+      
       res.json(result);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Error in /api/access/validate:", {
+        userId: req.query.userId,
+        diagnosticoCodigo: req.query.diagnosticoCodigo,
+        error: error?.message || error?.toString(),
+        errorType: error?.name || "Unknown"
+      });
+      
+      const errorMessage = error?.message || error?.toString() || "";
+      
+      // Detectar erros de autenticação ou conexão transitórios
+      if (errorMessage.includes("authentication") ||
+          errorMessage.includes("password authentication failed") ||
+          errorMessage.includes("JWT") ||
+          errorMessage.includes("connection") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("timeout")) {
+        return res.status(503).json({
+          canAccess: false,
+          reason: "Erro temporário de conexão com o banco de dados. Por favor, aguarde alguns instantes e tente novamente.",
+          retryAfter: 60
+        });
+      }
+      
+      res.status(500).json({ 
+        canAccess: false,
+        reason: `Erro ao validar acesso: ${errorMessage}`
+      });
     }
   });
 
@@ -351,6 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Chat IA endpoint - handles both text and audio responses
   app.post("/api/landeiro-chat-ia", async (req, res) => {
+    console.log("Received request to /api/landeiro-chat-ia:", req.body);
     try {
       const { message, chat_id, email, user_email } = req.body;
 
@@ -364,7 +432,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add other fields from original request if they exist
       if (req.body.diagnostico) requestBody.diagnostico = req.body.diagnostico;
       if (req.body.protocolo) requestBody.protocolo = req.body.protocolo;
+      if (req.body.sessao !== undefined && req.body.sessao !== null) {
+        requestBody.sessao = req.body.sessao;
+      }
 
+      console.log("Received request body:", req.body);
       console.log("Sending request to external AI service:", requestBody);
 
       // Make request to external AI service
@@ -809,7 +881,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await AdminService.getSystemStats();
       res.json(stats);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Error in /api/admin/stats:", {
+        error: error?.message || error?.toString(),
+        errorType: error?.name || "Unknown"
+      });
+      const errorMessage = error?.message || error?.toString() || "";
+      
+      // Detectar erros de autenticação ou conexão transitórios
+      if (errorMessage.includes("authentication") ||
+          errorMessage.includes("password authentication failed") ||
+          errorMessage.includes("JWT") ||
+          errorMessage.includes("connection") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("timeout")) {
+        return res.status(503).json({ 
+          error: "Erro temporário de conexão com o banco de dados. Por favor, aguarde alguns instantes e tente novamente.",
+          retryAfter: 60
+        });
+      }
+      
+      res.status(500).json({ error: errorMessage });
     }
   });
 
@@ -819,7 +910,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await AdminService.getUserStats(userId);
       res.json(stats);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Error in /api/admin/stats/users/:userId:", {
+        userId: req.params.userId,
+        error: error?.message || error?.toString(),
+        errorType: error?.name || "Unknown"
+      });
+      const errorMessage = error?.message || error?.toString() || "";
+      
+      // Detectar erros de autenticação ou conexão transitórios
+      if (errorMessage.includes("authentication") ||
+          errorMessage.includes("password authentication failed") ||
+          errorMessage.includes("JWT") ||
+          errorMessage.includes("connection") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("timeout")) {
+        return res.status(503).json({ 
+          error: "Erro temporário de conexão com o banco de dados. Por favor, aguarde alguns instantes e tente novamente.",
+          retryAfter: 60
+        });
+      }
+      
+      res.status(500).json({ error: errorMessage });
     }
   });
 
@@ -859,7 +970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Convert to CSV
         const headers = ["Data", "Usuário", "Sessão", "Remetente", "Mensagem", "Tipo"];
         const rows = messages.map((msg) => [
-          new Date(msg.createdAt).toISOString(),
+          msg.createdAt ? new Date(msg.createdAt).toISOString() : "",
           msg.userId,
           msg.sessao.toString(),
           msg.sender,
@@ -896,7 +1007,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (format === "csv") {
         const headers = ["Data", "Usuário", "Sessão", "Remetente", "Mensagem", "Tipo"];
         const rows = messages.map((msg) => [
-          new Date(msg.createdAt).toISOString(),
+          msg.createdAt ? new Date(msg.createdAt).toISOString() : "",
           msg.userId,
           msg.sessao.toString(),
           msg.sender,
@@ -932,7 +1043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (format === "csv") {
         const headers = ["Data", "Usuário", "Sessão", "Remetente", "Mensagem", "Tipo"];
         const rows = messages.map((msg) => [
-          new Date(msg.createdAt).toISOString(),
+          msg.createdAt ? new Date(msg.createdAt).toISOString() : "",
           msg.userId,
           msg.sessao.toString(),
           msg.sender,

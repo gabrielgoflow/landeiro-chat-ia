@@ -175,8 +175,25 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
       }
 
       // Verificar acesso via API (data final de acesso)
-      const response = await fetch(`/api/access/validate?userId=${user.id}&diagnosticoCodigo=${formData.diagnostico}`);
-      const result = await response.json();
+      let result;
+      try {
+        const response = await fetch(`/api/access/validate?userId=${user.id}&diagnosticoCodigo=${formData.diagnostico}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        result = await response.json();
+      } catch (error) {
+        console.error("Erro ao validar acesso:", error);
+        toast({
+          title: "Erro de Conexão",
+          description: "Não foi possível validar o acesso. O serviço pode estar temporariamente indisponível. Por favor, aguarde alguns minutos e tente novamente.",
+          variant: "destructive",
+        });
+        setValidating(false);
+        return;
+      }
 
       if (!result.canAccess) {
         toast({
@@ -184,20 +201,33 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
           description: result.reason || "Você não tem acesso a este diagnóstico",
           variant: "destructive",
         });
+        setValidating(false);
         return;
       }
 
       onConfirm(formData);
       setFormData({ diagnostico: "", protocolo: "tcc" });
       onOpenChange(false);
+      setValidating(false);
     } catch (error) {
       console.error("Erro ao validar acesso:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao validar acesso. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
+      const errorMessage = error?.message || error?.toString() || "";
+      if (errorMessage.includes("temporário") || 
+          errorMessage.includes("temporariamente indisponível") ||
+          errorMessage.includes("conexão") ||
+          errorMessage.includes("authentication")) {
+        toast({
+          title: "Erro de Conexão",
+          description: "Erro temporário de conexão. Por favor, aguarde alguns instantes e tente novamente.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: "Erro ao validar acesso. Tente novamente.",
+          variant: "destructive",
+        });
+      }
       setValidating(false);
     }
   };

@@ -54,6 +54,9 @@ export default function Chat() {
     clearError,
   } = useChat();
 
+  const currentChatId = selectedSessionId || currentThread?.id;
+  const currentSessao = selectedSessaoNumber || currentThread?.sessionData?.sessao;
+
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -134,14 +137,58 @@ export default function Chat() {
 
   // Extract threadId from current thread
   useEffect(() => {
+    console.log('[DEBUG] Extract threadId - currentThread:', currentThread, 'currentChatId:', currentChatId);
     if (currentThread?.threadId) {
+      console.log('[DEBUG] Setting threadId from currentThread.threadId:', currentThread.threadId);
       setThreadId(currentThread.threadId);
       setCurrentSessionData(currentThread.sessionData);
+    } else if (currentThread?.id || currentChatId) {
+      // Se não tem threadId no currentThread, buscar do Supabase
+      const chatIdToSearch = currentThread?.id || currentChatId;
+      console.log('[DEBUG] threadId não encontrado no currentThread, buscando do Supabase para chat_id:', chatIdToSearch);
+      const fetchThreadId = async () => {
+        try {
+          // Primeiro tenta buscar com .single() (caso haja apenas um registro)
+          let { data, error } = await supabase
+            .from('chat_threads')
+            .select('thread_id')
+            .eq('chat_id', chatIdToSearch)
+            .maybeSingle();
+          
+          // Se não encontrou com .single(), tenta buscar todos e pegar o primeiro
+          if (!data && !error) {
+            console.log('[DEBUG] Tentando buscar sem .single()...');
+            const { data: allData, error: allError } = await supabase
+              .from('chat_threads')
+              .select('thread_id')
+              .eq('chat_id', chatIdToSearch)
+              .limit(1);
+            
+            if (allData && allData.length > 0) {
+              data = allData[0];
+              error = allError;
+            }
+          }
+          
+          if (data && !error) {
+            console.log('[DEBUG] ✅ threadId encontrado no Supabase:', data.thread_id);
+            setThreadId(data.thread_id);
+          } else {
+            console.warn('[DEBUG] ❌ Não foi possível encontrar thread_id no Supabase para chat_id:', chatIdToSearch, 'error:', error);
+            setThreadId(null);
+          }
+        } catch (err) {
+          console.error('[DEBUG] Erro ao buscar thread_id:', err);
+          setThreadId(null);
+        }
+      };
+      fetchThreadId();
     } else {
+      console.log('[DEBUG] currentThread não tem threadId nem id, limpando threadId');
       setThreadId(null);
       setCurrentSessionData(null);
     }
-  }, [currentThread, chatId]);
+  }, [currentThread, chatId, currentChatId]);
 
   // Check if current chat has a review - CONSOLIDADO e corrigido para usar sessão selecionada
   useEffect(() => {
@@ -305,6 +352,8 @@ export default function Chat() {
           },
           body: JSON.stringify({
             chat_id: currentThread.id,
+            sessao: currentThread.sessionData?.sessao,
+            diagnostico: currentThread.sessionData?.diagnostico,
           }),
         },
       );
@@ -625,11 +674,11 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Session Tabs - only show if we have a threadId */}
-        {threadId && (
+        {/* Session Tabs - show if we have threadId OR currentChatId (para casos onde thread_id está vazio) */}
+        {(threadId || currentChatId) && (
           <SessionTabs
             threadId={threadId}
-            currentChatId={currentThread?.id}
+            currentChatId={currentChatId}
             onSessionChange={handleSessionChange}
             onNewSession={handleNewSessionFromTabs}
             className="border-b"

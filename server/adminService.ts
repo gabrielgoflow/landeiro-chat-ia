@@ -556,24 +556,44 @@ export class AdminService {
   static async getSystemStats() {
     if (!db) throw new Error("Database not connected");
 
-    const [
-      totalUsers,
-      totalSessions,
-      totalMessages,
-      totalCost,
-    ] = await Promise.all([
-      db.select({ count: sql<number>`count(distinct ${userMetadata.userId})` }).from(userMetadata),
-      db.select({ count: sql<number>`count(*)` }).from(chatThreads),
-      db.select({ count: sql<number>`count(*)` }).from(chatMessages),
-      db.select({ sum: sql<number>`coalesce(sum(${sessionCosts.costAmount}), 0)` }).from(sessionCosts),
-    ]);
+    try {
+      const [
+        totalUsers,
+        totalSessions,
+        totalMessages,
+        totalCost,
+      ] = await Promise.all([
+        db.select({ count: sql<number>`count(distinct ${userMetadata.userId})` }).from(userMetadata),
+        db.select({ count: sql<number>`count(*)` }).from(chatThreads),
+        db.select({ count: sql<number>`count(*)` }).from(chatMessages),
+        db.select({ sum: sql<number>`coalesce(sum(${sessionCosts.costAmount}), 0)` }).from(sessionCosts),
+      ]);
 
-    return {
-      totalUsers: Number(totalUsers[0]?.count || 0),
-      totalSessions: Number(totalSessions[0]?.count || 0),
-      totalMessages: Number(totalMessages[0]?.count || 0),
-      totalCost: Number(totalCost[0]?.sum || 0),
-    };
+      return {
+        totalUsers: Number(totalUsers[0]?.count || 0),
+        totalSessions: Number(totalSessions[0]?.count || 0),
+        totalMessages: Number(totalMessages[0]?.count || 0),
+        totalCost: Number(totalCost[0]?.sum || 0),
+      };
+    } catch (error: any) {
+      const errorMessage = error?.message || error?.toString() || "";
+      console.error("Error in getSystemStats:", {
+        error: errorMessage,
+        errorType: error?.name || "Unknown"
+      });
+      
+      // Detectar erros de autenticação ou conexão transitórios
+      if (errorMessage.includes("authentication") ||
+          errorMessage.includes("password authentication failed") ||
+          errorMessage.includes("JWT") ||
+          errorMessage.includes("connection") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("timeout")) {
+        throw new Error("Erro temporário de conexão com o banco de dados");
+      }
+      
+      throw error;
+    }
   }
 
   /**
