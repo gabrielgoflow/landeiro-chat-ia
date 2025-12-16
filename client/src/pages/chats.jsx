@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabaseService } from "@/services/supabaseService";
-import { Plus, MessageSquare, Calendar, User, LogOut } from "lucide-react";
+import { Plus, MessageSquare, Calendar, User, LogOut, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DiagnosticFilterSidebar } from "@/components/DiagnosticFilterSidebar.jsx";
+import { useIsMobile } from "@/hooks/use-mobile.jsx";
 
 export default function ChatsPage() {
   const { user, signOut } = useAuth();
@@ -25,6 +26,8 @@ export default function ChatsPage() {
   const [loading, setLoading] = useState(true);
   const [chatReviews, setChatReviews] = useState({});
   const [selectedDiagnostico, setSelectedDiagnostico] = useState(null);
+  const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (user) {
@@ -116,21 +119,34 @@ export default function ChatsPage() {
         selectedDiagnostico={selectedDiagnostico}
         onSelectDiagnostico={setSelectedDiagnostico}
         userChats={userChats}
+        isOpen={isFilterSidebarOpen}
+        onClose={() => setIsFilterSidebarOpen(false)}
       />
 
       {/* Conteúdo Principal */}
       <div className="flex-1 flex flex-col">
       {/* Header */}
       <div className="bg-white border-b">
-        <div className="w-full mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <User className="h-8 w-8 text-blue-600" />
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">
+        <div className="w-full mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
+            <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFilterSidebarOpen(true)}
+                  className="p-1.5 sm:p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  data-testid="open-filter-sidebar-button"
+                >
+                  <Filter className="h-4 w-4" />
+                </Button>
+              )}
+              <User className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
+              <div className="flex-1 sm:flex-initial min-w-0">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">
                   Seus Atendimentos
                 </h2>
-                <p className="text-gray-600">
+                <p className="text-sm sm:text-base text-gray-600">
                   Gerencie suas conversas de terapia
                 </p>
               </div>
@@ -148,7 +164,7 @@ export default function ChatsPage() {
                       {user?.email?.charAt(0).toUpperCase() || "U"}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm text-gray-700">{user?.email}</span>
+                  <span className="hidden sm:inline text-sm text-gray-700">{user?.email}</span>
                   <i className="fas fa-chevron-down text-xs text-gray-400"></i>
                 </Button>
               </DropdownMenuTrigger>
@@ -175,26 +191,27 @@ export default function ChatsPage() {
       </div>
 
       {/* Content */}
-      <div className="w-full mx-auto px-4 py-8 overflow-y-auto h-[80vh]">
+      <div className="w-full mx-auto px-4 sm:px-6 py-4 sm:py-8 overflow-y-auto h-[80vh]">
         {/* Header with New Chat Button */}
-        <div className="flex justify-end mb-6">
+        <div className="flex justify-end mb-4 sm:mb-6">
           <Button
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base"
             data-testid="button-new-chat"
             onClick={() => navigate("/chat/new")}
           >
-            <Plus className="h-5 w-5 mr-2" />
-            Nova Conversa
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Nova Conversa</span>
+            <span className="sm:hidden">Nova</span>
           </Button>
         </div>
 
         {chatsToShow.length === 0 ? (
-          <div className="text-center py-12">
-            <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <div className="text-center py-8 sm:py-12">
+            <MessageSquare className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-3 sm:mb-4" />
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
               Nenhuma conversa ainda
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 px-4">
               Comece sua jornada de autoconhecimento criando sua primeira
               conversa
             </p>
@@ -209,7 +226,7 @@ export default function ChatsPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {chatsToShow.map((chat) => {
               // Badge de status
               const statusBadge =
@@ -243,7 +260,7 @@ export default function ChatsPage() {
               return (
                 <Link key={chat.chat_id} href={`/chat/${chat.chat_id}`}>
                   <Card
-                    className="hover:shadow-lg transition-shadow cursor-pointer h-full relative"
+                    className="hover:shadow-lg transition-shadow cursor-pointer h-full relative bg-white"
                     data-testid={`card-chat-${chat.chat_id}`}
                   >
                     {/* Status Tag */}
@@ -251,10 +268,10 @@ export default function ChatsPage() {
                       {statusBadge}
                       {sessionBadge}
                     </div>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between pr-20">
-                        <MessageSquare className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
-                        <div className="flex flex-col space-y-2 ml-3 flex-1">
+                    <CardHeader className="pb-2 sm:pb-3">
+                      <div className="flex items-start justify-between pr-16 sm:pr-20">
+                        <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 flex-shrink-0 mt-1" />
+                        <div className="flex flex-col space-y-1.5 sm:space-y-2 ml-2 sm:ml-3 flex-1">
                           <Badge variant="secondary" className="w-fit">
                             {(chat.diagnostico || "Diagnóstico").toUpperCase()}
                           </Badge>
@@ -265,19 +282,19 @@ export default function ChatsPage() {
                       </div>
                     </CardHeader>
                     <CardContent className="pt-0">
-                      <div className="space-y-3">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          {lastMessageDate}
+                      <div className="space-y-2 sm:space-y-3">
+                        <div className="flex items-center text-xs sm:text-sm text-gray-600">
+                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                          <span className="truncate">{lastMessageDate}</span>
                         </div>
-                        <div className="text-sm text-gray-800">
+                        <div className="text-xs sm:text-sm text-gray-800">
                           <strong>ID:</strong> {chat.chat_id.substring(0, 8)}...
                         </div>
-                        <div className="border-t pt-3">
+                        <div className="border-t pt-2 sm:pt-3">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            className="w-full text-xs sm:text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             data-testid={`button-open-${chat.chat_id}`}
                           >
                             {chat.status === "finalizado"

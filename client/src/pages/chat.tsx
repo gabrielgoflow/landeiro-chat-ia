@@ -579,49 +579,50 @@ export default function Chat() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Chat Header */}
-        <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              data-testid="back-to-chats-button"
-              onClick={() => navigate("/chats")}
-            >
-              <i className="fas fa-arrow-left mr-2"></i>
-              Voltar
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              data-testid="open-sidebar-button"
-            >
-              <i className="fas fa-bars"></i>
-            </Button>
-            <Avatar className="w-8 h-8 bg-secondary">
-              <AvatarFallback className="bg-secondary text-white">
-                <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Paciente IA
-              </h2>
-              <p className="text-sm text-gray-500">
-                Online • Responde instantaneamente
-              </p>
+        <div className="bg-white border-b border-gray-200 px-2 sm:px-4 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-1.5 sm:p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                data-testid="back-to-chats-button"
+                onClick={() => navigate("/chats")}
+              >
+                <i className="fas fa-arrow-left mr-1 sm:mr-2 text-sm"></i>
+                <span className="text-xs sm:text-sm">Voltar</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden p-1.5 sm:p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                data-testid="open-sidebar-button"
+              >
+                <i className="fas fa-bars text-sm"></i>
+              </Button>
+              <Avatar className="w-6 h-6 sm:w-8 sm:h-8 bg-secondary flex-shrink-0">
+                <AvatarFallback className="bg-secondary text-white">
+                  <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-3 h-3 sm:w-4 sm:h-4" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 sm:flex-initial min-w-0">
+                <h2 className="text-sm sm:text-lg font-semibold text-gray-900 truncate">
+                  Paciente IA
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-500 truncate">
+                  Online • Responde instantaneamente
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5 sm:space-x-2 w-full sm:w-auto justify-end">
             {/* Conditional review button - only shows when review exists */}
             {hasReview && (
               <>
                 <Button
                   onClick={loadReview}
                   disabled={isLoadingReview}
-                  className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
                   data-testid="view-review-button"
                 >
                   {isLoadingReview ? (
@@ -635,7 +636,7 @@ export default function Chat() {
                 <Button
                   onClick={handleStartNextSession}
                   disabled={isStartingNextSession}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
                   data-testid="start-next-session-button"
                 >
                   {isStartingNextSession ? (
@@ -657,7 +658,7 @@ export default function Chat() {
               <Button
                 onClick={handleFinalizeChat}
                 disabled={isFinalizingChat}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="bg-green-600 hover:bg-green-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
                 data-testid="finalize-chat-button"
               >
                 {isFinalizingChat ? (
@@ -698,10 +699,10 @@ export default function Chat() {
 
         {/* Messages Container */}
         <div
-          className="flex-1 overflow-y-auto px-4 py-6 min-h-0"
+          className="flex-1 overflow-y-auto px-2 sm:px-4 py-3 sm:py-6 min-h-0"
           data-testid="messages-container"
         >
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
             {/* Welcome Message */}
             {currentMessages.length === 0 && (
               <div className="flex items-start space-x-3">
@@ -711,12 +712,12 @@ export default function Chat() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
-                    <p className="text-gray-800">
+                  <div className="bg-ai-message rounded-2xl rounded-tl-md px-3 sm:px-4 py-2 sm:py-3 max-w-md">
+                    <p className="text-sm sm:text-base text-gray-800">
                       Olá! Podemos iniciar nossa sessão?
                     </p>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 ml-1">
+                  <div className="text-[10px] sm:text-xs text-gray-500 mt-1 ml-1">
                     Agora mesmo
                   </div>
                 </div>
@@ -768,7 +769,7 @@ export default function Chat() {
 
         {/* Debug Info (Admin only) */}
         {user?.email && ["admin@goflow.digital", "admin@nexialab.com.br"].includes(user.email) && (
-          <div className="px-4 pb-2">
+          <div className="px-2 sm:px-4 pb-2">
             <Button
               variant="ghost"
               size="sm"

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/hooks/useAuth.jsx'
 import { useToast } from '@/hooks/use-toast'
+import { Logo } from '@/components/Logo'
 
 export default function Login() {
   const [, setLocation] = useLocation()
@@ -53,16 +54,16 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 sm:py-12 px-4 sm:px-6">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-12 h-12 bg-secondary rounded-lg flex items-center justify-center">
-              <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-6 h-6" />
+          <div className="text-center sm:flex sm:items-center sm:justify-center mb-3 sm:mb-4">
+            <div className="inline-block">
+              <Logo size="xl" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">Entrar na conta</CardTitle>
-          <CardDescription className="text-center">
+          <CardTitle className="text-xl sm:text-2xl text-center">Entrar na conta</CardTitle>
+          <CardDescription className="text-sm sm:text-base text-center">
             Entre com seu email e senha para acessar o chat IA
           </CardDescription>
         </CardHeader>

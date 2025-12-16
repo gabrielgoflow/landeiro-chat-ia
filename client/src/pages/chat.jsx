@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,7 +17,6 @@ import { SessionTabs } from "@/components/SessionTabs.jsx";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
 import { SessionTimer } from "@/components/SessionTimer";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function Chat() {
   const { chatId } = useParams();
@@ -70,67 +69,6 @@ export default function Chat() {
   
   const currentChatId = selectedSessionId || currentThread?.id;
   const currentSessao = selectedSessaoNumber || currentThread?.sessionData?.sessao;
-  
-  // Verificar se existe alguma sessão em andamento no mesmo chat_id
-  const [hasSessionInProgress, setHasSessionInProgress] = useState(false);
-  
-  const checkSessionsInProgress = async () => {
-    if (!currentChatId) {
-      setHasSessionInProgress(false);
-      return;
-    }
-    
-    try {
-      // Buscar todas as sessões do mesmo chat_id
-      const { data: chatThreads, error } = await supabase
-        .from("chat_threads")
-        .select("sessao")
-        .eq("chat_id", currentChatId)
-        .order("sessao", { ascending: true });
-      
-      if (error) {
-        console.error("Erro ao buscar sessões:", error);
-        setHasSessionInProgress(false);
-        return;
-      }
-      
-      if (!chatThreads || chatThreads.length === 0) {
-        setHasSessionInProgress(false);
-        return;
-      }
-      
-      // Verificar se alguma sessão está em andamento (não tem review)
-      const sessionsToCheck = chatThreads.map(t => t.sessao);
-      const reviewChecks = await Promise.all(
-        sessionsToCheck.map(async (sessao) => {
-          const { data: review, error: reviewError } = await supabase
-            .from("chat_reviews")
-            .select("id")
-            .eq("chat_id", currentChatId)
-            .eq("sessao", sessao)
-            .single();
-          return !reviewError && review;
-        })
-      );
-      
-      // Se alguma sessão não tem review, está em andamento
-      const hasInProgress = reviewChecks.some(hasReview => !hasReview);
-      setHasSessionInProgress(hasInProgress);
-      console.log("Sessões em andamento verificadas:", {
-        currentChatId,
-        sessions: sessionsToCheck,
-        reviews: reviewChecks,
-        hasInProgress
-      });
-    } catch (error) {
-      console.error("Erro ao verificar sessões em andamento:", error);
-      setHasSessionInProgress(false);
-    }
-  };
-  
-  useEffect(() => {
-    checkSessionsInProgress();
-  }, [currentChatId, hasReview, isCurrentSessionFinalized]);
   
   const { timeRemaining, isExpired: isSessionExpired } = useSessionTimer(
     currentChatId,
@@ -518,12 +456,6 @@ export default function Chat() {
           setIsCurrentSessionFinalized(true);
           setShowReviewSidebar(true);
           
-          // Aguardar um pouco para garantir que o review foi salvo no banco
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Verificar novamente as sessões em andamento após criar o review
-          await checkSessionsInProgress();
-          
           console.log('ReviewSidebar should now be visible with data');
         } else {
           console.error("Error saving review:", saveResponse.status);
@@ -700,43 +632,44 @@ export default function Chat() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Chat Header */}
-        <div className="bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              data-testid="back-to-chats-button"
-              onClick={() => navigate("/chats")}
-            >
-              <i className="fas fa-arrow-left mr-2"></i>
-              Voltar
-            </Button>
+        <div className="bg-white border-b border-gray-200 px-2 sm:px-4 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-1.5 sm:p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                data-testid="back-to-chats-button"
+                onClick={() => navigate("/chats")}
+              >
+                <i className="fas fa-arrow-left mr-1 sm:mr-2 text-sm"></i>
+                <span className="text-xs sm:text-sm">Voltar</span>
+              </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              data-testid="open-sidebar-button"
-            >
-              <i className="fas fa-bars"></i>
-            </Button>
-            <Avatar className="w-8 h-8 bg-secondary">
-              <AvatarFallback className="bg-secondary text-white">
-                <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Paciente IA
-              </h2>
-              <p className="text-sm text-gray-500">
-                Online • Responde instantaneamente
-              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden p-1.5 sm:p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                data-testid="open-sidebar-button"
+              >
+                <i className="fas fa-bars text-sm"></i>
+              </Button>
+              <Avatar className="w-6 h-6 sm:w-8 sm:h-8 bg-secondary flex-shrink-0">
+                <AvatarFallback className="bg-secondary text-white">
+                  <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-3 h-3 sm:w-4 sm:h-4" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 sm:flex-initial min-w-0">
+                <h2 className="text-sm sm:text-lg font-semibold text-gray-900 truncate">
+                  Paciente IA
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-500 truncate">
+                  Online • Responde instantaneamente
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5 sm:space-x-2 w-full sm:w-auto justify-end">
             {/* Session Timer */}
             {selectedSessionId && timeRemaining !== null && (
               <SessionTimer 
@@ -764,37 +697,24 @@ export default function Chat() {
                   Ver Review
                 </Button>
 
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button
-                          onClick={handleStartNextSession}
-                          disabled={isStartingNextSession || hasSessionInProgress}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          data-testid="start-next-session-button"
-                        >
-                          {isStartingNextSession ? (
-                            <>
-                              <i className="fas fa-spinner fa-spin mr-2"></i>
-                              Iniciando...
-                            </>
-                          ) : (
-                            <>
-                              <i className="fas fa-play mr-2"></i>
-                              Iniciar Próxima Sessão
-                            </>
-                          )}
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    {hasSessionInProgress && (
-                      <TooltipContent side="bottom">
-                        <p className="max-w-xs">Finalize o atendimento e aguarde o review antes de iniciar nova sessão</p>
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
+                <Button
+                  onClick={handleStartNextSession}
+                  disabled={isStartingNextSession}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
+                  data-testid="start-next-session-button"
+                >
+                  {isStartingNextSession ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin mr-2"></i>
+                      Iniciando...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-play mr-2"></i>
+                      Iniciar Próxima Sessão
+                    </>
+                  )}
+                </Button>
               </>
             )}
 
@@ -802,7 +722,7 @@ export default function Chat() {
               <Button
                 onClick={handleFinalizeChat}
                 disabled={isFinalizingChat}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="bg-green-600 hover:bg-green-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
                 data-testid="finalize-chat-button"
               >
                 {isFinalizingChat ? (
@@ -821,11 +741,12 @@ export default function Chat() {
             <Button
               variant="ghost"
               size="sm"
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              className="p-1.5 sm:p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
               data-testid="settings-button"
             >
-              <i className="fas fa-cog"></i>
+              <i className="fas fa-cog text-sm"></i>
             </Button>
+            </div>
           </div>
         </div>
 
@@ -842,10 +763,10 @@ export default function Chat() {
 
         {/* Messages Container */}
         <div
-          className="flex-1 overflow-y-auto px-4 py-6 min-h-0"
+          className="flex-1 overflow-y-auto px-2 sm:px-4 py-3 sm:py-6 min-h-0"
           data-testid="messages-container"
         >
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
             {/* Welcome Message */}
             {currentMessages.length === 0 && (
               <div className="flex items-start space-x-3">
@@ -855,12 +776,12 @@ export default function Chat() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <div className="bg-ai-message rounded-2xl rounded-tl-md px-4 py-3 max-w-md">
-                    <p className="text-gray-800">
+                  <div className="bg-ai-message rounded-2xl rounded-tl-md px-3 sm:px-4 py-2 sm:py-3 max-w-md">
+                    <p className="text-sm sm:text-base text-gray-800">
                       Olá! Podemos iniciar nossa sessão?
                     </p>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 ml-1">
+                  <div className="text-[10px] sm:text-xs text-gray-500 mt-1 ml-1">
                     Agora mesmo
                   </div>
                 </div>
@@ -913,7 +834,7 @@ export default function Chat() {
 
         {/* Debug Info (Admin only) */}
         {user?.email && ["admin@goflow.digital", "admin@nexialab.com.br"].includes(user.email) && (
-          <div className="px-4 pb-2">
+          <div className="px-2 sm:px-4 pb-2">
             <Button
               variant="ghost"
               size="sm"

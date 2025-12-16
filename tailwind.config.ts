@@ -61,6 +61,18 @@ export default {
           border: "var(--sidebar-border)",
           ring: "var(--sidebar-ring)",
         },
+        // Cores Pantone Grupo PBE
+        pantone: {
+          6126: "#00609D", // Azul escuro - Primary
+          2400: "#00A88A", // Verde-azulado - Secondary
+          656: "#DFE6EF", // Azul claro - Muted
+          6224: "#3D5155", // Cinza escuro - Foreground
+        },
+      },
+      backgroundImage: {
+        "gradient-pbe": "var(--gradient-pbe)",
+        "gradient-pbe-reverse": "var(--gradient-pbe-reverse)",
+        "gradient-pbe-vertical": "var(--gradient-pbe-vertical)",
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

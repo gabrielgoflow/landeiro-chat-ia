@@ -6,36 +6,41 @@
 
 :root {
   --background: hsl(0 0% 100%);
-  --foreground: hsl(210 25% 7.8431%);
+  --foreground: hsl(186 16% 28%); /* PANTONE 6224 #3D5155 - Cinza escuro */
   --card: hsl(180 6.6667% 97.0588%);
-  --card-foreground: hsl(210 25% 7.8431%);
+  --card-foreground: hsl(186 16% 28%); /* PANTONE 6224 #3D5155 */
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(210 25% 7.8431%);
-  /* Nova paleta */
-  --primary: hsl(45 88% 58%); /* #F2C336 */
-  --primary-foreground: hsl(282 72% 14%); /* usar roxo escuro no texto sobre o amarelo */
-  --secondary: hsl(282 72% 14%); /* #2e0a3d */
+  --popover-foreground: hsl(186 16% 28%); /* PANTONE 6224 #3D5155 */
+  /* Paleta Grupo PBE - Pantone */
+  --primary: hsl(201 100% 31%); /* PANTONE 6126 #00609D - Azul escuro */
+  --primary-foreground: hsl(0 0% 100%); /* Branco para contraste */
+  --secondary: hsl(171 100% 33%); /* PANTONE 2400 #00A88A - Verde-azulado */
   --secondary-foreground: hsl(0 0% 100%);
-  --muted: hsl(240 1.9608% 90%);
-  --muted-foreground: hsl(210 25% 7.8431%);
-  --accent: hsl(211.5789 51.3514% 92.7451%);
-  --accent-foreground: hsl(45 88% 58%);
+  --muted: hsl(214 29% 92%); /* PANTONE 656 #DFE6EF - Azul claro */
+  --muted-foreground: hsl(186 16% 28%); /* PANTONE 6224 #3D5155 - Cinza escuro */
+  --accent: hsl(171 100% 33%); /* Usar secondary para accent */
+  --accent-foreground: hsl(0 0% 100%);
   --destructive: hsl(356.3033 90.5579% 54.3137%);
   --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(201.4286 30.4348% 90.9804%);
-  --input: hsl(200 23.0769% 97.4510%);
-  --ring: hsl(45 88% 58%);
-  --chart-1: hsl(45 88% 58%);
-  --chart-2: hsl(159.7826 100% 36.0784%);
-  --chart-3: hsl(42.0290 92.8251% 56.2745%);
-  --chart-4: hsl(147.1429 78.5047% 41.9608%);
-  --chart-5: hsl(341.4894 75.2000% 50.9804%);
+  --border: hsl(214 29% 85%);
+  --input: hsl(214 29% 97%);
+  --ring: hsl(201 100% 31%);
+  
+  /* Variáveis de gradiente PBE */
+  --gradient-pbe: linear-gradient(135deg, hsl(201 100% 31%) 0%, hsl(171 100% 33%) 100%);
+  --gradient-pbe-reverse: linear-gradient(135deg, hsl(171 100% 33%) 0%, hsl(201 100% 31%) 100%);
+  --gradient-pbe-vertical: linear-gradient(180deg, hsl(201 100% 31%) 0%, hsl(171 100% 33%) 100%);
+  --chart-1: hsl(201 100% 31%); /* PANTONE 6126 */
+  --chart-2: hsl(171 100% 33%); /* PANTONE 2400 */
+  --chart-3: hsl(214 29% 92%); /* PANTONE 656 */
+  --chart-4: hsl(186 16% 28%); /* PANTONE 6224 */
+  --chart-5: hsl(201 80% 45%); /* Variação do azul */
   --sidebar: hsl(180 6.6667% 97.0588%);
-  --sidebar-foreground: hsl(210 25% 7.8431%);
-  --sidebar-primary: hsl(45 88% 58%);
-  --sidebar-primary-foreground: hsl(282 72% 14%);
-  --sidebar-accent: hsl(211.5789 51.3514% 92.7451%);
-  --sidebar-accent-foreground: hsl(45 88% 58%);
+  --sidebar-foreground: hsl(186 16% 28%); /* PANTONE 6224 */
+  --sidebar-primary: hsl(201 100% 31%); /* PANTONE 6126 */
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(171 100% 33%); /* PANTONE 2400 */
+  --sidebar-accent-foreground: hsl(0 0% 100%);
   --sidebar-border: hsl(205.0000 25.0000% 90.5882%);
   --sidebar-ring: hsl(248.2 83.5% 66.7%);
   --font-sans: 'Inter', 'Open Sans', sans-serif;
@@ -54,8 +59,8 @@
   --spacing: 0.25rem;
   
   /* Chat-specific color variables */
-  --user-message: hsl(45 88% 58%);
-  --ai-message: hsl(210 17% 96%);
+  --user-message: hsl(201 100% 31%); /* PANTONE 6126 */
+  --ai-message: hsl(214 29% 96%); /* PANTONE 656 mais claro */
 }
 
 .dark {
@@ -65,31 +70,31 @@
   --card-foreground: hsl(0 0% 85.0980%);
   --popover: hsl(0 0% 0%);
   --popover-foreground: hsl(200 6.6667% 91.1765%);
-  /* Nova paleta (modo escuro) */
-  --primary: hsl(45 88% 58%);
-  --primary-foreground: hsl(282 72% 14%);
-  --secondary: hsl(282 72% 14%);
+  /* Paleta Grupo PBE (modo escuro) */
+  --primary: hsl(201 100% 40%); /* PANTONE 6126 mais claro para modo escuro */
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(171 100% 45%); /* PANTONE 2400 mais claro para modo escuro */
   --secondary-foreground: hsl(0 0% 100%);
   --muted: hsl(0 0% 9.4118%);
-  --muted-foreground: hsl(210 3.3898% 46.2745%);
-  --accent: hsl(205.7143 70% 7.8431%);
-  --accent-foreground: hsl(45 88% 58%);
+  --muted-foreground: hsl(214 29% 70%); /* PANTONE 656 ajustado */
+  --accent: hsl(171 100% 25%); /* PANTONE 2400 escurecido */
+  --accent-foreground: hsl(0 0% 100%);
   --destructive: hsl(356.3033 90.5579% 54.3137%);
   --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(210 5.2632% 14.9020%);
-  --input: hsl(207.6923 27.6596% 18.4314%);
-  --ring: hsl(45 88% 58%);
-  --chart-1: hsl(45 88% 58%);
-  --chart-2: hsl(159.7826 100% 36.0784%);
-  --chart-3: hsl(42.0290 92.8251% 56.2745%);
-  --chart-4: hsl(147.1429 78.5047% 41.9608%);
-  --chart-5: hsl(341.4894 75.2000% 50.9804%);
+  --border: hsl(186 16% 20%); /* PANTONE 6224 escurecido */
+  --input: hsl(186 16% 15%);
+  --ring: hsl(201 100% 40%);
+  --chart-1: hsl(201 100% 40%); /* PANTONE 6126 */
+  --chart-2: hsl(171 100% 45%); /* PANTONE 2400 */
+  --chart-3: hsl(214 29% 70%); /* PANTONE 656 */
+  --chart-4: hsl(186 16% 40%); /* PANTONE 6224 */
+  --chart-5: hsl(201 80% 50%); /* Variação do azul */
   --sidebar: hsl(228 9.8039% 10%);
   --sidebar-foreground: hsl(0 0% 85.0980%);
-  --sidebar-primary: hsl(45 88% 58%);
-  --sidebar-primary-foreground: hsl(282 72% 14%);
-  --sidebar-accent: hsl(205.7143 70% 7.8431%);
-  --sidebar-accent-foreground: hsl(45 88% 58%);
+  --sidebar-primary: hsl(201 100% 40%); /* PANTONE 6126 */
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(171 100% 25%); /* PANTONE 2400 escurecido */
+  --sidebar-accent-foreground: hsl(0 0% 100%);
   --sidebar-border: hsl(205.7143 15.7895% 26.0784%);
   --sidebar-ring: hsl(248.2 83.5% 66.7%);
   --font-sans: 'Inter', 'Open Sans', sans-serif;
@@ -106,8 +111,8 @@
   --shadow-2xl: 0px 2px 0px 0px hsl(248.2 83.5% 66.7% / 0.00);
 
   /* Dark mode chat colors */
-  --user-message: hsl(45 88% 58%);
-  --ai-message: hsl(228 9.8039% 15%);
+  --user-message: hsl(201 100% 40%); /* PANTONE 6126 */
+  --ai-message: hsl(186 16% 15%); /* PANTONE 6224 escurecido */
 }
 
 @layer base {
@@ -128,5 +133,38 @@
   
   .bg-ai-message {
     background-color: var(--ai-message);
+  }
+  
+  /* Gradientes PBE */
+  .bg-gradient-pbe {
+    background: var(--gradient-pbe);
+  }
+  
+  .bg-gradient-pbe-reverse {
+    background: var(--gradient-pbe-reverse);
+  }
+  
+  .bg-gradient-pbe-vertical {
+    background: var(--gradient-pbe-vertical);
+  }
+  
+  .text-gradient-pbe {
+    background: var(--gradient-pbe);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  
+  .gradient-pbe {
+    background: var(--gradient-pbe);
+  }
+  
+  .gradient-text {
+    background: var(--gradient-pbe);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
   }
 }

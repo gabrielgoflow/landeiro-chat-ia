@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChatService } from "@/services/chatService";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { ChatThread, Message } from "@shared/schema";
+import { Logo } from "@/components/Logo";
 
 interface ChatSidebarProps {
   threads: ChatThread[];
@@ -56,43 +57,43 @@ export function ChatSidebar({
       `} data-testid="sidebar">
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-secondary rounded-lg flex items-center justify-center">
-                <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
+          <div className="flex items-center justify-between p-2 sm:p-4 border-b border-border">
+            <div className="flex items-center justify-center flex-1">
+              <div className="w-auto h-6 sm:h-8 rounded-lg">
+                <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-3 h-3 sm:w-4 sm:h-4" />
               </div>
-              <h1 className="text-lg font-semibold text-gray-900">Chat IA</h1>
             </div>
             {isMobile && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                className="p-1.5 sm:p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
                 data-testid="close-sidebar-button"
               >
-                <i className="fas fa-times"></i>
+                <i className="fas fa-times text-sm"></i>
               </Button>
             )}
           </div>
 
           {/* New Chat Button */}
-          <div className="p-4">
+          <div className="p-2 sm:p-4">
             <Button
               onClick={onStartNewThread}
-              className="w-full flex items-center justify-center px-4 py-3 bg-primary text-white rounded-lg hover:bg-indigo-600 transition-colors duration-200"
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-gradient-pbe text-white text-sm sm:text-base rounded-lg hover:opacity-90 transition-opacity duration-200"
               data-testid="new-chat-button"
             >
-              <i className="fas fa-plus mr-2"></i>
-              Nova Conversa
+              <i className="fas fa-plus mr-1.5 sm:mr-2"></i>
+              <span className="hidden sm:inline">Nova Conversa</span>
+              <span className="sm:hidden">Nova</span>
             </Button>
           </div>
 
           {/* Chat History */}
-          <div className="flex-1 overflow-y-auto px-4 pb-4">
-            <div className="space-y-2">
+          <div className="flex-1 overflow-y-auto px-2 sm:px-4 pb-2 sm:pb-4">
+            <div className="space-y-1.5 sm:space-y-2">
               {threads.length > 0 && (
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider px-2 py-1">
+                <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider px-1.5 sm:px-2 py-0.5 sm:py-1">
                   Conversas Recentes
                 </div>
               )}
@@ -106,23 +107,23 @@ export function ChatSidebar({
                   <div
                     key={thread.id}
                     className={`
-                      group flex items-center px-3 py-2 rounded-lg cursor-pointer transition-colors duration-150
+                      group flex items-center px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg cursor-pointer transition-colors duration-150
                       ${isActive 
-                        ? 'bg-indigo-50 border border-indigo-100' 
-                        : 'hover:bg-gray-100'
+                        ? 'bg-primary/10 border border-primary/20' 
+                        : 'hover:bg-muted'
                       }
                     `}
                     onClick={() => onSelectThread(thread.id)}
                     data-testid={`thread-${thread.id}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">
+                      <div className="text-xs sm:text-sm font-medium text-foreground truncate">
                         {thread.title}
                       </div>
-                      <div className="text-xs text-gray-500 truncate">
+                      <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
                         {lastMessage}
                       </div>
-                      <div className="text-xs text-gray-400 mt-1">
+                      <div className="text-[10px] sm:text-xs text-muted-foreground/70 mt-0.5 sm:mt-1">
                         {formattedTime}
                       </div>
                     </div>
@@ -133,7 +134,7 @@ export function ChatSidebar({
                         e.stopPropagation();
                         onDeleteThread(thread.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-400 hover:text-red-500 transition-opacity duration-150"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive transition-opacity duration-150"
                       data-testid={`delete-thread-${thread.id}`}
                     >
                       <i className="fas fa-trash text-xs"></i>
@@ -143,28 +144,28 @@ export function ChatSidebar({
               })}
 
               {threads.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <i className="fas fa-comments text-3xl mb-3 text-gray-300"></i>
-                  <p className="text-sm">Nenhuma conversa ainda</p>
-                  <p className="text-xs mt-1">Clique em "Nova Conversa" para começar</p>
+                <div className="text-center py-4 sm:py-8 text-muted-foreground">
+                  <i className="fas fa-comments text-2xl sm:text-3xl mb-2 sm:mb-3 text-muted"></i>
+                  <p className="text-xs sm:text-sm">Nenhuma conversa ainda</p>
+                  <p className="text-[10px] sm:text-xs mt-1 px-2">Clique em "Nova Conversa" para começar</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* User Info */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center space-x-3">
-              <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-gray-300 text-gray-600">
-                  <i className="fas fa-user text-sm"></i>
+          <div className="p-2 sm:p-4 border-t border-border">
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <Avatar className="w-6 h-6 sm:w-8 sm:h-8 flex-shrink-0">
+                <AvatarFallback className="bg-muted text-muted-foreground">
+                  <i className="fas fa-user text-xs sm:text-sm"></i>
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 truncate">
+                <div className="text-xs sm:text-sm font-medium text-foreground truncate">
                   gabriel@goflow.digital
                 </div>
-                <div className="text-xs text-gray-500">Usuário ativo</div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">Usuário ativo</div>
               </div>
             </div>
           </div>
