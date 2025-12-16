@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,6 +17,7 @@ import { SessionTabs } from "@/components/SessionTabs.jsx";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
 import { SessionTimer } from "@/components/SessionTimer";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function Chat() {
   const { chatId } = useParams();
@@ -69,6 +70,67 @@ export default function Chat() {
   
   const currentChatId = selectedSessionId || currentThread?.id;
   const currentSessao = selectedSessaoNumber || currentThread?.sessionData?.sessao;
+  
+  // Verificar se existe alguma sessão em andamento no mesmo chat_id
+  const [hasSessionInProgress, setHasSessionInProgress] = useState(false);
+  
+  const checkSessionsInProgress = async () => {
+    if (!currentChatId) {
+      setHasSessionInProgress(false);
+      return;
+    }
+    
+    try {
+      // Buscar todas as sessões do mesmo chat_id
+      const { data: chatThreads, error } = await supabase
+        .from("chat_threads")
+        .select("sessao")
+        .eq("chat_id", currentChatId)
+        .order("sessao", { ascending: true });
+      
+      if (error) {
+        console.error("Erro ao buscar sessões:", error);
+        setHasSessionInProgress(false);
+        return;
+      }
+      
+      if (!chatThreads || chatThreads.length === 0) {
+        setHasSessionInProgress(false);
+        return;
+      }
+      
+      // Verificar se alguma sessão está em andamento (não tem review)
+      const sessionsToCheck = chatThreads.map(t => t.sessao);
+      const reviewChecks = await Promise.all(
+        sessionsToCheck.map(async (sessao) => {
+          const { data: review, error: reviewError } = await supabase
+            .from("chat_reviews")
+            .select("id")
+            .eq("chat_id", currentChatId)
+            .eq("sessao", sessao)
+            .single();
+          return !reviewError && review;
+        })
+      );
+      
+      // Se alguma sessão não tem review, está em andamento
+      const hasInProgress = reviewChecks.some(hasReview => !hasReview);
+      setHasSessionInProgress(hasInProgress);
+      console.log("Sessões em andamento verificadas:", {
+        currentChatId,
+        sessions: sessionsToCheck,
+        reviews: reviewChecks,
+        hasInProgress
+      });
+    } catch (error) {
+      console.error("Erro ao verificar sessões em andamento:", error);
+      setHasSessionInProgress(false);
+    }
+  };
+  
+  useEffect(() => {
+    checkSessionsInProgress();
+  }, [currentChatId, hasReview, isCurrentSessionFinalized]);
   
   const { timeRemaining, isExpired: isSessionExpired } = useSessionTimer(
     currentChatId,
@@ -456,6 +518,12 @@ export default function Chat() {
           setIsCurrentSessionFinalized(true);
           setShowReviewSidebar(true);
           
+          // Aguardar um pouco para garantir que o review foi salvo no banco
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Verificar novamente as sessões em andamento após criar o review
+          await checkSessionsInProgress();
+          
           console.log('ReviewSidebar should now be visible with data');
         } else {
           console.error("Error saving review:", saveResponse.status);
@@ -518,10 +586,12 @@ export default function Chat() {
           await window.refreshSidebar();
         }
         
-        toast({
-          title: "Sucesso",
-          description: `Sessão ${newSession} iniciada com sucesso`,
-        });
+        // Refresh na URL atual para atualizar os dados após criar a nova sessão
+        // Pequeno delay para garantir que o banco foi atualizado antes do reload
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Recarregar a página para atualizar todos os dados
+        window.location.reload();
       } else {
         console.error('Erro ao criar nova sessão: sem newSession');
         toast({
@@ -671,7 +741,10 @@ export default function Chat() {
             {selectedSessionId && timeRemaining !== null && (
               <SessionTimer 
                 timeRemaining={timeRemaining} 
-                isExpired={isSessionExpired} 
+                isExpired={isSessionExpired}
+                isFinalized={isCurrentSessionFinalized}
+                chatId={currentChatId}
+                sessao={currentSessao}
               />
             )}
             {/* Conditional review button - only shows when review exists */}
@@ -691,24 +764,37 @@ export default function Chat() {
                   Ver Review
                 </Button>
 
-                <Button
-                  onClick={handleStartNextSession}
-                  disabled={isStartingNextSession}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                  data-testid="start-next-session-button"
-                >
-                  {isStartingNextSession ? (
-                    <>
-                      <i className="fas fa-spinner fa-spin mr-2"></i>
-                      Iniciando...
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-play mr-2"></i>
-                      Iniciar Próxima Sessão
-                    </>
-                  )}
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          onClick={handleStartNextSession}
+                          disabled={isStartingNextSession || hasSessionInProgress}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          data-testid="start-next-session-button"
+                        >
+                          {isStartingNextSession ? (
+                            <>
+                              <i className="fas fa-spinner fa-spin mr-2"></i>
+                              Iniciando...
+                            </>
+                          ) : (
+                            <>
+                              <i className="fas fa-play mr-2"></i>
+                              Iniciar Próxima Sessão
+                            </>
+                          )}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {hasSessionInProgress && (
+                      <TooltipContent side="bottom">
+                        <p className="max-w-xs">Finalize o atendimento e aguarde o review antes de iniciar nova sessão</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
               </>
             )}
 

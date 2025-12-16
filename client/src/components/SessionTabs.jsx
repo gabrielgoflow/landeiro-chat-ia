@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabaseService } from "@/services/supabaseService";
 import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase.js";
@@ -12,12 +13,14 @@ export function SessionTabs({
   onSessionChange,
   onNewSession,
   className = "",
+  refreshKey = 0, // Nova prop para forçar refresh
 }) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSession, setActiveSession] = useState(null);
   const lastThreadIdRef = useRef(null);
   const lastChatIdRef = useRef(null);
+  const lastRefreshKeyRef = useRef(0);
   const isLoadingRef = useRef(false);
 
   useEffect(() => {
@@ -30,29 +33,35 @@ export function SessionTabs({
     // Verificar se realmente mudou
     const threadIdChanged = lastThreadIdRef.current !== threadId;
     const chatIdChanged = lastChatIdRef.current !== currentChatId;
+    const refreshKeyChanged = lastRefreshKeyRef.current !== refreshKey;
+    
+    // Se não temos sessões carregadas mas temos um chatId/threadId disponível, forçar reload
+    const needsInitialLoad = sessions.length === 0 && (threadId || currentChatId);
 
-    if (!threadIdChanged && !chatIdChanged) {
-      console.log("SessionTabs: threadId e currentChatId não mudaram, ignorando");
+    // Se refreshKey mudou ou precisamos de um carregamento inicial, forçar reload
+    if (!threadIdChanged && !chatIdChanged && !refreshKeyChanged && !needsInitialLoad) {
+      console.log("SessionTabs: threadId, currentChatId e refreshKey não mudaram, ignorando");
       return;
     }
 
     // Atualizar refs
     lastThreadIdRef.current = threadId;
     lastChatIdRef.current = currentChatId;
+    lastRefreshKeyRef.current = refreshKey;
 
     // Se temos threadId, usar ele. Se não, usar currentChatId para buscar por chat_id
     if (threadId) {
-      console.log("SessionTabs: useEffect triggered, threadId:", threadId);
+      console.log("SessionTabs: useEffect triggered, threadId:", threadId, "refreshKey:", refreshKey, "needsInitialLoad:", needsInitialLoad);
       loadSessions();
     } else if (currentChatId) {
-      console.log("SessionTabs: threadId não disponível, buscando por currentChatId:", currentChatId);
+      console.log("SessionTabs: threadId não disponível, buscando por currentChatId:", currentChatId, "refreshKey:", refreshKey, "needsInitialLoad:", needsInitialLoad);
       loadSessionsByChatId();
     } else {
       console.log("SessionTabs: threadId e currentChatId não disponíveis, clearing sessions");
       setSessions([]);
       setLoading(false);
     }
-  }, [threadId, currentChatId]);
+  }, [threadId, currentChatId, refreshKey, sessions.length]);
 
   // Atualizar activeSession quando currentChatId mudar
   const lastActiveSessionRef = useRef(null);
@@ -227,6 +236,51 @@ export function SessionTabs({
     onNewSession?.();
   };
 
+  // Encontrar a sessão atual para verificar se está finalizada
+  // IMPORTANTE: Hooks devem ser chamados antes de qualquer return condicional
+  // Verificar a sessão que corresponde ao currentChatId (sessão atual sendo visualizada)
+  const currentSession = useMemo(() => {
+    if (!currentChatId || !sessions.length) return null;
+    // Primeiro tentar encontrar pela sessão ativa nas tabs
+    if (activeSession) {
+      const sessionByActive = sessions.find((s) => s.sessao.toString() === activeSession);
+      if (sessionByActive && sessionByActive.chat_id === currentChatId) {
+        return sessionByActive;
+      }
+    }
+    // Se não encontrar, buscar pela sessão que corresponde ao currentChatId
+    const sessionByChatId = sessions.find((s) => s.chat_id === currentChatId);
+    return sessionByChatId || null;
+  }, [activeSession, sessions, currentChatId]);
+
+  // Verificar se existe alguma sessão em andamento no mesmo chat_id
+  // O botão só deve estar habilitado se TODAS as sessões do mesmo chat_id estiverem finalizadas
+  const hasSessionInProgress = useMemo(() => {
+    if (!sessions.length || !currentChatId) return false;
+    // Verificar se existe alguma sessão em andamento (não finalizada) no mesmo chat_id
+    // Filtrar apenas sessões do mesmo chat_id para garantir que estamos verificando o chat correto
+    const sessionsForCurrentChat = sessions.filter((s) => s.chat_id === currentChatId);
+    return sessionsForCurrentChat.some((s) => s.status === "em_andamento");
+  }, [sessions, currentChatId]);
+
+  // O botão só deve estar habilitado se não houver nenhuma sessão em andamento
+  const canCreateNewSession = !hasSessionInProgress;
+  
+  // Debug log
+  useEffect(() => {
+    if (currentSession) {
+      console.log("SessionTabs: Current session status:", {
+        sessao: currentSession.sessao,
+        status: currentSession.status,
+        hasSessionInProgress,
+        canCreateNewSession,
+        chatId: currentSession.chat_id,
+        currentChatId,
+        allSessions: sessions.map(s => ({ sessao: s.sessao, status: s.status }))
+      });
+    }
+  }, [currentSession, hasSessionInProgress, canCreateNewSession, currentChatId, sessions]);
+
   if (loading) {
     return (
       <div className={`flex items-center justify-center p-4 ${className}`}>
@@ -260,43 +314,59 @@ export function SessionTabs({
         onValueChange={handleSessionSelect}
         className="w-full"
       >
-        <div className="flex items-center justify-between px-4 py-2">
-          <TabsList className="flex-1 justify-start bg-gray-50">
-            {sessions.map((session) => {
-              // console.log("SessionTab:", session, "Status:", session.status); // Removido para evitar logs excessivos
-              return (
-                <TabsTrigger
-                  key={session.sessao}
-                  value={session.sessao.toString()}
-                  className="relative flex items-center gap-2"
-                  data-testid={`session-tab-${session.sessao}`}
-                >
-                  <span>SESSÃO {session.sessao}</span>
-                  {session.status === "finalizado" ? (
-                    <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-1 py-0">
-                      FINALIZADA
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs px-1 py-0">
-                      EM ANDAMENTO
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
+        <div className="flex items-center justify-between px-4 py-2 gap-4" style={{overflowX: 'scroll', maxWidth: '80vw'}}>
+          <div className="flex-1 min-w-0 overflow-x-auto">
+            <TabsList className="inline-flex justify-start bg-gray-50 min-w-max">
+              {sessions.map((session) => {
+                // console.log("SessionTab:", session, "Status:", session.status); // Removido para evitar logs excessivos
+                return (
+                  <TabsTrigger
+                    key={session.sessao}
+                    value={session.sessao.toString()}
+                    className="relative flex items-center gap-2 whitespace-nowrap"
+                    data-testid={`session-tab-${session.sessao}`}
+                  >
+                    <span>SESSÃO {session.sessao}</span>
+                    {session.status === "finalizado" ? (
+                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-1 py-0">
+                        FINALIZADA
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs px-1 py-0">
+                        EM ANDAMENTO
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </div>
 
           {/* Botão para nova sessão */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleNewSession}
-            className="ml-4 flex items-center gap-2"
-            data-testid="new-session-button"
-          >
-            <Plus className="h-4 w-4" />
-            Nova Sessão
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNewSession}
+                    disabled={!canCreateNewSession}
+                    className="flex items-center gap-2"
+                    data-testid="new-session-button"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nova Sessão
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {!canCreateNewSession && (
+                <TooltipContent side="bottom">
+                  <p className="max-w-xs">Finalize o atendimento e aguarde o review antes de iniciar nova sessão</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         {/* Content das sessões */}

@@ -33,6 +33,7 @@ export default function Chat() {
     useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [selectedSessaoNumber, setSelectedSessaoNumber] = useState(null);
+  const [sessionTabsRefreshKey, setSessionTabsRefreshKey] = useState(0);
   const messagesEndRef = useRef(null);
   const lastChatIdRef = useRef(null);
   const isMobile = useIsMobile();
@@ -310,19 +311,21 @@ export default function Chat() {
         // Limpa o estado anterior para permitir re-inicialização
         lastChatIdRef.current = null;
 
+        // Incrementa refreshKey para forçar SessionTabs a recarregar
+        setSessionTabsRefreshKey((prev) => prev + 1);
+
         // Redireciona IMEDIATAMENTE para a URL do novo chat
         navigate(`/chat/${newChatId}`);
 
-        // Força atualização da URL se necessário (backup)
+        // Aguarda um pouco e força refresh novamente para garantir que as sessões sejam carregadas
         setTimeout(() => {
+          setSessionTabsRefreshKey((prev) => prev + 1);
           const expectedPath = `/chat/${newChatId}`;
           if (window.location.pathname !== expectedPath) {
             console.log("URL não atualizada, forçando:", expectedPath);
             window.history.replaceState(null, "", expectedPath);
-            // Força re-render se necessário
-            window.location.reload();
           }
-        }, 200);
+        }, 500);
 
         console.log("Redirecionamento concluído para:", `/chat/${newChatId}`);
       } else {
@@ -471,11 +474,18 @@ export default function Chat() {
         setCurrentReview(null);
         setShowReviewSidebar(false);
         setIsCurrentSessionFinalized(false); // Nova sessão não está finalizada
+        
+        // Incrementa refreshKey para forçar SessionTabs a recarregar
+        setSessionTabsRefreshKey((prev) => prev + 1);
+        
         if (window.refreshSidebar) {
           await window.refreshSidebar();
         }
-        // Refresh na URL atual
-        window.location.reload();
+        
+        // Aguarda um pouco e força refresh novamente para garantir que as sessões sejam carregadas
+        setTimeout(() => {
+          setSessionTabsRefreshKey((prev) => prev + 1);
+        }, 500);
       } else {
         console.error("Erro ao criar nova sessão:", error);
       }
@@ -682,6 +692,7 @@ export default function Chat() {
             onSessionChange={handleSessionChange}
             onNewSession={handleNewSessionFromTabs}
             className="border-b"
+            refreshKey={sessionTabsRefreshKey}
           />
         )}
 
