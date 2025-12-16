@@ -341,6 +341,7 @@ export function useChat() {
                 diagnostico: threadData.diagnostico,
                 protocolo: threadData.protocolo,
                 sessao: threadData.sessao,
+                sessionStartedAt: threadData.session_started_at,
               },
               createdAt: new Date(threadData.created_at),
               updatedAt: new Date(threadData.updated_at),

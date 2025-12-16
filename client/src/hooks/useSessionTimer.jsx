@@ -12,6 +12,7 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
   const lastInitializedRef = useRef({ chatId: null, sessao: null, sessionStartedAt: null });
   const lastQueryRef = useRef(null);
   const isQueryingRef = useRef(false);
+  const correctedFromDbRef = useRef(false); // Flag para indicar que já corrigimos do banco
 
   // Inicializar timer quando sessão é carregada
   const initializeTimer = useCallback(async () => {
@@ -139,21 +140,92 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
         const elapsed = now - startTime;
         
         // Se o tempo decorrido for maior que a duração da sessão, a sessão já expirou
-        // Se for muito antigo (mais de 2 horas), simplesmente marcar como expirado
-        // Não reiniciar automaticamente para evitar loops de queries ao banco
+        // Se for muito antigo (mais de 2 horas), verificar se é a sessão correta
+        // Se não for, tentar buscar a sessão correta do banco
         if (elapsed > SESSION_DURATION_MS * 2) {
-          console.warn("Session timer muito antigo (mais de 2 horas), marcando como expirado:", {
+          // Verificar se já corrigimos do banco para esta combinação de chatId/sessao
+          const correctionKey = `${chatId}-${sessao}`;
+          const alreadyCorrected = correctedFromDbRef.current === correctionKey;
+          
+          if (alreadyCorrected) {
+            // Já verificamos e atualizamos, não fazer novamente
+            console.log("Timer já foi corrigido do banco para esta sessão, evitando verificação duplicada");
+            // Usar o valor que já está no lastInitializedRef
+            const correctedStartedAt = lastInitializedRef.current.sessionStartedAt;
+            if (correctedStartedAt) {
+              const correctedStartTime = new Date(correctedStartedAt).getTime();
+              const correctedEndTime = correctedStartTime + SESSION_DURATION_MS;
+              const correctedRemaining = correctedEndTime - now;
+              setTimeRemaining(Math.max(0, correctedRemaining));
+              setIsExpired(correctedRemaining <= 0);
+              setIsInitialized(true);
+            }
+            return;
+          }
+          
+          console.warn("Session timer muito antigo (mais de 2 horas), verificando se é a sessão correta:", {
             startedAt,
             elapsedHours: elapsed / (1000 * 60 * 60),
             chatId,
             sessao
           });
-          // Simplesmente marcar como expirado em vez de reiniciar
-          // O usuário pode iniciar uma nova sessão se necessário
+          
+          // Se temos uma sessão específica, verificar se o timestamp no banco é diferente
+          // Isso pode indicar que estamos usando o timestamp de uma sessão anterior
+          if (sessao !== null && sessao !== undefined) {
+            try {
+              const { data: currentSessionData, error: checkError } = await supabase
+                .from("chat_threads")
+                .select("session_started_at, sessao")
+                .eq("chat_id", chatId)
+                .eq("sessao", sessao)
+                .single();
+              
+              if (!checkError && currentSessionData && currentSessionData.session_started_at) {
+                const currentSessionStart = new Date(currentSessionData.session_started_at).getTime();
+                const currentSessionElapsed = now - currentSessionStart;
+                
+                // Se a sessão atual no banco é mais recente (menos de 2 horas), usar ela
+                if (currentSessionElapsed < SESSION_DURATION_MS * 2) {
+                  console.log("Encontrada sessão mais recente no banco, reiniciando timer:", {
+                    oldStartedAt: startedAt,
+                    newStartedAt: currentSessionData.session_started_at,
+                    sessao
+                  });
+                  startedAt = currentSessionData.session_started_at;
+                  // Recalcular com o novo timestamp
+                  const newStartTime = new Date(startedAt).getTime();
+                  const newElapsed = now - newStartTime;
+                  const newEndTime = newStartTime + SESSION_DURATION_MS;
+                  const newRemaining = newEndTime - now;
+                  
+                  setTimeRemaining(Math.max(0, newRemaining));
+                  setIsExpired(newRemaining <= 0);
+                  setIsInitialized(true);
+                  // Marcar como já inicializado com o valor do banco para evitar loops
+                  lastInitializedRef.current = { 
+                    chatId, 
+                    sessao, 
+                    sessionStartedAt: startedAt 
+                  };
+                  // Marcar que já corrigimos do banco para esta sessão
+                  correctedFromDbRef.current = correctionKey;
+                  // Resetar query ref para permitir nova query se necessário
+                  lastQueryRef.current = null;
+                  return;
+                }
+              }
+            } catch (err) {
+              console.error("Erro ao verificar sessão atual no banco:", err);
+            }
+          }
+          
+          // Se não encontrou uma sessão mais recente, marcar como expirado
           setTimeRemaining(0);
           setIsExpired(true);
           setIsInitialized(true);
           lastInitializedRef.current = { chatId, sessao, sessionStartedAt: startedAt };
+          correctedFromDbRef.current = correctionKey; // Marcar como verificado mesmo se expirado
           return;
         }
         
@@ -235,17 +307,27 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
         lastInitializedRef.current.sessao !== sessao ||
         lastInitializedRef.current.sessionStartedAt !== sessionStartedAt;
       
+      // Se já está inicializado e os valores não mudaram, não reinicializar
+      if (!hasChanged && isInitialized) {
+        return;
+      }
+      
       if (hasChanged) {
         setIsInitialized(false);
         setIsExpired(false);
         setTimeRemaining(null);
-        lastInitializedRef.current = { chatId: null, sessao: null, sessionStartedAt: null }; // Reset antes de reinicializar
+        // Resetar flag de correção do banco se mudou chatId ou sessao
+        if (lastInitializedRef.current.chatId !== chatId || 
+            lastInitializedRef.current.sessao !== sessao) {
+          lastInitializedRef.current = { chatId: null, sessao: null, sessionStartedAt: null };
+          correctedFromDbRef.current = false; // Reset flag de correção
+        }
         lastQueryRef.current = null; // Reset query ref também
         isQueryingRef.current = false; // Reset query flag também
         initializeTimer();
       }
     }
-  }, [chatId, sessionStartedAt, sessao, isInitializing, initializeTimer]);
+  }, [chatId, sessionStartedAt, sessao, isInitializing, initializeTimer, isInitialized]);
 
   return {
     timeRemaining,

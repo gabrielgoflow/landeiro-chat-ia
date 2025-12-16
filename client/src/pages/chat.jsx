@@ -17,6 +17,7 @@ import { SessionTabs } from "@/components/SessionTabs.jsx";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
 import { SessionTimer } from "@/components/SessionTimer";
+import iconPaciente from "@/images/icon-paciente.jpg";
 
 export default function Chat() {
   const { chatId } = useParams();
@@ -35,6 +36,7 @@ export default function Chat() {
   const [isCurrentSessionFinalized, setIsCurrentSessionFinalized] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [selectedSessaoNumber, setSelectedSessaoNumber] = useState(null);
+  const [isTimerPaused, setIsTimerPaused] = useState(false);
   const messagesEndRef = useRef(null);
   const lastChatIdRef = useRef(null);
   const isMobile = useIsMobile();
@@ -382,6 +384,9 @@ export default function Chat() {
 
     setIsFinalizingChat(true);
     try {
+      // Usa currentSessao que leva em conta selectedSessaoNumber
+      const sessaoToUse = currentSessao || currentThread.sessionData?.sessao;
+      
       // Get review from external service
       const reviewResponse = await fetch(
         "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review",
@@ -392,7 +397,7 @@ export default function Chat() {
           },
           body: JSON.stringify({
             chat_id: currentThread.id,
-            sessao: currentThread.sessionData?.sessao,
+            sessao: sessaoToUse,
             diagnostico: currentThread.sessionData?.diagnostico,
           }),
         },
@@ -411,7 +416,7 @@ export default function Chat() {
           sinaisPaciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
           pontosPositivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
           pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item),
-          sessao: currentThread.sessionData?.sessao
+          sessao: sessaoToUse
         };
 
         // Save review to our database
@@ -444,7 +449,7 @@ export default function Chat() {
             sinais_paciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
             pontos_positivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
             pontos_negativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item),
-            sessao: currentThread.sessionData?.sessao,
+            sessao: sessaoToUse,
             created_at: new Date().toISOString()
           };
           
@@ -656,8 +661,8 @@ export default function Chat() {
                 <i className="fas fa-bars text-sm"></i>
               </Button>
               <Avatar className="w-6 h-6 sm:w-8 sm:h-8 bg-secondary flex-shrink-0">
-                <AvatarFallback className="bg-secondary text-white">
-                  <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-3 h-3 sm:w-4 sm:h-4" />
+                <AvatarFallback className="bg-gray-300 text-gray-600 p-0">
+                  <img src={iconPaciente} alt="Paciente" className="w-full h-full object-cover rounded-full" />
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 sm:flex-initial min-w-0">
@@ -678,6 +683,7 @@ export default function Chat() {
                 isFinalized={isCurrentSessionFinalized}
                 chatId={currentChatId}
                 sessao={currentSessao}
+                onPauseChange={setIsTimerPaused}
               />
             )}
             {/* Conditional review button - only shows when review exists */}
@@ -767,12 +773,12 @@ export default function Chat() {
           data-testid="messages-container"
         >
           <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
-            {/* Welcome Message */}
-            {currentMessages.length === 0 && (
+            {/* Welcome Message - apenas na primeira sessão */}
+            {currentMessages.length === 0 && currentSessao === 1 && (
               <div className="flex items-start space-x-3">
                 <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
-                  <AvatarFallback className="bg-secondary text-white">
-                    <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
+                  <AvatarFallback className="bg-gray-300 text-gray-600 p-0">
+                    <img src={iconPaciente} alt="Paciente" className="w-full h-full object-cover rounded-full" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
@@ -800,8 +806,8 @@ export default function Chat() {
                 data-testid="loading-message"
               >
                 <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
-                  <AvatarFallback className="bg-secondary text-white">
-                    <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
+                  <AvatarFallback className="bg-gray-300 text-gray-600 p-0">
+                    <img src={iconPaciente} alt="Paciente" className="w-full h-full object-cover rounded-full" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
@@ -861,6 +867,7 @@ export default function Chat() {
           onClearError={clearError}
           isFinalized={isCurrentSessionFinalized}
           isSessionExpired={isSessionExpired}
+          isPaused={isTimerPaused}
         />
       </div>
 

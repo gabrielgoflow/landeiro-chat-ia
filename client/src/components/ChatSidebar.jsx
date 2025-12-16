@@ -8,7 +8,6 @@ import { useIsMobile } from "@/hooks/use-mobile.jsx";
 import { useAuth } from "@/hooks/useAuth.jsx";
 import { useToast } from "@/hooks/use-toast";
 import { NewChatDialog } from "./NewChatDialog.jsx";
-import { Trash2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 
 export function ChatSidebar({
@@ -111,51 +110,6 @@ export function ChatSidebar({
     }
   };
 
-  const handleDeleteChat = async (chatId, e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (
-      !confirm(
-        "Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.",
-      )
-    ) {
-      return;
-    }
-
-    try {
-      // Delete from Supabase
-      await supabaseService.deleteUserChat(user.id, chatId);
-
-      // Update local state
-      setUserChats((prev) => prev.filter((chat) => chat.chat_id !== chatId));
-      setChatReviews((prev) => {
-        const newReviews = { ...prev };
-        delete newReviews[chatId];
-        return newReviews;
-      });
-
-      // If this was the current chat, redirect to home page
-      if (
-        currentThread?.id === chatId ||
-        currentThread?.openaiChatId === chatId
-      ) {
-        window.location.href = "/";
-      }
-
-      toast({
-        title: "Conversa excluída",
-        description: "A conversa foi removida com sucesso",
-      });
-    } catch (error) {
-      console.error("Erro ao excluir chat:", error);
-      toast({
-        title: "Erro ao excluir",
-        description: "Não foi possível excluir a conversa",
-        variant: "destructive",
-      });
-    }
-  };
 
   const getLastMessage = (threadId) => {
     const threadMessages = messages[threadId] || [];
@@ -282,7 +236,7 @@ export function ChatSidebar({
                       }}
                       data-testid={`chat-${chat.chat_id}`}
                     >
-                      {/* Status Tags and Delete Button */}
+                      {/* Status Tags */}
                       <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
                         <div className="flex items-center space-x-1">
                           {chat.status === "finalizado" ? (
@@ -294,18 +248,6 @@ export function ChatSidebar({
                               EM ANDAMENTO
                             </Badge>
                           )}
-
-                          {/* Delete Button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => handleDeleteChat(chat.chat_id, e)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            data-testid={`delete-chat-${chat.chat_id}`}
-                            title="Excluir conversa"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
                         </div>
 
                         {/* Latest Session Badge - below status */}
@@ -314,7 +256,7 @@ export function ChatSidebar({
                             variant="default"
                             className="w-fit text-xs bg-gradient-pbe text-white px-2 py-0.5"
                           >
-                            SESSÃO {chat.sessao} (ATUAL)
+                            SESSÃO {chat.sessao}/14 (ATUAL)
                           </Badge>
                         )}
                       </div>

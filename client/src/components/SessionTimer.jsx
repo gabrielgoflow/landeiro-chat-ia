@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase.js";
 
-export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinalized = false }) {
+export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinalized = false, onPauseChange }) {
   const [displayTime, setDisplayTime] = useState("");
   
   // Criar chave única para localStorage baseada em chatId e sessao
@@ -248,6 +248,13 @@ export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinal
       lastSavedStateRef.current = { ...currentState };
     }
   }, [isPaused, pausedTime, chatId, sessao]);
+
+  // Notificar componente pai sobre mudanças no estado de pausa
+  useEffect(() => {
+    if (onPauseChange && !isInitializingRef.current && !isLoadingFromDBRef.current) {
+      onPauseChange(isPaused);
+    }
+  }, [isPaused, onPauseChange]);
 
   const handlePauseToggle = async () => {
     if (isPaused) {

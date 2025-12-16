@@ -14,6 +14,7 @@ import { MessageInput } from "@/components/MessageInput.jsx";
 import { NewChatDialog } from "@/components/NewChatDialog.jsx";
 import { ReviewSidebar } from "@/components/ReviewSidebar";
 import { SessionTabs } from "@/components/SessionTabs.jsx";
+import iconPaciente from "@/images/icon-paciente.jpg";
 
 export default function Chat() {
   const { chatId } = useParams();
@@ -707,8 +708,8 @@ export default function Chat() {
             {currentMessages.length === 0 && (
               <div className="flex items-start space-x-3">
                 <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
-                  <AvatarFallback className="bg-secondary text-white">
-                    <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
+                  <AvatarFallback className="bg-gray-300 text-gray-600 p-0">
+                    <img src={iconPaciente} alt="Paciente" className="w-full h-full object-cover rounded-full" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
@@ -736,8 +737,8 @@ export default function Chat() {
                 data-testid="loading-message"
               >
                 <Avatar className="w-8 h-8 bg-secondary flex-shrink-0">
-                  <AvatarFallback className="bg-secondary text-white">
-                    <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-4 h-4" />
+                  <AvatarFallback className="bg-gray-300 text-gray-600 p-0">
+                    <img src={iconPaciente} alt="Paciente" className="w-full h-full object-cover rounded-full" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">

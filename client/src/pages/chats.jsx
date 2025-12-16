@@ -245,7 +245,7 @@ export default function ChatsPage() {
                   variant="default"
                   className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5"
                 >
-                  SESSÃO {chat.sessao} (ATUAL)
+                  SESSÃO {chat.sessao}/14 (ATUAL)
                 </Badge>
               );
               // Data da última mensagem

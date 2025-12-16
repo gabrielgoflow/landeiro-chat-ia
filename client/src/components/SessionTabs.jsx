@@ -380,7 +380,7 @@ export function SessionTabs({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4 text-sm">
                   <span className="font-medium">
-                    Sessão {session.sessao} - {session.diagnostico} (
+                    Sessão {session.sessao}/14 - {session.diagnostico} (
                     {session.protocolo.toUpperCase()})
                   </span>
                   <span className="text-gray-500">

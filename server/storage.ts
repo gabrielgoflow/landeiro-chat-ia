@@ -221,9 +221,21 @@ export class DatabaseStorage implements IStorage {
 
   async createChatReview(insertReview: InsertChatReview): Promise<ChatReview> {
     if (!db) throw new Error("Database not connected");
+    // Usa UPSERT para atualizar se já existir uma revisão para o mesmo chat_id e sessao
+    // O índice único é chat_reviews_chat_id_sessao_key
     const result = await db
       .insert(chatReviews)
       .values(insertReview)
+      .onConflictDoUpdate({
+        target: sql`chat_reviews_chat_id_sessao_key`,
+        set: {
+          resumoAtendimento: insertReview.resumoAtendimento,
+          feedbackDireto: insertReview.feedbackDireto,
+          sinaisPaciente: insertReview.sinaisPaciente,
+          pontosPositivos: insertReview.pontosPositivos,
+          pontosNegativos: insertReview.pontosNegativos,
+        },
+      })
       .returning();
     return result[0];
   }

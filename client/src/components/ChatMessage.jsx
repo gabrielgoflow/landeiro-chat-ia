@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ChatService } from "@/services/chatService.js";
 import { AudioMessage } from "./AudioMessage.jsx";
+import iconPaciente from "@/images/icon-paciente.jpg";
 
 export function ChatMessage({ message }) {
   // console.log("ChatMessage:", message); // Removido para evitar logs excessivos
@@ -81,8 +82,8 @@ export function ChatMessage({ message }) {
       data-testid={`message-${parsedMessage.id}`}
     >
       <Avatar className="w-6 h-6 sm:w-8 sm:h-8 bg-secondary flex-shrink-0">
-        <AvatarFallback className="bg-secondary text-white">
-          <img src="https://nexialab.com.br/wp-content/uploads/2025/10/cropped-favicon-1.png" alt="Logo" className="w-3 h-3 sm:w-4 sm:h-4" />
+        <AvatarFallback className="bg-gray-300 text-gray-600 p-0">
+          <img src={iconPaciente} alt="Paciente" className="w-full h-full object-cover rounded-full" />
         </AvatarFallback>
       </Avatar>
       <div className="flex-1">
