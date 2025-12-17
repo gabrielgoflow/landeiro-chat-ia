@@ -221,19 +221,72 @@ export class DatabaseStorage implements IStorage {
 
   async createChatReview(insertReview: InsertChatReview): Promise<ChatReview> {
     if (!db) throw new Error("Database not connected");
-    // Usa UPSERT para atualizar se já existir uma revisão para o mesmo chat_id e sessao
-    // O índice único é chat_reviews_chat_id_sessao_key
+    
+    // Validar e garantir que todos os campos obrigatórios estejam definidos
+    if (!insertReview.chatId) {
+      throw new Error("chatId é obrigatório para criar um review");
+    }
+    
+    if (insertReview.sessao === undefined || insertReview.sessao === null) {
+      throw new Error("sessao é obrigatório para criar um review");
+    }
+    
+    if (!insertReview.resumoAtendimento) {
+      throw new Error("resumoAtendimento é obrigatório para criar um review");
+    }
+    
+    if (!insertReview.feedbackDireto) {
+      throw new Error("feedbackDireto é obrigatório para criar um review");
+    }
+    
+    // Garantir que os arrays não sejam undefined e sejam arrays válidos
+    const sinaisPaciente = Array.isArray(insertReview.sinaisPaciente) 
+      ? insertReview.sinaisPaciente.filter(item => item !== null && item !== undefined && item !== '')
+      : [];
+    const pontosPositivos = Array.isArray(insertReview.pontosPositivos)
+      ? insertReview.pontosPositivos.filter(item => item !== null && item !== undefined && item !== '')
+      : [];
+    const pontosNegativos = Array.isArray(insertReview.pontosNegativos)
+      ? insertReview.pontosNegativos.filter(item => item !== null && item !== undefined && item !== '')
+      : [];
+    
+    // Criar objeto validado para inserção
+    const validatedReview = {
+      chatId: insertReview.chatId,
+      sessao: insertReview.sessao,
+      resumoAtendimento: insertReview.resumoAtendimento,
+      feedbackDireto: insertReview.feedbackDireto,
+      sinaisPaciente,
+      pontosPositivos,
+      pontosNegativos,
+    };
+    
+    // Verificar se já existe um review com o mesmo chatId e sessao
+    const existingReview = await db
+      .select()
+      .from(chatReviews)
+      .where(
+        and(
+          eq(chatReviews.chatId, validatedReview.chatId),
+          eq(chatReviews.sessao, validatedReview.sessao)
+        )
+      )
+      .limit(1);
+    
+    // Usar UPSERT com o índice único composto (chat_id, sessao)
+    // O índice chat_reviews_chat_id_sessao_key já existe no banco
+    // No Drizzle, usamos um array de colunas para índices compostos
     const result = await db
       .insert(chatReviews)
-      .values(insertReview)
+      .values(validatedReview)
       .onConflictDoUpdate({
-        target: sql`chat_reviews_chat_id_sessao_key`,
+        target: [chatReviews.chatId, chatReviews.sessao],
         set: {
-          resumoAtendimento: insertReview.resumoAtendimento,
-          feedbackDireto: insertReview.feedbackDireto,
-          sinaisPaciente: insertReview.sinaisPaciente,
-          pontosPositivos: insertReview.pontosPositivos,
-          pontosNegativos: insertReview.pontosNegativos,
+          resumoAtendimento: validatedReview.resumoAtendimento,
+          feedbackDireto: validatedReview.feedbackDireto,
+          sinaisPaciente: validatedReview.sinaisPaciente,
+          pontosPositivos: validatedReview.pontosPositivos,
+          pontosNegativos: validatedReview.pontosNegativos,
         },
       })
       .returning();

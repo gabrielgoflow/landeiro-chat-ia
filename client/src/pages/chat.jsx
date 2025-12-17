@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -37,6 +37,11 @@ export default function Chat() {
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [selectedSessaoNumber, setSelectedSessaoNumber] = useState(null);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
+  
+  // Usar useCallback para evitar recriação da função e loops
+  const handlePauseChange = useCallback((paused) => {
+    setIsTimerPaused(paused);
+  }, []);
   const messagesEndRef = useRef(null);
   const lastChatIdRef = useRef(null);
   const isMobile = useIsMobile();
@@ -387,6 +392,14 @@ export default function Chat() {
       // Usa currentSessao que leva em conta selectedSessaoNumber
       const sessaoToUse = currentSessao || currentThread.sessionData?.sessao;
       
+      // Validar que sessao está definida
+      if (!sessaoToUse || sessaoToUse === undefined || sessaoToUse === null) {
+        console.error("Erro: sessao não está definida. currentSessao:", currentSessao, "sessionData.sessao:", currentThread.sessionData?.sessao);
+        alert("Erro: Não foi possível determinar o número da sessão. Por favor, tente novamente.");
+        setIsFinalizingChat(false);
+        return;
+      }
+      
       // Get review from external service
       const reviewResponse = await fetch(
         "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review",
@@ -409,13 +422,28 @@ export default function Chat() {
 
         // Extract from output field and transform nested arrays to flat strings for storage
         const reviewOutput = reviewData.output;
+        
+        // Função auxiliar para achatar arrays aninhados recursivamente
+        const flattenArray = (arr) => {
+          if (!Array.isArray(arr)) return [arr];
+          const result = [];
+          for (const item of arr) {
+            if (Array.isArray(item)) {
+              result.push(...flattenArray(item));
+            } else {
+              result.push(item);
+            }
+          }
+          return result.filter(item => item !== null && item !== undefined && item !== '');
+        };
+        
         const transformedReview = {
           chatId: currentThread.id,  // API espera camelCase
-          resumoAtendimento: reviewOutput.resumoAtendimento,
-          feedbackDireto: reviewOutput.feedbackDireto,
-          sinaisPaciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
-          pontosPositivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
-          pontosNegativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item),
+          resumoAtendimento: reviewOutput.resumoAtendimento || '',
+          feedbackDireto: reviewOutput.feedbackDireto || '',
+          sinaisPaciente: flattenArray(reviewOutput.sinaisPaciente || []),
+          pontosPositivos: flattenArray(reviewOutput.pontosPositivos || []),
+          pontosNegativos: flattenArray(reviewOutput.pontosNegativos || []),
           sessao: sessaoToUse
         };
 
@@ -683,7 +711,7 @@ export default function Chat() {
                 isFinalized={isCurrentSessionFinalized}
                 chatId={currentChatId}
                 sessao={currentSessao}
-                onPauseChange={setIsTimerPaused}
+                onPauseChange={handlePauseChange}
               />
             )}
             {/* Conditional review button - only shows when review exists */}

@@ -55,7 +55,7 @@ export const chatMessages = pgTable("chat_messages", {
 
 export const chatReviews = pgTable("chat_reviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  chatId: varchar("chat_id").notNull().unique(),
+  chatId: varchar("chat_id").notNull(),
   resumoAtendimento: text("resumo_atendimento").notNull(),
   feedbackDireto: text("feedback_direto").notNull(),
   sinaisPaciente: text("sinais_paciente").array().notNull(),

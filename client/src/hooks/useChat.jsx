@@ -528,6 +528,28 @@ export function useChat() {
 
         console.log("Current thread for message:", { threadId, sessionData });
 
+        // Buscar a sessão atual do banco de dados para garantir que estamos usando a sessão correta
+        let sessaoToUse = sessionData?.sessao || 1;
+        try {
+          const { data: threadData, error: threadError } = await supabase
+            .from('chat_threads')
+            .select('sessao')
+            .eq('chat_id', threadId)
+            .order('sessao', { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (!threadError && threadData?.sessao) {
+            sessaoToUse = threadData.sessao;
+            console.log("Sessão encontrada no banco:", sessaoToUse);
+          } else {
+            console.warn("Não foi possível buscar sessão do banco, usando sessão do sessionData:", sessaoToUse);
+          }
+        } catch (error) {
+          console.error("Erro ao buscar sessão do banco:", error);
+          // Continua com a sessão do sessionData como fallback
+        }
+
         // Prepare metadata with transcription if available
         const metadata = {};
         if (typeof content === "object" && content.type === "audio" && content.transcription) {
@@ -535,10 +557,10 @@ export function useChat() {
         }
 
         // Save user message to chat_messages table
-        await ChatMessageService.saveMessage({
+        const saveResult = await ChatMessageService.saveMessage({
           chatId: threadId,
           threadId: currentThread?.threadId || "",
-          sessao: sessionData?.sessao || 1,
+          sessao: sessaoToUse,
           messageId: userMessage.id,
           sender: "user",
           content:
@@ -553,6 +575,10 @@ export function useChat() {
               : null,
           metadata: metadata,
         });
+
+        if (saveResult.error) {
+          console.error("Erro ao salvar mensagem do usuário:", saveResult.error);
+        }
 
         // Send to webhook and get AI response (using threadId as chat_id)
         const aiResponse = await ChatService.sendMessage(
@@ -602,11 +628,29 @@ export function useChat() {
             content: aiResponse.text || "Mensagem de áudio",
           };
 
+          // Buscar a sessão atual do banco de dados
+          let sessaoToUse = sessionData?.sessao || 1;
+          try {
+            const { data: threadData, error: threadError } = await supabase
+              .from('chat_threads')
+              .select('sessao')
+              .eq('chat_id', threadId)
+              .order('sessao', { ascending: false })
+              .limit(1)
+              .single();
+            
+            if (!threadError && threadData?.sessao) {
+              sessaoToUse = threadData.sessao;
+            }
+          } catch (error) {
+            console.error("Erro ao buscar sessão do banco:", error);
+          }
+
           // Save AI audio message to chat_messages table
-          await ChatMessageService.saveMessage({
+          const saveResult = await ChatMessageService.saveMessage({
             chatId: threadId,
             threadId: currentThread?.threadId || "",
-            sessao: sessionData?.sessao || 1,
+            sessao: sessaoToUse,
             messageId: aiMessage.id,
             sender: "assistant",
             content: JSON.stringify(audioContent),
@@ -617,17 +661,39 @@ export function useChat() {
               text: aiResponse.text || "Mensagem de áudio",
             },
           });
+
+          if (saveResult.error) {
+            console.error("Erro ao salvar mensagem de áudio da IA:", saveResult.error);
+          }
         } else {
           // Create text message
           const messageText =
             typeof aiResponse === "string" ? aiResponse : aiResponse.message;
           aiMessage = ChatService.createAiMessage(threadId, messageText);
 
+          // Buscar a sessão atual do banco de dados
+          let sessaoToUse = sessionData?.sessao || 1;
+          try {
+            const { data: threadData, error: threadError } = await supabase
+              .from('chat_threads')
+              .select('sessao')
+              .eq('chat_id', threadId)
+              .order('sessao', { ascending: false })
+              .limit(1)
+              .single();
+            
+            if (!threadError && threadData?.sessao) {
+              sessaoToUse = threadData.sessao;
+            }
+          } catch (error) {
+            console.error("Erro ao buscar sessão do banco:", error);
+          }
+
           // Save AI text message to chat_messages table
-          await ChatMessageService.saveMessage({
+          const saveResult = await ChatMessageService.saveMessage({
             chatId: threadId,
             threadId: currentThread?.threadId || "",
-            sessao: sessionData?.sessao || 1,
+            sessao: sessaoToUse,
             messageId: aiMessage.id,
             sender: "assistant",
             content: messageText,
@@ -635,6 +701,10 @@ export function useChat() {
             audioUrl: null,
             metadata: {},
           });
+
+          if (saveResult.error) {
+            console.error("Erro ao salvar mensagem de texto da IA:", saveResult.error);
+          }
         }
 
         setChatHistory((prev) => ({

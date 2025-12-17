@@ -21,10 +21,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chat Reviews
   app.post("/api/reviews", async (req, res) => {
     try {
+      console.log("Received review data:", JSON.stringify(req.body, null, 2));
       const reviewData = insertChatReviewSchema.parse(req.body);
+      console.log("Parsed review data:", JSON.stringify(reviewData, null, 2));
       const review = await storage.createChatReview(reviewData);
       res.status(201).json(review);
     } catch (error: any) {
+      console.error("Error creating review:", error);
       res.status(400).json({ error: error.message });
     }
   });

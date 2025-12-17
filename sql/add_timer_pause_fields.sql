@@ -10,3 +10,4 @@ ADD COLUMN IF NOT EXISTS timer_paused_time BIGINT;
 COMMENT ON COLUMN chat_threads.timer_paused IS 'Indica se o timer da sessão está pausado';
 COMMENT ON COLUMN chat_threads.timer_paused_time IS 'Tempo restante em milissegundos quando o timer foi pausado';
 
+

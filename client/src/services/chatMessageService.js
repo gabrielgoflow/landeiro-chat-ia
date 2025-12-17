@@ -15,29 +15,74 @@ export class ChatMessageService {
     metadata = {}
   }) {
     try {
+      // Validar campos obrigatórios
+      if (!chatId) {
+        throw new Error('chatId é obrigatório');
+      }
+      if (!sessao || sessao === undefined || sessao === null) {
+        throw new Error('sessao é obrigatório');
+      }
+      if (!messageId) {
+        throw new Error('messageId é obrigatório');
+      }
+      if (!sender) {
+        throw new Error('sender é obrigatório');
+      }
+      if (!content) {
+        throw new Error('content é obrigatório');
+      }
+
+      console.log('Salvando mensagem:', {
+        chatId,
+        threadId,
+        sessao,
+        messageId,
+        sender,
+        messageType,
+        contentLength: content?.length || 0
+      });
+
       const { data, error } = await supabase
         .from('chat_messages')
         .insert([
           {
             chat_id: chatId,
-            thread_id: threadId,
+            thread_id: threadId || null,
             sessao: sessao,
             message_id: messageId,
             sender,
             content,
             message_type: messageType,
-            audio_url: audioUrl,
-            metadata
+            audio_url: audioUrl || null,
+            metadata: metadata || {}
           }
         ])
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Erro do Supabase ao salvar mensagem:', {
+          error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
+
+      console.log('Mensagem salva com sucesso:', data?.id);
       return { data, error: null }
     } catch (error) {
-      console.error('Error saving message:', error)
-      return { data: null, error: error.message }
+      console.error('Error saving message:', {
+        error,
+        message: error.message,
+        chatId,
+        sessao,
+        sender,
+        messageType
+      });
+      return { data: null, error: error.message || 'Erro desconhecido ao salvar mensagem' }
     }
   }
 

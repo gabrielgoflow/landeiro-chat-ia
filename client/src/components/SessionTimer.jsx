@@ -53,9 +53,72 @@ export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinal
     return { isPaused: false, pausedTime: null };
   };
   
+  // Função para ajustar session_started_at quando retomamos o timer
+  const adjustSessionStartedAtOnResume = async (chatId, sessao, pausedTime) => {
+    if (!chatId || !sessao || pausedTime === null) {
+      console.warn("SessionTimer: Tentativa de ajustar session_started_at sem dados necessários:", { chatId, sessao, pausedTime });
+      return;
+    }
+    
+    try {
+      // Calcular o novo session_started_at baseado no tempo pausado
+      // Se o tempo restante é pausedTime, então o tempo decorrido é SESSION_DURATION_MS - pausedTime
+      // O novo session_started_at deve ser: now - (SESSION_DURATION_MS - pausedTime)
+      const SESSION_DURATION_MS = 60 * 60 * 1000; // 1 hora
+      const now = new Date().getTime();
+      const elapsedWhenPaused = SESSION_DURATION_MS - pausedTime;
+      const newSessionStartedAt = new Date(now - elapsedWhenPaused).toISOString();
+      
+      console.log("SessionTimer: Ajustando session_started_at ao retomar:", {
+        chatId,
+        sessao,
+        pausedTime,
+        pausedTimeMinutes: Math.floor(pausedTime / 60000),
+        elapsedWhenPaused,
+        elapsedWhenPausedMinutes: Math.floor(elapsedWhenPaused / 60000),
+        newSessionStartedAt
+      });
+      
+      const { data, error } = await supabase
+        .from("chat_threads")
+        .update({ session_started_at: newSessionStartedAt })
+        .eq("chat_id", chatId)
+        .eq("sessao", sessao)
+        .select("session_started_at");
+      
+      if (error) {
+        console.error("SessionTimer: Erro ao ajustar session_started_at:", error);
+      } else {
+        console.log("SessionTimer: session_started_at ajustado com sucesso:", {
+          chatId,
+          sessao,
+          newSessionStartedAt: data?.[0]?.session_started_at
+        });
+      }
+    } catch (error) {
+      console.error("SessionTimer: Erro ao ajustar session_started_at:", error);
+    }
+  };
+
   // Função para salvar estado no banco de dados
   const savePausedStateToDB = async (chatId, sessao, isPaused, pausedTime) => {
-    if (!chatId || !sessao) return;
+    if (!chatId || !sessao) {
+      console.warn("SessionTimer: Tentativa de salvar sem chatId ou sessao:", { chatId, sessao });
+      return;
+    }
+    
+    // NÃO salvar durante carregamento do banco ou inicialização
+    if (isLoadingFromDBRef.current || isInitializingRef.current) {
+      console.warn("SessionTimer: Tentativa de salvar durante carregamento/inicialização, ignorando:", {
+        chatId,
+        sessao,
+        isPaused,
+        pausedTime,
+        isLoadingFromDB: isLoadingFromDBRef.current,
+        isInitializing: isInitializingRef.current
+      });
+      return;
+    }
     
     try {
       const updateData = {
@@ -63,20 +126,51 @@ export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinal
         timer_paused_time: isPaused ? pausedTime : null
       };
       
-      const { error } = await supabase
+      console.log("SessionTimer: Tentando salvar estado no banco:", {
+        chatId,
+        sessao,
+        updateData,
+        isLoadingFromDB: isLoadingFromDBRef.current,
+        isInitializing: isInitializingRef.current
+      });
+      
+      const { data, error } = await supabase
         .from("chat_threads")
         .update(updateData)
         .eq("chat_id", chatId)
-        .eq("sessao", sessao);
+        .eq("sessao", sessao)
+        .select();
       
       if (error) {
         console.error("SessionTimer: Erro ao salvar estado no banco:", error);
+        throw error; // Re-throw para que o chamador saiba que falhou
       } else {
-        console.log("SessionTimer: Estado salvo no banco:", {
+        console.log("SessionTimer: Estado salvo no banco com sucesso:", {
           chatId,
           sessao,
-          ...updateData
+          updateData,
+          rowsUpdated: data?.length || 0
         });
+        
+        // Verificar se realmente foi salvo
+        if (data && data.length > 0) {
+          console.log("SessionTimer: Verificação - dados salvos:", data[0]);
+          
+          // Verificar se os dados salvos correspondem ao que tentamos salvar
+          const savedData = data[0];
+          if (savedData.timer_paused !== isPaused || 
+              (isPaused && savedData.timer_paused_time !== pausedTime) ||
+              (!isPaused && savedData.timer_paused_time !== null)) {
+            console.error("SessionTimer: ERRO - Dados salvos não correspondem ao esperado!", {
+              esperado: { isPaused, pausedTime },
+              salvo: { timer_paused: savedData.timer_paused, timer_paused_time: savedData.timer_paused_time }
+            });
+          } else {
+            console.log("SessionTimer: Confirmação - Dados salvos corretamente!");
+          }
+        } else {
+          console.warn("SessionTimer: AVISO - Nenhuma linha foi atualizada!");
+        }
       }
     } catch (error) {
       console.error("SessionTimer: Erro ao salvar estado de pausa no banco:", error);
@@ -108,6 +202,15 @@ export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinal
   
   // Carregar estado do banco quando chatId ou sessao mudarem (troca de aba)
   useEffect(() => {
+    // Criar uma chave única para esta combinação de chatId/sessao
+    const sessionKey = `${chatId}-${sessao}`;
+    
+    // Limpar timeout pendente se existir
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+      notificationTimeoutRef.current = null;
+    }
+    
     const loadState = async () => {
       if (!chatId || !sessao) {
         setIsPaused(false);
@@ -118,19 +221,52 @@ export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinal
         lastSavedStateRef.current = { isPaused: false, pausedTime: null };
         isLoadingFromDBRef.current = false;
         isInitializingRef.current = true; // Resetar flag de inicialização
+        isLoadingStateRef.current = false;
+        lastSessionKeyRef.current = null;
+        lastPauseChangeNotificationRef.current = null;
         return;
       }
       
-      // Só recarregar se chatId ou sessao realmente mudaram
-      if (lastChatIdRef.current === chatId && lastSessaoRef.current === sessao) {
+      // Verificação mais robusta: comparar chatId e sessao separadamente
+      const sessionChanged = 
+        lastChatIdRef.current !== chatId || 
+        lastSessaoRef.current !== sessao;
+      
+      // Só recarregar se a sessão realmente mudou
+      if (!sessionChanged && lastSessionKeyRef.current === sessionKey) {
+        console.log("SessionTimer: Sessão não mudou, ignorando carregamento:", { 
+          sessionKey, 
+          lastSessionKey: lastSessionKeyRef.current,
+          chatId,
+          sessao,
+          lastChatId: lastChatIdRef.current,
+          lastSessao: lastSessaoRef.current
+        });
         return;
       }
+      
+      // Evitar carregamento simultâneo
+      if (isLoadingStateRef.current) {
+        console.log("SessionTimer: Já está carregando estado, ignorando chamada duplicada:", { 
+          chatId, 
+          sessao,
+          sessionKey,
+          lastSessionKey: lastSessionKeyRef.current
+        });
+        return;
+      }
+      
+      // Atualizar refs ANTES de marcar como carregando para evitar execuções duplicadas
+      lastSessionKeyRef.current = sessionKey;
+      lastChatIdRef.current = chatId;
+      lastSessaoRef.current = sessao;
       
       // Marcar como carregando do banco para evitar salvar durante o carregamento
+      isLoadingStateRef.current = true;
       isLoadingFromDBRef.current = true;
       isInitializingRef.current = true;
       
-      console.log("SessionTimer: Carregando estado do banco para:", { chatId, sessao });
+      console.log("SessionTimer: Carregando estado do banco para:", { chatId, sessao, sessionKey });
       const state = await loadPausedStateFromDB(chatId, sessao);
       
       // Atualizar lastSavedStateRef ANTES de atualizar o estado
@@ -140,29 +276,75 @@ export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinal
         pausedTime: state.pausedTime
       };
       
+      // Garantir que userInitiatedChange está false ao carregar do banco
+      userInitiatedChange.current = false;
+      
       // Agora atualizar o estado
       setIsPaused(state.isPaused);
       setPausedTime(state.pausedTime);
       wasPausedRef.current = state.isPaused;
-      lastChatIdRef.current = chatId;
-      lastSessaoRef.current = sessao;
       
-      // Marcar como não carregando após um pequeno delay
+      // Consolidar notificação: só notificar se o valor mudou
+      const shouldNotify = lastPauseChangeNotificationRef.current !== state.isPaused;
+      if (onPauseChange && shouldNotify) {
+        console.log("SessionTimer: Notificando estado pausado após carregar:", {
+          isPaused: state.isPaused,
+          chatId,
+          sessao,
+          previousNotification: lastPauseChangeNotificationRef.current
+        });
+        lastPauseChangeNotificationRef.current = state.isPaused;
+        onPauseChange(state.isPaused);
+      }
+      
+      // Marcar como não carregando após um delay maior
       // para garantir que todos os useEffects tenham processado
-      setTimeout(() => {
+      notificationTimeoutRef.current = setTimeout(() => {
+        console.log("SessionTimer: Finalizando carregamento do banco, habilitando persistência:", {
+          chatId,
+          sessao,
+          sessionKey,
+          estadoCarregado: { isPaused: state.isPaused, pausedTime: state.pausedTime },
+          lastSavedState: lastSavedStateRef.current,
+          userInitiated: userInitiatedChange.current
+        });
         isLoadingFromDBRef.current = false;
         isInitializingRef.current = false;
-      }, 100);
+        isLoadingStateRef.current = false; // Liberar flag de carregamento
+        notificationTimeoutRef.current = null;
+      }, 500);
       
       console.log("SessionTimer: Estado carregado do banco:", {
         chatId,
         sessao,
+        sessionKey,
         isPaused: state.isPaused,
         pausedTime: state.pausedTime
       });
     };
     
-    loadState();
+    loadState().catch((error) => {
+      console.error("SessionTimer: Erro ao carregar estado do banco:", error);
+      isLoadingStateRef.current = false;
+      isLoadingFromDBRef.current = false;
+      isInitializingRef.current = false;
+      // Resetar lastSessionKeyRef em caso de erro para permitir nova tentativa
+      if (error.code !== "PGRST116") {
+        lastSessionKeyRef.current = null;
+      }
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+        notificationTimeoutRef.current = null;
+      }
+    });
+    
+    // Cleanup: cancelar timeout pendente se o componente for desmontado ou sessão mudar
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+        notificationTimeoutRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, sessao]);
   
@@ -173,6 +355,11 @@ export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinal
   const isInitializingRef = useRef(true);
   const isLoadingFromDBRef = useRef(false); // Flag para indicar que estamos carregando do banco
   const lastSavedStateRef = useRef({ isPaused: false, pausedTime: null });
+  const userInitiatedChange = useRef(false); // Flag para rastrear mudanças intencionais do usuário
+  const isLoadingStateRef = useRef(false); // Flag para evitar carregamento simultâneo
+  const lastSessionKeyRef = useRef(null); // Ref para rastrear a última sessão carregada
+  const lastPauseChangeNotificationRef = useRef(null); // Ref para rastrear última notificação de onPauseChange
+  const notificationTimeoutRef = useRef(null); // Ref para armazenar timeout de notificação
 
   useEffect(() => {
     // Se a sessão foi finalizada ou expirou, parar o timer
@@ -227,10 +414,22 @@ export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinal
   useEffect(() => {
     // Não salvar durante inicialização ou carregamento do estado do banco
     if (isInitializingRef.current || isLoadingFromDBRef.current) {
+      console.log("SessionTimer: useEffect de persistência ignorado (inicializando/carregando):", {
+        isInitializing: isInitializingRef.current,
+        isLoadingFromDB: isLoadingFromDBRef.current,
+        isPaused,
+        pausedTime
+      });
       return;
     }
     
-    if (!chatId || !sessao) return;
+    if (!chatId || !sessao) {
+      console.log("SessionTimer: useEffect de persistência ignorado (sem chatId/sessao):", {
+        chatId,
+        sessao
+      });
+      return;
+    }
     
     // Só salvar se o estado realmente mudou E não for o estado inicial padrão
     const currentState = { isPaused, pausedTime };
@@ -238,34 +437,81 @@ export function SessionTimer({ timeRemaining, isExpired, chatId, sessao, isFinal
       lastSavedStateRef.current.isPaused !== currentState.isPaused ||
       lastSavedStateRef.current.pausedTime !== currentState.pausedTime;
     
-    // Só salvar se houve mudança real (não durante carregamento)
-    if (stateChanged) {
-      console.log("SessionTimer: Estado mudou, salvando no banco:", {
+    if (!stateChanged) {
+      // Estado não mudou, não fazer nada
+      return;
+    }
+    
+    // Só salvar se foi uma mudança intencional do usuário
+    if (userInitiatedChange.current) {
+      console.log("SessionTimer: Estado mudou (ação do usuário), salvando no banco:", {
         from: lastSavedStateRef.current,
-        to: currentState
+        to: currentState,
+        chatId,
+        sessao
       });
       savePausedStateToDB(chatId, sessao, isPaused, pausedTime);
+      lastSavedStateRef.current = { ...currentState };
+      // Resetar flag após salvar
+      userInitiatedChange.current = false;
+    } else {
+      // Se houve mudança mas não foi intencional, pode ser uma transição de aba ou carregamento
+      // Neste caso, NÃO salvar para evitar sobrescrever o estado correto do banco
+      console.log("SessionTimer: Estado mudou mas NÃO foi ação do usuário, IGNORANDO salvamento:", {
+        from: lastSavedStateRef.current,
+        to: currentState,
+        userInitiated: userInitiatedChange.current,
+        chatId,
+        sessao,
+        motivo: "Mudança detectada após carregamento do banco ou transição de aba"
+      });
+      // Atualizar lastSavedStateRef para evitar loops, mas NÃO salvar no banco
       lastSavedStateRef.current = { ...currentState };
     }
   }, [isPaused, pausedTime, chatId, sessao]);
 
   // Notificar componente pai sobre mudanças no estado de pausa
+  // IMPORTANTE: Não incluir onPauseChange nas dependências para evitar loops
+  // Só notificar se o valor realmente mudou e não estamos carregando
   useEffect(() => {
-    if (onPauseChange && !isInitializingRef.current && !isLoadingFromDBRef.current) {
+    if (onPauseChange && 
+        !isInitializingRef.current && 
+        !isLoadingFromDBRef.current && 
+        !isLoadingStateRef.current &&
+        lastPauseChangeNotificationRef.current !== isPaused) {
+      console.log("SessionTimer: Notificando mudança de estado pausado:", {
+        isPaused,
+        previousNotification: lastPauseChangeNotificationRef.current
+      });
+      lastPauseChangeNotificationRef.current = isPaused;
       onPauseChange(isPaused);
     }
-  }, [isPaused, onPauseChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaused]);
 
   const handlePauseToggle = async () => {
+    // Marcar como mudança intencional do usuário ANTES de alterar o estado
+    userInitiatedChange.current = true;
+    
     if (isPaused) {
-      // Retomar: limpar o tempo pausado e atualizar no banco
+      // Retomar: ajustar session_started_at e limpar o tempo pausado
       console.log("SessionTimer: Retomando timer");
+      
+      // Salvar o tempo pausado antes de limpar
+      const pausedTimeToUse = pausedTime;
+      
       const newState = { isPaused: false, pausedTime: null };
       lastSavedStateRef.current = newState; // Atualizar ref antes de mudar estado
       setPausedTime(null);
       setIsPaused(false);
       wasPausedRef.current = false;
-      // Atualizar no banco de dados
+      
+      // Ajustar session_started_at no banco para refletir o tempo pausado
+      if (chatId && sessao && pausedTimeToUse !== null) {
+        await adjustSessionStartedAtOnResume(chatId, sessao, pausedTimeToUse);
+      }
+      
+      // Atualizar estado no banco de dados
       if (chatId && sessao) {
         await savePausedStateToDB(chatId, sessao, false, null);
       }
