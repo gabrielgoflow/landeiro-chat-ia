@@ -73,7 +73,7 @@ CREATE POLICY "Users can insert their own diagnosticos" ON user_diagnosticos
 
 -- 9. Inserir os 12 transtornos iniciais
 INSERT INTO diagnosticos (nome, codigo, ativo) VALUES
-  ('Depressão', 'depressao', true),
+  ('Depressão', 'depressão', true),
   ('Transtorno Bipolar', 'transtorno_bipolar', true),
   ('Transtorno de Ansiedade Generalizada (TAG)', 'transtorno_ansiedade_generalizada', true),
   ('Transtorno da Ansiedade Social', 'transtorno_ansiedade_social', true),

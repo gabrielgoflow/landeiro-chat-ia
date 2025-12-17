@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth.jsx";
 import { useToast } from "@/hooks/use-toast";
 import { NewChatDialog } from "./NewChatDialog.jsx";
 import { Logo } from "@/components/Logo";
+import { supabase } from "@/lib/supabase.js";
 
 export function ChatSidebar({
   currentThread,
@@ -26,6 +27,21 @@ export function ChatSidebar({
   const [userChats, setUserChats] = useState([]);
   const [chatReviews, setChatReviews] = useState({});
   const [loadingChats, setLoadingChats] = useState(false);
+  const [diagnosticosMap, setDiagnosticosMap] = useState({});
+
+  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  const getMaxSessionsForDiagnostico = (diagnosticoCodigo) => {
+    // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
+    const normalizedCodigo = diagnosticoCodigo?.toLowerCase() || '';
+    
+    // Depressão tem limite de 14 sessões (contando com a sessão extra)
+    if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
+      return 14;
+    }
+    
+    // Outros diagnósticos têm limite de 10 sessões
+    return 10;
+  };
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -75,6 +91,34 @@ export function ChatSidebar({
       setLoadingChats(false);
     }
   }, [user]);
+
+  // Carregar diagnósticos para mapear código -> nome
+  useEffect(() => {
+    const loadDiagnosticos = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("diagnosticos")
+          .select("codigo, nome")
+          .eq("ativo", true);
+
+        if (error) {
+          console.error("Erro ao carregar diagnósticos:", error);
+          return;
+        }
+
+        // Criar mapa de código para nome
+        const map = {};
+        (data || []).forEach((d) => {
+          map[d.codigo] = d.nome;
+        });
+        setDiagnosticosMap(map);
+      } catch (error) {
+        console.error("Erro ao carregar diagnósticos:", error);
+      }
+    };
+
+    loadDiagnosticos();
+  }, []);
 
   // Load user chats from Supabase on mount and when user changes
   useEffect(() => {
@@ -256,7 +300,7 @@ export function ChatSidebar({
                             variant="default"
                             className="w-fit text-xs bg-gradient-pbe text-white px-2 py-0.5"
                           >
-                            SESSÃO {chat.sessao}/14 (ATUAL)
+                            SESSÃO {chat.sessao}/{getMaxSessionsForDiagnostico(chat.diagnostico)} (ATUAL)
                           </Badge>
                         )}
                       </div>
@@ -264,7 +308,7 @@ export function ChatSidebar({
                       <div className="flex-1 min-w-0 pr-16 sm:pr-24">
                         <div className="flex flex-col space-y-0.5 sm:space-y-1 mb-1.5 sm:mb-2">
                           <Badge variant="secondary" className="w-fit text-[10px] sm:text-xs">
-                            {(chat.diagnostico || "Diagnóstico").toUpperCase()}
+                            {(diagnosticosMap[chat.diagnostico] || chat.diagnostico || "Diagnóstico").toUpperCase()}
                           </Badge>
                           <Badge variant="outline" className="w-fit text-[10px] sm:text-xs">
                             {(chat.protocolo || "Protocolo").toUpperCase()}

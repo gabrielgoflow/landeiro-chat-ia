@@ -4,7 +4,7 @@
 -- 1. Inserir chat_threads (sempre usando TCC)
 INSERT INTO chat_threads (id, chat_id, thread_id, diagnostico, protocolo) VALUES
     ('550e8400-e29b-41d4-a716-446655440001', 'chat_001', 'thread_openai_001', 'ansiedade', 'tcc'),
-    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressao', 'tcc'),
+    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressão', 'tcc'),
     ('550e8400-e29b-41d4-a716-446655440003', 'chat_003', 'thread_openai_003', 'estresse', 'tcc');
 
 -- 2. Inserir user_chats

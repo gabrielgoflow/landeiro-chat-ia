@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -35,6 +35,7 @@ export default function Chat() {
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [selectedSessaoNumber, setSelectedSessaoNumber] = useState(null);
   const [sessionTabsRefreshKey, setSessionTabsRefreshKey] = useState(0);
+  const [maxSessionNumber, setMaxSessionNumber] = useState(0);
   const messagesEndRef = useRef(null);
   const lastChatIdRef = useRef(null);
   const isMobile = useIsMobile();
@@ -58,6 +59,62 @@ export default function Chat() {
 
   const currentChatId = selectedSessionId || currentThread?.id;
   const currentSessao = selectedSessaoNumber || currentThread?.sessionData?.sessao;
+
+  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  const getMaxSessionsForDiagnostico = (diagnosticoCodigo) => {
+    // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
+    const normalizedCodigo = diagnosticoCodigo?.toLowerCase()?.trim() || '';
+    
+    // Depressão tem limite de 14 sessões (contando com a sessão extra)
+    if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
+      return 14;
+    }
+    
+    // Outros diagnósticos têm limite de 10 sessões
+    return 10;
+  };
+  
+  // Buscar número máximo de sessões do thread atual
+  useEffect(() => {
+    const fetchMaxSession = async () => {
+      if (!threadId) {
+        setMaxSessionNumber(0);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from("chat_threads")
+          .select("sessao")
+          .eq("thread_id", threadId)
+          .order("sessao", { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error("Erro ao buscar sessão máxima:", error);
+          return;
+        }
+        
+        if (data) {
+          setMaxSessionNumber(data.sessao || 0);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar sessão máxima:", error);
+      }
+    };
+    
+    fetchMaxSession();
+  }, [threadId]);
+  
+  // Verificar se atingiu o limite de sessões
+  const hasReachedMaxSessions = useMemo(() => {
+    if (!currentThread || !currentThread.sessionData?.diagnostico || maxSessionNumber === 0) {
+      return false;
+    }
+    const maxSessions = getMaxSessionsForDiagnostico(currentThread.sessionData.diagnostico);
+    return maxSessionNumber >= maxSessions;
+  }, [currentThread, maxSessionNumber]);
 
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
@@ -634,24 +691,31 @@ export default function Chat() {
                   Ver Review
                 </Button>
 
-                <Button
-                  onClick={handleStartNextSession}
-                  disabled={isStartingNextSession}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
-                  data-testid="start-next-session-button"
-                >
-                  {isStartingNextSession ? (
-                    <>
-                      <i className="fas fa-spinner fa-spin mr-2"></i>
-                      Iniciando...
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-play mr-2"></i>
-                      Iniciar Próxima Sessão
-                    </>
-                  )}
-                </Button>
+                {hasReachedMaxSessions ? (
+                  <div className="bg-green-50 border border-green-200 text-green-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium">
+                    <i className="fas fa-check-circle mr-2"></i>
+                    Protocolo concluído!
+                  </div>
+                ) : (
+                  <Button
+                    onClick={handleStartNextSession}
+                    disabled={isStartingNextSession}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
+                    data-testid="start-next-session-button"
+                  >
+                    {isStartingNextSession ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin mr-2"></i>
+                        Iniciando...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-play mr-2"></i>
+                        Iniciar Próxima Sessão
+                      </>
+                    )}
+                  </Button>
+                )}
               </>
             )}
 

@@ -57,7 +57,7 @@ async function createTestData(userId) {
           id: '550e8400-e29b-41d4-a716-446655440002',
           chat_id: 'chat_002',
           thread_id: 'thread_openai_002',
-          diagnostico: 'depressao',
+          diagnostico: 'depressão',
           protocolo: 'tcc'
         },
         {

@@ -18,10 +18,55 @@ export function SessionTabs({
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSession, setActiveSession] = useState(null);
+  const [diagnosticosMap, setDiagnosticosMap] = useState({});
   const lastThreadIdRef = useRef(null);
   const lastChatIdRef = useRef(null);
   const lastRefreshKeyRef = useRef(0);
   const isLoadingRef = useRef(false);
+
+  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  const getMaxSessionsForDiagnostico = useMemo(() => {
+    return (diagnosticoCodigo) => {
+      // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
+      const normalizedCodigo = diagnosticoCodigo?.toLowerCase()?.trim() || '';
+      
+      // Depressão tem limite de 14 sessões (contando com a sessão extra)
+      if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
+        return 14;
+      }
+      
+      // Outros diagnósticos têm limite de 10 sessões
+      return 10;
+    };
+  }, []);
+
+  // Carregar diagnósticos para mapear código -> nome
+  useEffect(() => {
+    const loadDiagnosticos = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("diagnosticos")
+          .select("codigo, nome")
+          .eq("ativo", true);
+
+        if (error) {
+          console.error("Erro ao carregar diagnósticos:", error);
+          return;
+        }
+
+        // Criar mapa de código para nome
+        const map = {};
+        (data || []).forEach((d) => {
+          map[d.codigo] = d.nome;
+        });
+        setDiagnosticosMap(map);
+      } catch (error) {
+        console.error("Erro ao carregar diagnósticos:", error);
+      }
+    };
+
+    loadDiagnosticos();
+  }, []);
 
   useEffect(() => {
     // Evitar chamadas duplicadas
@@ -380,8 +425,8 @@ export function SessionTabs({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4 text-sm">
                   <span className="font-medium">
-                    Sessão {session.sessao}/14 - {session.diagnostico} (
-                    {session.protocolo.toUpperCase()})
+                    Sessão {session.sessao}/{getMaxSessionsForDiagnostico(session.diagnostico || '')} - {diagnosticosMap[session.diagnostico] || session.diagnostico || 'N/A'} (
+                    {session.protocolo?.toUpperCase() || 'TCC'})
                   </span>
                   <span className="text-gray-500">
                     Iniciada em{" "}

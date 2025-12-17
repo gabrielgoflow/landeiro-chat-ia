@@ -1,6 +1,20 @@
 import { supabase } from "@/lib/supabase.js";
 
 export class SupabaseService {
+  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  static getMaxSessionsForDiagnostico(diagnosticoCodigo) {
+    // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
+    const normalizedCodigo = diagnosticoCodigo?.toLowerCase() || '';
+    
+    // Depressão tem limite de 14 sessões (contando com a sessão extra)
+    if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
+      return 14;
+    }
+    
+    // Outros diagnósticos têm limite de 10 sessões
+    return 10;
+  }
+
   // Incrementar sessão de um chat existente (para "Iniciar Próxima Sessão")
   static async incrementChatSession(chatId) {
     try {
@@ -17,12 +31,15 @@ export class SupabaseService {
 
       const currentSession = lastSession?.sessao || 0;
       const nextSession = currentSession + 1;
+      
+      // Obter limite máximo baseado no diagnóstico
+      const maxSessions = this.getMaxSessionsForDiagnostico(lastSession?.diagnostico);
 
-      // Verificar se já atingiu o limite de 10 sessões
-      if (currentSession >= 10) {
+      // Verificar se já atingiu o limite de sessões para este diagnóstico
+      if (currentSession >= maxSessions) {
         return {
           data: null,
-          error: "Limite de 10 sessões atingido para este diagnóstico",
+          error: `Limite de ${maxSessions} sessões atingido para este diagnóstico`,
           newSession: null,
         };
       }
@@ -382,6 +399,23 @@ export class SupabaseService {
       return { error: null };
     } catch (error) {
       console.error("Error deleting chat thread:", error);
+      return { error: error.message };
+    }
+  }
+
+  // Deletar uma sessão específica (chat_id + sessao)
+  static async deleteSession(chatId, sessao) {
+    try {
+      const { error } = await supabase
+        .from("chat_threads")
+        .delete()
+        .eq("chat_id", chatId)
+        .eq("sessao", sessao);
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error("Error deleting session:", error);
       return { error: error.message };
     }
   }

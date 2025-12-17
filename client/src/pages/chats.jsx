@@ -29,6 +29,20 @@ export default function ChatsPage() {
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
 
+  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  const getMaxSessionsForDiagnostico = (diagnosticoCodigo) => {
+    // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
+    const normalizedCodigo = diagnosticoCodigo?.toLowerCase() || '';
+    
+    // Depressão tem limite de 14 sessões (contando com a sessão extra)
+    if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
+      return 14;
+    }
+    
+    // Outros diagnósticos têm limite de 10 sessões
+    return 10;
+  };
+
   useEffect(() => {
     if (user) {
       loadUserChats();
@@ -245,7 +259,7 @@ export default function ChatsPage() {
                   variant="default"
                   className="w-fit text-xs bg-indigo-600 text-white px-2 py-0.5"
                 >
-                  SESSÃO {chat.sessao}/14 (ATUAL)
+                  SESSÃO {chat.sessao}/{getMaxSessionsForDiagnostico(chat.diagnostico)} (ATUAL)
                 </Badge>
               );
               // Data da última mensagem

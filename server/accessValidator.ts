@@ -3,6 +3,58 @@ import { diagnosticos, userMetadata, chatThreads, userChats, type UserMetadata, 
 import { eq, and, sql } from "drizzle-orm";
 
 export class AccessValidator {
+  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  // Versão síncrona para uso rápido (usa comparação de strings)
+  static getMaxSessionsForDiagnostico(diagnosticoCodigo: string): number {
+    // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
+    const normalizedCodigo = diagnosticoCodigo?.toLowerCase() || '';
+    
+    // Depressão tem limite de 14 sessões (contando com a sessão extra)
+    if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
+      return 14;
+    }
+    
+    // Outros diagnósticos têm limite de 10 sessões
+    return 10;
+  }
+
+  // Função assíncrona para consultar o banco via MCP Supabase e determinar o limite
+  static async getMaxSessionsForDiagnosticoAsync(diagnosticoCodigo: string): Promise<number> {
+    if (!diagnosticoCodigo) {
+      return 10; // Default
+    }
+
+    try {
+      // Consultar a tabela diagnosticos para verificar se é depressão
+      // Usando Drizzle ORM que já está configurado
+      if (db) {
+        const diagnosticoResult = await db
+          .select()
+          .from(diagnosticos)
+          .where(eq(diagnosticos.codigo, diagnosticoCodigo))
+          .limit(1);
+
+        if (diagnosticoResult && diagnosticoResult.length > 0) {
+          const diagnostico = diagnosticoResult[0];
+          const normalizedCodigo = diagnostico.codigo?.toLowerCase() || '';
+          const normalizedNome = diagnostico.nome?.toLowerCase() || '';
+          
+          // Verificar se é depressão pelo código ou nome
+          if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao' ||
+              normalizedNome.includes('depressão') || normalizedNome.includes('depressao')) {
+            return 14;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao consultar diagnóstico para limite de sessões:", error);
+      // Fallback para a versão síncrona em caso de erro
+      return this.getMaxSessionsForDiagnostico(diagnosticoCodigo);
+    }
+
+    // Default: 10 sessões para outros diagnósticos
+    return 10;
+  }
   /**
    * Verifica se o usuário pode acessar um diagnóstico específico
    * Valida apenas: se o transtorno está ativo e se a data final de acesso é válida
@@ -156,12 +208,15 @@ export class AccessValidator {
 
       // Se já existe um chat para este diagnóstico
       if (existingChats && existingChats.length > 0) {
-        // Verificar se já atingiu o máximo de 10 sessões
+        // Obter limite máximo baseado no diagnóstico (consultando o banco)
+        const maxSessions = await this.getMaxSessionsForDiagnosticoAsync(diagnosticoCodigo);
         const maxSessao = existingChats[0].maxSessao || 0;
-        if (maxSessao >= 10) {
+        
+        // Verificar se já atingiu o limite de sessões para este diagnóstico
+        if (maxSessao >= maxSessions) {
           return {
             canAccess: false,
-            reason: "Limite de 10 sessões atingido para este diagnóstico",
+            reason: `Limite de ${maxSessions} sessões atingido para este diagnóstico`,
           };
         }
         

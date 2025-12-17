@@ -37,6 +37,7 @@ export default function Chat() {
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [selectedSessaoNumber, setSelectedSessaoNumber] = useState(null);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
+  const [maxSessionNumber, setMaxSessionNumber] = useState(0);
   
   // Usar useCallback para evitar recriação da função e loops
   const handlePauseChange = useCallback((paused) => {
@@ -64,6 +65,22 @@ export default function Chat() {
     clearError,
   } = useChat();
 
+  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  const getMaxSessionsForDiagnostico = (diagnosticoCodigo) => {
+    // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
+    const normalizedCodigo = diagnosticoCodigo?.toLowerCase()?.trim() || '';
+    
+    // Depressão tem limite de 14 sessões (contando com a sessão extra)
+    if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
+      return 14;
+    }
+    
+    // Outros diagnósticos têm limite de 10 sessões
+    return 10;
+  };
+  
+  // Verificar se atingiu o limite de sessões (será movido para depois da declaração de currentSessao)
+
   // Timer da sessão - buscar session_started_at da sessão atual
   // Memoizado para evitar recálculos desnecessários
   const sessionStartedAt = useMemo(() => {
@@ -76,6 +93,97 @@ export default function Chat() {
   
   const currentChatId = selectedSessionId || currentThread?.id;
   const currentSessao = selectedSessaoNumber || currentThread?.sessionData?.sessao;
+  
+  // Buscar número máximo de sessões do thread atual (movido para depois da declaração de currentSessao)
+  useEffect(() => {
+    const fetchMaxSession = async () => {
+      // Usar threadId do estado ou do currentThread
+      const threadIdToUse = threadId || currentThread?.threadId;
+      
+      if (!threadIdToUse) {
+        console.log('[DEBUG] fetchMaxSession: threadId não definido, resetando maxSessionNumber');
+        setMaxSessionNumber(0);
+        return;
+      }
+      
+      try {
+        console.log('[DEBUG] fetchMaxSession: Buscando sessão máxima para threadId:', threadIdToUse);
+        const { data, error } = await supabase
+          .from("chat_threads")
+          .select("sessao")
+          .eq("thread_id", threadIdToUse)
+          .order("sessao", { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error("[DEBUG] fetchMaxSession: Erro ao buscar sessão máxima:", error);
+          // Se não encontrou, tentar usar a sessão atual como fallback
+          const sessaoAtual = currentSessao || currentThread?.sessionData?.sessao;
+          if (sessaoAtual) {
+            console.log('[DEBUG] fetchMaxSession: Usando sessão atual como fallback:', sessaoAtual);
+            setMaxSessionNumber(sessaoAtual);
+          }
+          return;
+        }
+        
+        if (data) {
+          console.log('[DEBUG] fetchMaxSession: Sessão máxima encontrada:', data.sessao);
+          setMaxSessionNumber(data.sessao || 0);
+        } else {
+          const sessaoAtual = currentSessao || currentThread?.sessionData?.sessao;
+          console.log('[DEBUG] fetchMaxSession: Nenhuma sessão encontrada, usando sessão atual:', sessaoAtual);
+          setMaxSessionNumber(sessaoAtual || 0);
+        }
+      } catch (error) {
+        console.error("[DEBUG] fetchMaxSession: Erro ao buscar sessão máxima:", error);
+        // Fallback para sessão atual
+        const sessaoAtual = currentSessao || currentThread?.sessionData?.sessao;
+        if (sessaoAtual) {
+          setMaxSessionNumber(sessaoAtual);
+        }
+      }
+    };
+    
+    fetchMaxSession();
+  }, [threadId, currentThread?.threadId, currentSessao, currentThread?.sessionData?.sessao]);
+  
+  // Verificar se atingiu o limite de sessões
+  const hasReachedMaxSessions = useMemo(() => {
+    // Usar a sessão atual se maxSessionNumber não estiver disponível
+    const sessionNumberToCheck = maxSessionNumber > 0 ? maxSessionNumber : (currentSessao || currentThread?.sessionData?.sessao);
+    
+    if (!currentThread || !currentThread.sessionData?.diagnostico) {
+      console.log('[DEBUG] hasReachedMaxSessions: Condições não atendidas - sem currentThread ou diagnostico', {
+        hasCurrentThread: !!currentThread,
+        diagnostico: currentThread?.sessionData?.diagnostico,
+      });
+      return false;
+    }
+    
+    if (!sessionNumberToCheck || sessionNumberToCheck === 0) {
+      console.log('[DEBUG] hasReachedMaxSessions: Condições não atendidas - sem número de sessão', {
+        maxSessionNumber,
+        currentSessao,
+        sessaoFromThread: currentThread?.sessionData?.sessao,
+        sessionNumberToCheck
+      });
+      return false;
+    }
+    
+    const maxSessions = getMaxSessionsForDiagnostico(currentThread.sessionData.diagnostico);
+    const reached = sessionNumberToCheck >= maxSessions;
+    console.log('[DEBUG] hasReachedMaxSessions: Verificação FINAL', {
+      sessionNumberToCheck,
+      maxSessions,
+      diagnostico: currentThread.sessionData.diagnostico,
+      reached,
+      maxSessionNumber,
+      currentSessao,
+      sessaoFromThread: currentThread?.sessionData?.sessao
+    });
+    return reached;
+  }, [currentThread, maxSessionNumber, currentSessao]);
   
   const { timeRemaining, isExpired: isSessionExpired } = useSessionTimer(
     currentChatId,
@@ -503,6 +611,86 @@ export default function Chat() {
     }
   };
 
+  // Finalização automática quando sessão expira por tempo
+  const hasAutoFinalizedRef = useRef(false);
+  const lastExpiredSessionRef = useRef(null);
+  const hasDeletedEmptySessionRef = useRef(false);
+  
+  useEffect(() => {
+    // Verificar se a sessão expirou e ainda não foi finalizada
+    if (isSessionExpired && !hasReview && currentThread) {
+      const sessionKey = `${selectedSessionId}-${selectedSessaoNumber}`;
+      
+      // Se não há mensagens, deletar a sessão
+      if (currentMessages.length === 0) {
+        // Evitar múltiplas tentativas de deletar a mesma sessão
+        if (hasDeletedEmptySessionRef.current && lastExpiredSessionRef.current === sessionKey) {
+          return;
+        }
+        
+        console.log('Sessão expirada sem mensagens, deletando sessão...', {
+          chatId: selectedSessionId,
+          sessao: selectedSessaoNumber
+        });
+        
+        hasDeletedEmptySessionRef.current = true;
+        lastExpiredSessionRef.current = sessionKey;
+        
+        // Deletar a sessão do banco de dados
+        const deleteEmptySession = async () => {
+          try {
+            const { error } = await supabaseService.deleteSession(selectedSessionId, selectedSessaoNumber);
+            if (error) {
+              console.error('Erro ao deletar sessão vazia:', error);
+            } else {
+              console.log('Sessão vazia deletada com sucesso');
+              // Recarregar a página para atualizar a interface
+              window.location.reload();
+            }
+          } catch (error) {
+            console.error('Erro ao deletar sessão vazia:', error);
+          }
+        };
+        
+        deleteEmptySession();
+        return;
+      }
+      
+      // Evitar múltiplas finalizações para a mesma sessão
+      if (hasAutoFinalizedRef.current && lastExpiredSessionRef.current === sessionKey) {
+        return;
+      }
+      
+      // Verificar se já tem pelo menos 4 mensagens antes de finalizar automaticamente
+      if (currentMessages.length >= 4) {
+        console.log('Sessão expirada automaticamente, finalizando atendimento...', {
+          chatId: selectedSessionId,
+          sessao: selectedSessaoNumber,
+          messageCount: currentMessages.length
+        });
+        
+        hasAutoFinalizedRef.current = true;
+        lastExpiredSessionRef.current = sessionKey;
+        
+        // Chamar finalização automática
+        handleFinalizeChat();
+      } else {
+        console.log('Sessão expirada mas não há mensagens suficientes para finalizar automaticamente', {
+          chatId: selectedSessionId,
+          sessao: selectedSessaoNumber,
+          messageCount: currentMessages.length
+        });
+      }
+    } else if (!isSessionExpired) {
+      // Resetar flags quando a sessão não está mais expirada (nova sessão)
+      const sessionKey = `${selectedSessionId}-${selectedSessaoNumber}`;
+      if (lastExpiredSessionRef.current !== sessionKey) {
+        hasAutoFinalizedRef.current = false;
+        hasDeletedEmptySessionRef.current = false;
+      }
+    }
+  }, [isSessionExpired, hasReview, currentThread, selectedSessionId, selectedSessaoNumber, currentMessages.length, handleFinalizeChat]);
+
   const handleStartNextSession = async () => {
     if (!currentThread) return;
     setIsStartingNextSession(true);
@@ -731,33 +919,41 @@ export default function Chat() {
                   Ver Review
                 </Button>
 
-                <Button
-                  onClick={handleStartNextSession}
-                  disabled={isStartingNextSession}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
-                  data-testid="start-next-session-button"
-                >
-                  {isStartingNextSession ? (
-                    <>
-                      <i className="fas fa-spinner fa-spin mr-2"></i>
-                      Iniciando...
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-play mr-2"></i>
-                      Iniciar Próxima Sessão
-                    </>
-                  )}
-                </Button>
+                {hasReachedMaxSessions ? (
+                  <div className="bg-green-50 border border-green-200 text-green-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium">
+                    <i className="fas fa-check-circle mr-2"></i>
+                    Protocolo concluído!
+                  </div>
+                ) : (
+                  <Button
+                    onClick={handleStartNextSession}
+                    disabled={isStartingNextSession}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
+                    data-testid="start-next-session-button"
+                  >
+                    {isStartingNextSession ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin mr-2"></i>
+                        Iniciando...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-play mr-2"></i>
+                        Iniciar Próxima Sessão
+                      </>
+                    )}
+                  </Button>
+                )}
               </>
             )}
 
             {currentThread && !hasReview && (
               <Button
                 onClick={handleFinalizeChat}
-                disabled={isFinalizingChat}
-                className="bg-green-600 hover:bg-green-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
+                disabled={isFinalizingChat || currentMessages.length < 4}
+                className="bg-green-600 hover:bg-green-700 text-white px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="finalize-chat-button"
+                title={currentMessages.length < 4 ? "É necessário ter pelo menos 4 mensagens para finalizar o atendimento" : "Finalizar atendimento"}
               >
                 {isFinalizingChat ? (
                   <>

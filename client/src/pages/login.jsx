@@ -64,7 +64,7 @@ export default function Login() {
           </div>
           <CardTitle className="text-xl sm:text-2xl text-center">Entrar na conta</CardTitle>
           <CardDescription className="text-sm sm:text-base text-center">
-            Entre com seu email e senha para acessar o chat IA
+            Entre com seu email e senha para acessar a Prática Clínica Simulada
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -100,7 +100,21 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
     return Object.keys(threadsByDiagnostico).length > 0;
   };
 
-  // Verificar se o chat já atingiu o máximo de 10 sessões
+  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  const getMaxSessionsForDiagnostico = (diagnosticoCodigo) => {
+    // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
+    const normalizedCodigo = diagnosticoCodigo?.toLowerCase() || '';
+    
+    // Depressão tem limite de 14 sessões (contando com a sessão extra)
+    if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
+      return 14;
+    }
+    
+    // Outros diagnósticos têm limite de 10 sessões
+    return 10;
+  };
+
+  // Verificar se o chat já atingiu o máximo de sessões para o diagnóstico
   const hasMaxSessions = (diagnosticoCodigo) => {
     const threadsByDiagnostico = {};
     userChats.forEach((chat) => {
@@ -116,9 +130,12 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
       }
     });
     
-    // Verificar se algum thread já tem 10 ou mais sessões
+    // Obter limite máximo baseado no diagnóstico
+    const maxSessions = getMaxSessionsForDiagnostico(diagnosticoCodigo);
+    
+    // Verificar se algum thread já atingiu o limite de sessões
     return Object.values(threadsByDiagnostico).some(
-      (thread) => thread.maxSessao >= 10
+      (thread) => thread.maxSessao >= maxSessions
     );
   };
 
@@ -164,11 +181,12 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
         return;
       }
 
-      // Verificar se algum chat deste diagnóstico já atingiu 10 sessões
+      // Verificar se algum chat deste diagnóstico já atingiu o limite de sessões
       if (hasMaxSessions(formData.diagnostico)) {
+        const maxSessions = getMaxSessionsForDiagnostico(formData.diagnostico);
         toast({
           title: "Limite de sessões atingido",
-          description: "Este diagnóstico já atingiu o máximo de 10 sessões.",
+          description: `Este diagnóstico já atingiu o máximo de ${maxSessions} sessões.`,
           variant: "destructive",
         });
         return;

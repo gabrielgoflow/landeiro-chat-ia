@@ -10,7 +10,7 @@
 -- Exemplo de dados de teste para chat_threads
 INSERT INTO chat_threads (id, chat_id, thread_id, diagnostico, protocolo) VALUES
     ('550e8400-e29b-41d4-a716-446655440001', 'chat_001', 'thread_openai_001', 'ansiedade', 'tcc'),
-    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressao', 'dbt'),
+    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressão', 'dbt'),
     ('550e8400-e29b-41d4-a716-446655440003', 'chat_003', 'thread_openai_003', 'estresse', 'mindfulness');
 
 -- Exemplo de dados de teste para user_chats

@@ -51,7 +51,7 @@ Se preferir executar SQL manualmente:
 -- Inserir chat threads
 INSERT INTO chat_threads (id, chat_id, thread_id, diagnostico, protocolo) VALUES
     ('550e8400-e29b-41d4-a716-446655440001', 'chat_001', 'thread_openai_001', 'ansiedade', 'tcc'),
-    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressao', 'dbt');
+    ('550e8400-e29b-41d4-a716-446655440002', 'chat_002', 'thread_openai_002', 'depressão', 'dbt');
 
 -- Inserir user chats (substitua YOUR_USER_ID)
 INSERT INTO user_chats (user_id, chat_id, chat_threads_id) VALUES
