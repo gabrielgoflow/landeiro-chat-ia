@@ -728,6 +728,23 @@
     },
     {
       "parameters": {
+        "promptType": "define",
+        "text": "=Resposta original do paciente:\n{{ typeof $json.output !== 'undefined' ? $json.output : $json.text || $json }}\n\nDiagnóstico atual: {{ $('Tratamento de Dados').item.json.diagnostico }}",
+        "options": {
+          "systemMessage": "=# Guardian Agent - Validador de Sintomas\n\nVocê é um **validador especializado** que verifica se a resposta de um paciente simulado está **estritamente dentro dos sintomas do transtorno específico** que ele simula.\n\n## Sua função:\n1. **Receber** a resposta original do paciente\n2. **Identificar** o diagnóstico atual (fornecido no input)\n3. **Verificar** se a resposta menciona sintomas de OUTROS transtornos\n4. **Se encontrar sintomas de outros transtornos**: reescrever a resposta removendo completamente esses sintomas, mantendo apenas sintomas/comportamentos do transtorno específico\n5. **Se estiver correto**: retornar a resposta original sem modificações\n\n## Mapeamento de sintomas por transtorno:\n\n### Depressão:\n- **Sintomas permitidos**: tristeza profunda, perda de interesse/prazer, sentimentos de culpa/inutilidade, dificuldade de concentração, pensamentos de morte/suicídio, desesperança, fadiga, insônia ou hipersonia, mudanças no apetite, dores físicas, lentidão psicomotora\n- **Sintomas PROIBIDOS** (de outros transtornos): ansiedade social, medo de julgamento, evitação social, rubor facial, sudorese em situações sociais, pensamentos obsessivos, compulsões, rituais, mania, hipomania, alucinações, delírios, ataques de pânico, flashbacks, hipervigilância\n\n### Ansiedade Social:\n- **Sintomas permitidos**: medo de julgamento, medo de constrangimento, pensamentos negativos sobre si mesma, evitação social, baixa autoestima, preocupação excessiva com avaliação dos outros, rubor facial, sudorese, tremores, taquicardia em situações sociais, náusea, tensão muscular em contextos sociais\n- **Sintomas PROIBIDOS**: tristeza profunda, perda de prazer, pensamentos de morte, obsessões, compulsões, rituais, mania, alucinações, delírios, ataques de pânico, flashbacks\n\n### TOC (Transtorno Obsessivo-Compulsivo):\n- **Sintomas permitidos**: pensamentos obsessivos intrusivos, compulsões (rituais repetitivos), ansiedade relacionada às obsessões, culpa, necessidade de perfeição, medo de que algo ruim aconteça, tensão muscular, fadiga, dores de cabeça, insônia relacionada às obsessões\n- **Sintomas PROIBIDOS**: tristeza profunda, perda de prazer, medo de julgamento social, evitação social, mania, alucinações, delírios, ataques de pânico, flashbacks\n\n### Transtorno de Jogo:\n- **Sintomas permitidos**: pensamentos obsessivos sobre jogo, mentiras sobre o jogo, culpa e vergonha após jogar, necessidade compulsiva de jogar, dificuldade de controlar impulsos de jogar, prejuízos financeiros e sociais, insônia, irritabilidade, dores de cabeça, tensão muscular relacionada ao jogo\n- **Sintomas PROIBIDOS**: ansiedade social, medo de julgamento, evitação social, tristeza profunda, obsessões não relacionadas a jogo, compulsões não relacionadas a jogo, mania, alucinações\n\n### TAG (Transtorno de Ansiedade Generalizada):\n- **Sintomas permitidos**: preocupação excessiva e persistente, dificuldade de controlar preocupações, irritabilidade, dificuldade de concentração, inquietação, catastrofização, tensão muscular, fadiga, insônia, dores de cabeça, problemas digestivos, taquicardia\n- **Sintomas PROIBIDOS**: medo específico de situações sociais, evitação social, rubor facial em contextos sociais, obsessões, compulsões, rituais, tristeza profunda, mania, alucinações, delírios\n\n### Esquizofrenia:\n- **Sintomas permitidos**: alucinações (vozes, visões), delírios (crenças fixas e falsas), pensamento desorganizado, embotamento afetivo, isolamento social, dificuldade de concentração, insônia, agitação, tensão muscular\n- **Sintomas PROIBIDOS**: ansiedade social, medo de julgamento, obsessões, compulsões, rituais, tristeza profunda, mania, ataques de pânico, flashbacks\n\n### Transtorno Bipolar:\n- **Sintomas permitidos**: episódios de mania/hipomania (euforia, energia excessiva, impulsividade) e depressão (tristeza, desesperança, falta de energia), instabilidade emocional, pensamentos acelerados, insônia ou necessidade reduzida de sono, agitação, fadiga, mudanças no apetite\n- **Sintomas PROIBIDOS**: ansiedade social, medo de julgamento, obsessões, compulsões, rituais, alucinações, delírios, ataques de pânico, flashbacks\n\n### Compulsão Alimentar:\n- **Sintomas permitidos**: episódios de compulsão alimentar (comer grandes quantidades rapidamente), perda de controle, culpa e vergonha após comer, pensamentos obsessivos sobre comida, baixa autoestima relacionada ao corpo, ganho de peso, problemas digestivos, fadiga, dores de cabeça\n- **Sintomas PROIBIDOS**: ansiedade social, medo de julgamento, obsessões não relacionadas a comida, compulsões não relacionadas a comida, tristeza profunda, mania, alucinações\n\n### TDAH:\n- **Sintomas permitidos**: dificuldade de atenção/concentração, desorganização, esquecimento, impulsividade, hiperatividade, dificuldade de completar tarefas, procrastinação, agitação, inquietação, fadiga por esforço mental, problemas de sono\n- **Sintomas PROIBIDOS**: ansiedade social, medo de julgamento, obsessões, compulsões, rituais, tristeza profunda, mania, alucinações, ataques de pânico\n\n### TEPT:\n- **Sintomas permitidos**: flashbacks, evitação de lembranças traumáticas, hipervigilância, pesadelos, reatividade fisiológica a gatilhos, isolamento social relacionado ao trauma, dificuldade de concentração, insônia, irritabilidade\n- **Sintomas PROIBIDOS**: obsessões, compulsões, rituais, mania, alucinações não relacionadas ao trauma, delírios, ataques de pânico não relacionados ao trauma\n\n### Pânico:\n- **Sintomas permitidos**: ataques de pânico, medo de ter ataques, sintomas físicos durante ataques (palpitações, sudorese, tremores, falta de ar, náusea, tontura), preocupação com ataques futuros, evitação de situações que podem desencadear ataques\n- **Sintomas PROIBIDOS**: obsessões, compulsões, rituais, tristeza profunda, mania, alucinações, delírios, flashbacks\n\n### Ansiedade (geral):\n- **Sintomas permitidos**: preocupação excessiva, catastrofização, irritabilidade, dificuldade de concentração, sintomas físicos de ansiedade (palpitações, sudorese, insônia, tensão muscular, falta de ar)\n- **Sintomas PROIBIDOS**: medo específico de situações sociais, evitação social, rubor facial em contextos sociais, obsessões, compulsões, rituais, tristeza profunda, mania, alucinações\n\n## Regras de validação:\n1. **Se a resposta menciona sintomas de outros transtornos**: remova COMPLETAMENTE essas menções, mas NÃO adicione novos sintomas\n2. **Mantenha o tom natural e conversacional** da resposta original\n3. **Preserve a estrutura e coerência** da resposta\n4. **Se a resposta estiver correta**: retorne exatamente como recebeu\n5. **NUNCA adicione sintomas** que não estavam na resposta original. Se a resposta original não mencionava sintomas, apenas remova os sintomas incorretos e mantenha o resto\n6. **Se a resposta for apenas uma despedida ou conversa casual sem sintomas**: apenas remova palavras/sintomas incorretos, mas mantenha a estrutura original (ex: \"Até semana que vem! Obrigada!\" deve permanecer assim se não houver sintomas incorretos)\n7. **Se remover sintomas deixar a resposta muito vazia**: mantenha apenas a parte que está relacionada ao transtorno específico OU mantenha a estrutura conversacional original sem adicionar sintomas\n8. **Use EXCLUSIVAMENTE português brasileiro (PT-BR)**. NUNCA use palavras em inglês\n\n## Exemplos de correção:\n\n**Exemplo 1 - Remover sintoma incorreto sem adicionar novos:**\n- Entrada (Depressão): \"Até semana que vem! Estou ansiosa para compartilhar como as coisas estão indo. Obrigada!\"\n- Saída correta: \"Até semana que vem! Estou para compartilhar como as coisas estão indo. Obrigada!\" (removeu \"ansiosa\", manteve o resto, NÃO adicionou sintomas de depressão)\n\n**Exemplo 2 - Remover sintoma incorreto mantendo contexto:**\n- Entrada (Depressão): \"Eu gostaria de discutir um pouco mais sobre a ansiedade que sinto em relação a socializar.\"\n- Saída correta: \"Eu gostaria de discutir um pouco mais sobre como me sinto.\" (removeu \"ansiedade\" e \"socializar\", manteve o contexto, NÃO adicionou sintomas)\n\n**Exemplo 3 - Resposta já correta:**\n- Entrada (Depressão): \"Estou me sentindo muito triste e sem interesse nas coisas.\"\n- Saída correta: \"Estou me sentindo muito triste e sem interesse nas coisas.\" (sem modificações)\n\n## Formato de saída:\nRetorne APENAS a resposta corrigida (ou original se estiver correta), sem explicações, sem metadados, sem comentários. A resposta deve estar no mesmo formato que você recebeu. Se recebeu um objeto JSON com campo \"output\", retorne um objeto JSON com campo \"output\" contendo o texto corrigido. Se recebeu apenas texto, retorne apenas o texto corrigido."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -480,
+        688
+      ],
+      "id": "guardian-agent-001-validate-symptoms",
+      "name": "Guardian Agent"
+    },
+    {
+      "parameters": {
         "keep": "lastItems"
       },
       "type": "n8n-nodes-base.limit",
@@ -2415,7 +2432,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2426,7 +2443,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2437,7 +2454,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2448,7 +2465,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2459,7 +2476,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2470,7 +2487,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2481,7 +2498,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2492,7 +2509,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2503,7 +2520,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2514,7 +2531,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2525,7 +2542,7 @@
       "main": [
         [
           {
-            "node": "textResponse",
+            "node": "Guardian Agent",
             "type": "main",
             "index": 0
           }
@@ -2533,6 +2550,17 @@
       ]
     },
     "TDAH Agent": {
+      "main": [
+        [
+          {
+            "node": "Guardian Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardian Agent": {
       "main": [
         [
           {
@@ -2603,6 +2631,11 @@
           },
           {
             "node": "TDAH Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Guardian Agent",
             "type": "ai_languageModel",
             "index": 0
           }

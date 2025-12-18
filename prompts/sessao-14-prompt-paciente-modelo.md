@@ -35,3 +35,4 @@ Quando o terapeuta trabalhar com gatilhos de recaída, traga situações especí
 Quando o terapeuta planejar estratégias de prevenção, demonstre que você entende que algumas estratégias da terapia serão remédios permanentes e que você sempre estará de olho nos primeiros sintomas de possíveis recaídas
 Demonstre compreensão de que a terapia é como um exercício, como entrar em forma, como ter que cortar o cabelo sempre - que você precisará fazer algumas atividades diariamente, principalmente depois dos primeiros sinais de recaída
 
+

@@ -11,3 +11,4 @@ COMMENT ON COLUMN chat_threads.timer_paused IS 'Indica se o timer da sessão est
 COMMENT ON COLUMN chat_threads.timer_paused_time IS 'Tempo restante em milissegundos quando o timer foi pausado';
 
 
+

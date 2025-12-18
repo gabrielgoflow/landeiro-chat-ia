@@ -16,8 +16,162 @@ import { AccessValidator } from "./accessValidator.js";
 import { trackChatCost } from "./costTracker.js";
 import OpenAI from "openai";
 import { Readable } from "stream";
+import { db, supabaseClient } from "./db.js";
+import { sendPasswordResetEmail } from "./emailService.js";
+import { randomUUID } from "crypto";
+import { sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Password Reset Endpoints
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email || typeof email !== "string" || !email.includes("@")) {
+        return res.status(400).json({ error: "Email inválido" });
+      }
+
+      // Buscar usuário no Supabase Auth
+      if (!supabaseClient) {
+        return res.status(500).json({ error: "Serviço de autenticação não configurado" });
+      }
+
+      // Verificar se o email existe (sem revelar se existe ou não por segurança)
+      const { data: users, error: listError } = await supabaseClient.auth.admin.listUsers();
+      
+      if (listError) {
+        console.error("Erro ao listar usuários:", listError);
+        // Por segurança, sempre retornar sucesso mesmo se houver erro
+        return res.json({ 
+          message: "Se o email existir, você receberá um link de reset de senha" 
+        });
+      }
+
+      const user = users.users.find((u) => u.email === email.toLowerCase().trim());
+
+      // Sempre retornar sucesso (não revelar se email existe)
+      if (!user) {
+        console.log(`Tentativa de reset para email não cadastrado: ${email}`);
+        return res.json({ 
+          message: "Se o email existir, você receberá um link de reset de senha" 
+        });
+      }
+
+      // Gerar token único
+      const token = randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1); // Expira em 1 hora
+
+      // Salvar token no banco de dados
+      if (!db) {
+        return res.status(500).json({ error: "Banco de dados não configurado" });
+      }
+
+      await db.execute(sql`
+        INSERT INTO password_reset_tokens (user_id, email, token, expires_at)
+        VALUES (${user.id}, ${email.toLowerCase().trim()}, ${token}, ${expiresAt.toISOString()})
+      `);
+
+      // Construir URL de reset
+      const frontendUrl = process.env.VITE_FRONTEND_URL|| 
+                         req.headers.origin || 
+                         `http://localhost:${process.env.PORT || 5000}`;
+      const resetUrl = `${frontendUrl}/reset-password/${token}`;
+
+      // Enviar email
+      try {
+        await sendPasswordResetEmail(email, resetUrl);
+        console.log(`Email de reset enviado para: ${email}`);
+      } catch (emailError: any) {
+        console.error("Erro ao enviar email:", emailError);
+        // Não falhar a requisição se o email falhar (pode ser problema temporário)
+      }
+
+      res.json({ 
+        message: "Se o email existir, você receberá um link de reset de senha" 
+      });
+    } catch (error: any) {
+      console.error("Erro em /api/auth/forgot-password:", error);
+      // Por segurança, sempre retornar sucesso
+      res.json({ 
+        message: "Se o email existir, você receberá um link de reset de senha" 
+      });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ error: "Token é obrigatório" });
+      }
+
+      if (!newPassword || typeof newPassword !== "string" || newPassword.length < 6) {
+        return res.status(400).json({ 
+          error: "A senha deve ter pelo menos 6 caracteres" 
+        });
+      }
+
+      if (!db || !supabaseClient) {
+        return res.status(500).json({ error: "Serviço não configurado" });
+      }
+
+      // Buscar token no banco
+      const tokenResult = await db.execute(sql`
+        SELECT id, user_id, email, expires_at, used_at
+        FROM password_reset_tokens
+        WHERE token = ${token}
+      `);
+
+      if (!tokenResult || (tokenResult as any).length === 0) {
+        return res.status(400).json({ error: "Token inválido ou expirado" });
+      }
+
+      const tokenData = (tokenResult as any)[0];
+
+      // Verificar se token já foi usado
+      if (tokenData.used_at) {
+        return res.status(400).json({ error: "Este token já foi usado" });
+      }
+
+      // Verificar se token expirou
+      const expiresAt = new Date(tokenData.expires_at);
+      if (expiresAt < new Date()) {
+        return res.status(400).json({ error: "Token expirado" });
+      }
+
+      // Atualizar senha no Supabase Auth
+      const { error: updateError } = await supabaseClient.auth.admin.updateUserById(
+        tokenData.user_id,
+        { password: newPassword }
+      );
+
+      if (updateError) {
+        console.error("Erro ao atualizar senha:", updateError);
+        return res.status(500).json({ 
+          error: "Erro ao atualizar senha. Tente novamente." 
+        });
+      }
+
+      // Marcar token como usado
+      await db.execute(sql`
+        UPDATE password_reset_tokens
+        SET used_at = NOW()
+        WHERE id = ${tokenData.id}
+      `);
+
+      res.json({ 
+        message: "Senha redefinida com sucesso" 
+      });
+    } catch (error: any) {
+      console.error("Erro em /api/auth/reset-password:", error);
+      res.status(500).json({ 
+        error: error.message || "Erro ao redefinir senha" 
+      });
+    }
+  });
+
   // Chat Reviews
   app.post("/api/reviews", async (req, res) => {
     try {

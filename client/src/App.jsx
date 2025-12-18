@@ -9,6 +9,8 @@ import ChatsPage from "@/pages/chats.jsx";
 import Chat from "@/pages/chat.jsx";
 import Login from "@/pages/login.jsx";
 import Register from "@/pages/register.jsx";
+import ForgotPassword from "@/pages/forgot-password.jsx";
+import ResetPassword from "@/pages/reset-password.jsx";
 import AdminSetup from "@/pages/admin-setup.jsx";
 import NotFound from "@/pages/not-found.jsx";
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
@@ -25,6 +27,8 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password/:token" component={ResetPassword} />
       <Route path="/admin-setup">
         <ProtectedRoute>
           <AdminSetup />

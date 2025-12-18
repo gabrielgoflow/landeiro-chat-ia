@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,10 @@ export default function ChatsPage() {
   const [selectedDiagnostico, setSelectedDiagnostico] = useState(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
+  
+  // Refs para evitar chamadas duplicadas
+  const isLoadingRef = useRef(false);
+  const lastUserIdRef = useRef(null);
 
   // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
   const getMaxSessionsForDiagnostico = (diagnosticoCodigo) => {
@@ -43,13 +47,29 @@ export default function ChatsPage() {
     return 10;
   };
 
-  useEffect(() => {
-    if (user) {
-      loadUserChats();
+  // Memoizar loadUserChats para evitar recriações desnecessárias
+  const loadUserChats = useCallback(async () => {
+    // Evitar chamadas duplicadas simultâneas
+    if (isLoadingRef.current) {
+      console.log("loadUserChats: Já está carregando, ignorando chamada duplicada");
+      return;
     }
-  }, [user]);
-
-  const loadUserChats = async () => {
+    
+    if (!user?.id) {
+      return;
+    }
+    
+    // Só evitar se for o mesmo usuário E já estiver carregando
+    // Se o usuário mudou, permitir carregar
+    if (lastUserIdRef.current === user.id && isLoadingRef.current) {
+      console.log("loadUserChats: Já carregando para este usuário, ignorando");
+      return;
+    }
+    
+    isLoadingRef.current = true;
+    const currentUserId = user.id;
+    lastUserIdRef.current = currentUserId;
+    
     try {
       setLoading(true);
       const chats = await supabaseService.getUserChats(user.id);
@@ -74,8 +94,25 @@ export default function ChatsPage() {
       console.error("Erro ao carregar chats:", error);
     } finally {
       setLoading(false);
+      // Só resetar se ainda for o mesmo usuário
+      if (lastUserIdRef.current === currentUserId) {
+        isLoadingRef.current = false;
+      }
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    // Resetar referência quando o usuário mudar
+    if (user?.id !== lastUserIdRef.current) {
+      lastUserIdRef.current = null;
+      isLoadingRef.current = false;
+    }
+    
+    if (user?.id && !isLoadingRef.current) {
+      loadUserChats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleSignOut = async () => {
     const { error } = await signOut();

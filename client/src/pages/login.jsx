@@ -110,6 +110,11 @@ export default function Login() {
                 'Entrar'
               )}
             </Button>
+            <div className="text-center">
+              <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800">
+                Esqueci minha senha
+              </Link>
+            </div>
           </form>
         </CardContent>
       </Card>

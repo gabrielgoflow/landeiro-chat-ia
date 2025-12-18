@@ -103,18 +103,18 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Digite sua mensagem ou grave um áudio..."
+                placeholder="Digite sua mensagem..."
                 className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 text-sm sm:text-base border border-gray-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent resize-none overflow-hidden min-h-[44px] sm:min-h-[48px] max-h-[120px]"
                 data-testid="message-input"
                 disabled={isLoading || isFinalized || isSessionExpired || isPaused}
               />
             </div>
           </div>
-          
+{/*           
           <AudioRecorder 
             onAudioSent={handleAudioSent} 
             disabled={isLoading || isFinalized || isSessionExpired || isPaused}
-          />
+          /> */}
           
           <Button
             type="submit"

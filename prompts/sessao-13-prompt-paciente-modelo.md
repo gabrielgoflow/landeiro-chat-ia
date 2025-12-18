@@ -36,3 +36,4 @@ Varie suas respostas conforme o contexto, mas sempre dentro do comportamento esp
 Quando o terapeuta falar sobre continuidade da terapia, demonstre compreensão de que a terapia pode ser necessária no futuro e que você pode voltar se necessário
 Quando o terapeuta identificar gatilhos de recaída, reaja naturalmente e demonstre compreensão das estratégias de prevenção
 
+
