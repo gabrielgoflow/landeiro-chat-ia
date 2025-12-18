@@ -29,7 +29,7 @@ NODE_ENV=production
 PORT=5000
 
 # URL do Frontend (usado para links de email, etc.)
-VITE_FRONTEND_URL=https://seu-dominio.com
+VITE_FRONTEND_URL=https://pcs.fernandalandeiro.com.br
 ```
 
 ### Supabase (Obrigatório)
@@ -198,7 +198,7 @@ Conteúdo da configuração:
 ```nginx
 server {
     listen 80;
-    server_name seu-dominio.com www.seu-dominio.com;
+    server_name pcs.fernandalandeiro.com.br;
 
     # Logs
     access_log /var/log/nginx/landeiro-access.log;
@@ -249,19 +249,44 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-### 6. Configurar SSL com Let's Encrypt
+### 6. Configurar DNS
+
+Antes de configurar SSL, certifique-se de que o DNS está apontando corretamente:
+
+1. **No painel de DNS do domínio `fernandalandeiro.com.br`**, adicione um registro A:
+   - **Tipo**: A
+   - **Nome**: `pcs`
+   - **Valor**: IP da sua VPS Hetzner
+   - **TTL**: 3600 (ou padrão)
+
+2. **Verificar propagação DNS**:
+```bash
+# Verificar se o DNS está resolvendo corretamente
+dig pcs.fernandalandeiro.com.br
+# ou
+nslookup pcs.fernandalandeiro.com.br
+```
+
+3. **Aguardar propagação**: Pode levar de alguns minutos a 24 horas (geralmente 5-30 minutos)
+
+### 7. Configurar SSL com Let's Encrypt
+
+**Importante**: Configure o DNS primeiro antes de executar este passo!
 
 ```bash
 # Obter certificado SSL
-sudo certbot --nginx -d seu-dominio.com -d www.seu-dominio.com
+sudo certbot --nginx -d pcs.fernandalandeiro.com.br
 
 # O Certbot irá:
 # - Obter certificado SSL
 # - Configurar renovação automática
 # - Modificar configuração do Nginx automaticamente
+# - Redirecionar HTTP para HTTPS automaticamente
 ```
 
-### 7. Configurar Firewall (UFW)
+**Nota**: Se preferir começar com HTTP primeiro (sem SSL), você pode pular este passo e configurar SSL depois. Nesse caso, use `http://pcs.fernandalandeiro.com.br` na variável `VITE_FRONTEND_URL`.
+
+### 8. Configurar Firewall (UFW)
 
 ```bash
 # Habilitar UFW
@@ -443,15 +468,19 @@ sudo certbot certificates
 
 ## 📝 Notas Importantes
 
-1. **Porta 5000**: A aplicação roda na porta 5000 internamente. O Nginx faz proxy para esta porta.
+1. **Domínio**: O projeto está configurado para `pcs.fernandalandeiro.com.br`. Certifique-se de configurar o DNS antes de solicitar o certificado SSL.
 
-2. **Supabase Pooler**: Sempre use o pooler do Supabase (porta 6543) para evitar problemas de conexão.
+2. **Porta 5000**: A aplicação roda na porta 5000 internamente. O Nginx faz proxy para esta porta.
 
-3. **Build**: Sempre execute `npm run build` após atualizações antes de reiniciar o PM2.
+3. **Supabase Pooler**: Sempre use o pooler do Supabase (porta 6543) para evitar problemas de conexão.
 
-4. **Variáveis de Ambiente**: Variáveis que começam com `VITE_` são expostas no frontend. Não coloque secrets nelas.
+4. **Build**: Sempre execute `npm run build` após atualizações antes de reiniciar o PM2.
 
-5. **Storage**: O projeto usa Supabase Storage por padrão. Se usar outro serviço, ajuste `server/supabaseStorage.ts`.
+5. **Variáveis de Ambiente**: Variáveis que começam com `VITE_` são expostas no frontend. Não coloque secrets nelas.
+
+6. **Storage**: O projeto usa Supabase Storage por padrão. Se usar outro serviço, ajuste `server/supabaseStorage.ts`.
+
+7. **HTTPS vs HTTP**: Recomendado usar HTTPS em produção. Se começar com HTTP, atualize `VITE_FRONTEND_URL` para `http://pcs.fernandalandeiro.com.br` temporariamente.
 
 ---
 

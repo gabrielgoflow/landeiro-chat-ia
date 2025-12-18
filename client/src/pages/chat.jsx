@@ -508,54 +508,36 @@ export default function Chat() {
         return;
       }
       
-      // Get review from external service
-      const reviewResponse = await fetch(
-        "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            chat_id: currentThread.id,
-            sessao: sessaoToUse,
-            diagnostico: currentThread.sessionData?.diagnostico,
-          }),
-        },
-      );
-
-      if (reviewResponse.ok) {
-        const reviewData = await reviewResponse.json();
-        console.log("Review data received:", reviewData);
-
-        // Extract from output field and transform nested arrays to flat strings for storage
-        const reviewOutput = reviewData.output;
-        
-        // Função auxiliar para achatar arrays aninhados recursivamente
-        const flattenArray = (arr) => {
-          if (!Array.isArray(arr)) return [arr];
-          const result = [];
-          for (const item of arr) {
-            if (Array.isArray(item)) {
-              result.push(...flattenArray(item));
-            } else {
-              result.push(item);
-            }
+      // Função auxiliar para achatar arrays aninhados recursivamente
+      const flattenArray = (arr) => {
+        if (!Array.isArray(arr)) return [arr];
+        const result = [];
+        for (const item of arr) {
+          if (Array.isArray(item)) {
+            result.push(...flattenArray(item));
+          } else {
+            result.push(item);
           }
-          return result.filter(item => item !== null && item !== undefined && item !== '');
-        };
-        
-        const transformedReview = {
-          chatId: currentThread.id,  // API espera camelCase
-          resumoAtendimento: reviewOutput.resumoAtendimento || '',
-          feedbackDireto: reviewOutput.feedbackDireto || '',
-          sinaisPaciente: flattenArray(reviewOutput.sinaisPaciente || []),
-          pontosPositivos: flattenArray(reviewOutput.pontosPositivos || []),
-          pontosNegativos: flattenArray(reviewOutput.pontosNegativos || []),
+        }
+        return result.filter(item => item !== null && item !== undefined && item !== '');
+      };
+
+      // Função auxiliar para criar review mínimo quando webhook falhar
+      const createMinimalReview = () => {
+        console.log('Criando review mínimo para sessão expirada');
+        return {
+          chatId: currentThread.id,
+          resumoAtendimento: 'Sessão expirada por tempo',
+          feedbackDireto: '',
+          sinaisPaciente: [],
+          pontosPositivos: [],
+          pontosNegativos: [],
           sessao: sessaoToUse
         };
+      };
 
-        // Save review to our database
+      // Função auxiliar para salvar review no banco
+      const saveReview = async (transformedReview) => {
         console.log('Payload being sent to /api/reviews:', JSON.stringify(transformedReview, null, 2));
         
         const saveResponse = await fetch('/api/reviews', {
@@ -569,40 +551,129 @@ export default function Chat() {
         console.log('API response status:', saveResponse.status);
         if (!saveResponse.ok) {
           const errorText = await saveResponse.text();
-          
           console.log('API error response:', errorText);
+          return false;
         }
         
-        if (saveResponse.ok) {
-          console.log('Review saved successfully');
+        console.log('Review saved successfully');
+        return true;
+      };
+
+      // Função auxiliar para atualizar estados após salvar review
+      const updateReviewState = (reviewOutput) => {
+        // Cria objeto com formato correto para o ReviewSidebar (snake_case)
+        const reviewForSidebar = {
+          id: null,
+          chat_id: currentThread.id,
+          resumo_atendimento: reviewOutput.resumoAtendimento || '',
+          feedback_direto: reviewOutput.feedbackDireto || '',
+          sinais_paciente: Array.isArray(reviewOutput.sinaisPaciente) 
+            ? reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item)
+            : [],
+          pontos_positivos: Array.isArray(reviewOutput.pontosPositivos)
+            ? reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item)
+            : [],
+          pontos_negativos: Array.isArray(reviewOutput.pontosNegativos)
+            ? reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item)
+            : [],
+          sessao: sessaoToUse,
+          created_at: new Date().toISOString()
+        };
+        
+        console.log('Setting currentReview with sidebar format:', reviewForSidebar);
+        
+        // Atualiza estados imediatamente
+        setCurrentReview(reviewForSidebar);
+        setHasReview(true);
+        setIsCurrentSessionFinalized(true);
+        setShowReviewSidebar(true);
+        
+        console.log('ReviewSidebar should now be visible with data');
+      };
+
+      // Get review from external service
+      let reviewOutput = null;
+      let useMinimalReview = false;
+
+      try {
+        const reviewResponse = await fetch(
+          "https://n8nflowhook.goflow.digital/webhook/landeiro-chat-ia-review",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              chat_id: currentThread.id,
+              sessao: sessaoToUse,
+              diagnostico: currentThread.sessionData?.diagnostico,
+            }),
+          },
+        );
+
+        if (reviewResponse.ok) {
+          const reviewData = await reviewResponse.json();
+          console.log("Review data received:", reviewData);
+
+          // Extract from output field and transform nested arrays to flat strings for storage
+          reviewOutput = reviewData.output;
           
-          // Cria objeto com formato correto para o ReviewSidebar (snake_case)
-          const reviewForSidebar = {
-            id: null,
-            chat_id: currentThread.id,
-            resumo_atendimento: reviewOutput.resumoAtendimento,
-            feedback_direto: reviewOutput.feedbackDireto,
-            sinais_paciente: reviewOutput.sinaisPaciente.map(item => Array.isArray(item) ? item[0] : item),
-            pontos_positivos: reviewOutput.pontosPositivos.map(item => Array.isArray(item) ? item[0] : item),
-            pontos_negativos: reviewOutput.pontosNegativos.map(item => Array.isArray(item) ? item[0] : item),
-            sessao: sessaoToUse,
-            created_at: new Date().toISOString()
-          };
-          
-          console.log('Setting currentReview with sidebar format:', reviewForSidebar);
-          
-          // Atualiza estados imediatamente
-          setCurrentReview(reviewForSidebar);
-          setHasReview(true);
-          setIsCurrentSessionFinalized(true);
-          setShowReviewSidebar(true);
-          
-          console.log('ReviewSidebar should now be visible with data');
+          // Verificar se o reviewOutput é válido e tem dados suficientes
+          if (!reviewOutput || 
+              (!reviewOutput.resumoAtendimento && 
+               !reviewOutput.feedbackDireto && 
+               (!reviewOutput.sinaisPaciente || reviewOutput.sinaisPaciente.length === 0))) {
+            console.warn('Review do webhook está vazio ou inválido, usando review mínimo');
+            useMinimalReview = true;
+          }
         } else {
-          console.error("Error saving review:", saveResponse.status);
+          console.error("Error getting review from webhook:", reviewResponse.status);
+          useMinimalReview = true;
+        }
+      } catch (error) {
+        console.error("Error calling review webhook:", error);
+        useMinimalReview = true;
+      }
+
+      // Se webhook falhou ou retornou dados insuficientes, usar review mínimo
+      if (useMinimalReview || !reviewOutput) {
+        const minimalReview = createMinimalReview();
+        const transformedReview = {
+          chatId: minimalReview.chatId,
+          resumoAtendimento: minimalReview.resumoAtendimento,
+          feedbackDireto: minimalReview.feedbackDireto,
+          sinaisPaciente: minimalReview.sinaisPaciente,
+          pontosPositivos: minimalReview.pontosPositivos,
+          pontosNegativos: minimalReview.pontosNegativos,
+          sessao: minimalReview.sessao
+        };
+
+        const saved = await saveReview(transformedReview);
+        if (saved) {
+          updateReviewState({
+            resumoAtendimento: minimalReview.resumoAtendimento,
+            feedbackDireto: minimalReview.feedbackDireto,
+            sinaisPaciente: minimalReview.sinaisPaciente,
+            pontosPositivos: minimalReview.pontosPositivos,
+            pontosNegativos: minimalReview.pontosNegativos
+          });
         }
       } else {
-        console.error("Error getting review:", reviewResponse.status);
+        // Usar review do webhook
+        const transformedReview = {
+          chatId: currentThread.id,  // API espera camelCase
+          resumoAtendimento: reviewOutput.resumoAtendimento || '',
+          feedbackDireto: reviewOutput.feedbackDireto || '',
+          sinaisPaciente: flattenArray(reviewOutput.sinaisPaciente || []),
+          pontosPositivos: flattenArray(reviewOutput.pontosPositivos || []),
+          pontosNegativos: flattenArray(reviewOutput.pontosNegativos || []),
+          sessao: sessaoToUse
+        };
+
+        const saved = await saveReview(transformedReview);
+        if (saved) {
+          updateReviewState(reviewOutput);
+        }
       }
     } catch (error) {
       console.error("Error finalizing chat:", error);
@@ -661,8 +732,8 @@ export default function Chat() {
         return;
       }
       
-      // Verificar se já tem pelo menos 4 mensagens antes de finalizar automaticamente
-      if (currentMessages.length >= 4) {
+      // Sempre finalizar automaticamente quando expirar e houver pelo menos 1 mensagem
+      if (currentMessages.length >= 1) {
         console.log('Sessão expirada automaticamente, finalizando atendimento...', {
           chatId: selectedSessionId,
           sessao: selectedSessaoNumber,
@@ -674,12 +745,6 @@ export default function Chat() {
         
         // Chamar finalização automática
         handleFinalizeChat();
-      } else {
-        console.log('Sessão expirada mas não há mensagens suficientes para finalizar automaticamente', {
-          chatId: selectedSessionId,
-          sessao: selectedSessaoNumber,
-          messageCount: currentMessages.length
-        });
       }
     } else if (!isSessionExpired) {
       // Resetar flags quando a sessão não está mais expirada (nova sessão)

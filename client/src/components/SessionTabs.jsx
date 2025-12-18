@@ -110,6 +110,7 @@ export function SessionTabs({
 
   // Atualizar activeSession quando currentChatId mudar
   const lastActiveSessionRef = useRef(null);
+  const lastChatIdRefForActiveSession = useRef(null);
   useEffect(() => {
     if (currentChatId && sessions.length > 0) {
       const currentSession = sessions.find(
@@ -117,10 +118,13 @@ export function SessionTabs({
       );
       if (currentSession) {
         const newActiveSession = currentSession.sessao.toString();
-        // Só atualizar se realmente mudou para evitar loops
-        if (lastActiveSessionRef.current !== newActiveSession && activeSession !== newActiveSession) {
+        // Atualizar sempre que currentChatId mudar, mesmo que activeSession seja o mesmo
+        // Isso garante que a sessão correta seja mostrada quando navegamos entre sessões
+        if (lastChatIdRefForActiveSession.current !== currentChatId || 
+            lastActiveSessionRef.current !== newActiveSession) {
           setActiveSession(newActiveSession);
           lastActiveSessionRef.current = newActiveSession;
+          lastChatIdRefForActiveSession.current = currentChatId;
         }
       }
     }
@@ -217,9 +221,15 @@ export function SessionTabs({
       (s) => s.chat_id === currentChatId,
     );
     if (currentSession) {
-      setActiveSession(currentSession.sessao.toString());
+      const newActiveSession = currentSession.sessao.toString();
+      // Sempre atualizar para garantir sincronização
+      setActiveSession(newActiveSession);
+      lastActiveSessionRef.current = newActiveSession;
+      lastChatIdRefForActiveSession.current = currentChatId;
     } else if (sessionsWithStatus.length > 0) {
-      setActiveSession(sessionsWithStatus[0].sessao.toString());
+      const firstSession = sessionsWithStatus[0].sessao.toString();
+      setActiveSession(firstSession);
+      lastActiveSessionRef.current = firstSession;
     }
   };
 
@@ -363,21 +373,47 @@ export function SessionTabs({
           <div className="flex-1 min-w-0 overflow-x-auto">
             <TabsList className="inline-flex justify-start bg-gray-50 min-w-max">
               {sessions.map((session) => {
+                const isActive = activeSession === session.sessao.toString();
                 // console.log("SessionTab:", session, "Status:", session.status); // Removido para evitar logs excessivos
                 return (
                   <TabsTrigger
                     key={session.sessao}
                     value={session.sessao.toString()}
-                    className="relative flex items-center gap-2 whitespace-nowrap"
+                    className={`relative flex items-center gap-2 whitespace-nowrap ${
+                      isActive 
+                        ? 'data-[state=active]:bg-[#009693] data-[state=active]:text-white data-[state=active]:shadow-[1px_2px_3px_1px_rgba(0,0,0,0.63)]' 
+                        : ''
+                    }`}
+                    style={
+                      isActive
+                        ? {
+                            background: '#009693',
+                            color: 'white',
+                            boxShadow: '1px 2px 3px 1px rgba(0, 0, 0, 0.63)',
+                          }
+                        : undefined
+                    }
                     data-testid={`session-tab-${session.sessao}`}
                   >
                     <span>SESSÃO {session.sessao}</span>
                     {session.status === "finalizado" ? (
-                      <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-1 py-0">
+                      <Badge 
+                        className={`text-xs px-1 py-0 ${
+                          isActive 
+                            ? 'bg-white/20 text-white border-white/30' 
+                            : 'bg-green-100 text-green-800 border-green-200'
+                        }`}
+                      >
                         FINALIZADA
                       </Badge>
                     ) : (
-                      <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs px-1 py-0">
+                      <Badge 
+                        className={`text-xs px-1 py-0 ${
+                          isActive 
+                            ? 'bg-white/20 text-white border-white/30' 
+                            : 'bg-blue-100 text-blue-800 border-blue-200'
+                        }`}
+                      >
                         EM ANDAMENTO
                       </Badge>
                     )}

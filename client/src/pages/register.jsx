@@ -93,7 +93,8 @@ export default function Register() {
           </div>
           <CardTitle className="text-xl sm:text-2xl text-center">Criar conta</CardTitle>
           <CardDescription className="text-sm sm:text-base text-center">
-            Crie sua conta para acessar o chat IA
+            Crie sua conta para acessar a Prática Clínica Simulada (PSC)
+
           </CardDescription>
           
           {/* Admin Seed Button */}
