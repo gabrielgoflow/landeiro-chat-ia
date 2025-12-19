@@ -39,16 +39,26 @@ export default function AdminRoute({ children }: { children: React.ReactNode }) 
           .from("user_metadata")
           .select("role")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
         if (!error && data && data.role === "admin") {
           setIsAdmin(true);
         } else {
-          setIsAdmin(false);
+          // Se não tem metadata ou role não é admin, verificar novamente por email (fallback)
+          if (isAdminEmail(user.email)) {
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
         }
       } catch (error) {
         console.error("Error checking admin status:", error);
-        setIsAdmin(false);
+        // Em caso de erro, verificar por email como fallback
+        if (isAdminEmail(user.email)) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
       } finally {
         setCheckingAdmin(false);
       }

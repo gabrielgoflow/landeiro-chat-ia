@@ -755,3 +755,24 @@ grep -r "fnprdocklfpmndailkoo" dist/public/ | head -3
 
 # Reiniciar PM2
 pm2 start ecosystem.config.cjs
+
+
+
+atualizações git
+
+git pull
+
+# 1. Parar PM2
+pm2 stop landeiro-chat-ia
+
+# 2. Build com variáveis (SEM barra no final da URL)
+VITE_SUPABASE_URL=... \
+VITE_SUPABASE_ANON_KEY=... \
+VITE_FRONTEND_URL=https://pcs.fernandalandeiro.com.br \
+npm run build
+
+# 3. Reiniciar PM2
+pm2 start ecosystem.config.cjs
+
+# 4. Verificar
+pm2 status
