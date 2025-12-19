@@ -41,25 +41,37 @@ function extractToken(req: Request): string | null {
  * Verify if user is admin
  */
 async function isUserAdmin(userId: string, userEmail?: string): Promise<boolean> {
-  // Check if email matches any admin email
+  // Check if email matches any admin email (fastest check first)
   if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
+    console.log("[AdminMiddleware] Admin verified by email:", userEmail);
     return true;
   }
 
-  // Check user_metadata table for admin role
+  // Check user_metadata table for admin role (with timeout)
   if (db) {
     try {
-      const metadata = await db
+      // Add timeout to prevent hanging
+      const metadataPromise = db
         .select()
         .from(userMetadata)
         .where(eq(userMetadata.userId, userId))
         .limit(1);
 
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Database query timeout")), 5000);
+      });
+
+      const metadata = await Promise.race([metadataPromise, timeoutPromise]);
+
       if (metadata.length > 0 && metadata[0].role === "admin") {
+        console.log("[AdminMiddleware] Admin verified by metadata for user:", userId);
         return true;
       }
-    } catch (error) {
-      console.error("Error checking user metadata:", error);
+    } catch (error: any) {
+      // If timeout or other error, log but don't block
+      console.error("[AdminMiddleware] Error checking user metadata:", error?.message || error);
+      // If it's a timeout, we'll fall through to return false
+      // But we already checked email above, so if email matches, we would have returned true
     }
   }
 
@@ -91,11 +103,23 @@ export async function isAdmin(
       return;
     }
 
-    // Verify token with Supabase
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token);
+    // Verify token with Supabase (with timeout)
+    const getUserPromise = supabase.auth.getUser(token);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Token verification timeout")), 10000);
+    });
+
+    let user: any = null;
+    let error: any = null;
+    try {
+      const result = await Promise.race([getUserPromise, timeoutPromise]);
+      user = result.data?.user;
+      error = result.error;
+    } catch (timeoutError: any) {
+      console.error("[AdminMiddleware] Token verification timeout:", timeoutError?.message);
+      res.status(504).json({ error: "Timeout ao verificar autenticação. Tente novamente." });
+      return;
+    }
 
     if (error || !user) {
       console.log("[AdminMiddleware] Invalid token:", error?.message);
@@ -105,8 +129,26 @@ export async function isAdmin(
 
     console.log("[AdminMiddleware] User authenticated:", user.email);
 
-    // Check if user is admin
-    const isAdminUser = await isUserAdmin(user.id, user.email);
+    // Check if user is admin (with timeout)
+    const isAdminCheckPromise = isUserAdmin(user.id, user.email);
+    const adminTimeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Admin check timeout")), 6000);
+    });
+
+    let isAdminUser: boolean;
+    try {
+      isAdminUser = await Promise.race([isAdminCheckPromise, adminTimeoutPromise]);
+    } catch (timeoutError: any) {
+      console.error("[AdminMiddleware] Admin check timeout:", timeoutError?.message);
+      // If email matches admin list, allow access even if DB check times out
+      if (user.email && ADMIN_EMAILS.includes(user.email)) {
+        console.log("[AdminMiddleware] Admin access granted by email (DB timeout):", user.email);
+        isAdminUser = true;
+      } else {
+        res.status(504).json({ error: "Timeout ao verificar permissões. Tente novamente." });
+        return;
+      }
+    }
 
     if (!isAdminUser) {
       console.log("[AdminMiddleware] User is not admin:", user.email);
@@ -122,7 +164,7 @@ export async function isAdmin(
 
     next();
   } catch (error: any) {
-    console.error("[AdminMiddleware] Error:", error);
+    console.error("[AdminMiddleware] Error:", error?.message || error);
     res.status(500).json({ error: "Erro ao verificar autenticação" });
   }
 }

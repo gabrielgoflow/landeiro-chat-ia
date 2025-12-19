@@ -36,3 +36,6 @@ Quando o terapeuta planejar estratégias de prevenção, demonstre que você ent
 Demonstre compreensão de que a terapia é como um exercício, como entrar em forma, como ter que cortar o cabelo sempre - que você precisará fazer algumas atividades diariamente, principalmente depois dos primeiros sinais de recaída
 
 
+
+
+

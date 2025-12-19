@@ -37,3 +37,6 @@ Quando o terapeuta falar sobre continuidade da terapia, demonstre compreensão d
 Quando o terapeuta identificar gatilhos de recaída, reaja naturalmente e demonstre compreensão das estratégias de prevenção
 
 
+
+
+

@@ -29,6 +29,8 @@ NODE_ENV=production
 PORT=5000
 
 # URL do Frontend (usado para links de email, etc.)
+# Temporário (enquanto DNS não propaga): use http://SEU_IP ou http://SEU_IP:5000
+# Depois: https://pcs.fernandalandeiro.com.br
 VITE_FRONTEND_URL=https://pcs.fernandalandeiro.com.br
 ```
 
@@ -148,12 +150,23 @@ ls -la dist/
 
 ### 4. Configurar PM2
 
+**⚠️ IMPORTANTE**: Como o projeto usa ES modules (`"type": "module"` no package.json), você precisa escolher UMA das opções abaixo:
+
+- **Opção 1 (Recomendada)**: Arquivo `.cjs` com sintaxe **CommonJS** (`module.exports`)
+- **Opção 2**: Arquivo `.js` com sintaxe **ES module** (`export default`)
+
+**NÃO misture**: Se usar `.cjs`, DEVE usar `module.exports`. Se usar `.js`, DEVE usar `export default`.
+
+#### Opção 1: Usar extensão .cjs com CommonJS (Recomendado)
+
 ```bash
 # Criar arquivo de configuração do PM2
-nano ecosystem.config.js
+nano ecosystem.config.cjs
 ```
 
-Conteúdo do `ecosystem.config.js`:
+**⚠️ ATENÇÃO**: Arquivo `.cjs` usa sintaxe CommonJS (`module.exports`), NÃO `export default`!
+
+Conteúdo do `ecosystem.config.cjs`:
 ```javascript
 module.exports = {
   apps: [{
@@ -175,8 +188,43 @@ module.exports = {
 };
 ```
 
+#### Opção 2: Usar extensão .js com ES module
+
+```bash
+# Criar arquivo de configuração do PM2
+nano ecosystem.config.js
+```
+
+**⚠️ ATENÇÃO**: Arquivo `.js` com `"type": "module"` usa sintaxe ES module (`export default`), NÃO `module.exports`!
+
+Conteúdo do `ecosystem.config.js`:
+```javascript
+export default {
+  apps: [{
+    name: 'landeiro-chat-ia',
+    script: 'dist/index.js',
+    instances: 1,
+    exec_mode: 'fork',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 5000
+    },
+    error_file: '/var/log/pm2/landeiro-error.log',
+    out_file: '/var/log/pm2/landeiro-out.log',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    merge_logs: true,
+    autorestart: true,
+    max_memory_restart: '1G'
+  }]
+};
+```
+
 ```bash
 # Iniciar aplicação com PM2
+# Se usou Opção 1 (.cjs):
+pm2 start ecosystem.config.cjs
+
+# Se usou Opção 2 (.js com ES module):
 pm2 start ecosystem.config.js
 
 # Salvar configuração do PM2
@@ -249,7 +297,133 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-### 6. Configurar DNS
+### 6. Acessar via IP (Temporário - Enquanto DNS não propaga)
+
+Enquanto o DNS não propaga, você pode acessar a aplicação diretamente pelo IP da VPS:
+
+#### Opção 1: Configurar Nginx para aceitar requisições por IP
+
+Edite a configuração do Nginx para aceitar requisições tanto pelo domínio quanto pelo IP:
+
+```bash
+sudo nano /etc/nginx/sites-available/landeiro-chat-ia
+```
+
+Atualize o `server_name` para aceitar ambos:
+
+```nginx
+server {
+    listen 80;
+    server_name pcs.fernandalandeiro.com.br _;  # _ aceita qualquer hostname/IP
+    
+    # ... resto da configuração ...
+}
+```
+
+Ou crie um bloco separado para IP:
+
+```nginx
+# Bloco para acesso via IP (temporário)
+server {
+    listen 80 default_server;
+    server_name _;  # Aceita qualquer hostname/IP
+    
+    # Logs
+    access_log /var/log/nginx/landeiro-ip-access.log;
+    error_log /var/log/nginx/landeiro-ip-error.log;
+    
+    # Tamanho máximo de upload (para áudios)
+    client_max_body_size 10M;
+    
+    # Proxy para aplicação Node.js
+    location / {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        
+        # Timeouts para requisições longas (OpenAI)
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+    }
+}
+
+# Bloco para acesso via domínio (quando DNS propagar)
+server {
+    listen 80;
+    server_name pcs.fernandalandeiro.com.br;
+    
+    # ... mesma configuração do bloco acima ...
+}
+```
+
+```bash
+# Testar configuração
+sudo nginx -t
+
+# Reiniciar Nginx
+sudo systemctl restart nginx
+```
+
+#### Opção 2: Acessar diretamente pela porta 5000 (sem Nginx)
+
+Você pode acessar diretamente pela porta 5000, mas precisará abrir a porta no firewall:
+
+```bash
+# Abrir porta 5000 temporariamente
+sudo ufw allow 5000/tcp
+
+# Acessar via: http://SEU_IP:5000
+```
+
+**⚠️ Importante**: Feche a porta 5000 depois que o DNS propagar e o Nginx estiver funcionando:
+
+```bash
+sudo ufw delete allow 5000/tcp
+```
+
+#### Configurar variável de ambiente temporária
+
+Enquanto usa o IP, configure a variável `VITE_FRONTEND_URL` temporariamente:
+
+```bash
+# Editar .env
+nano /var/www/landeiro-chat-ia/.env
+```
+
+```bash
+# Temporário - usar IP
+VITE_FRONTEND_URL=http://SEU_IP_AQUI
+
+# Depois que DNS propagar, altere para:
+# VITE_FRONTEND_URL=https://pcs.fernandalandeiro.com.br
+```
+
+```bash
+# Reiniciar aplicação para aplicar mudanças
+pm2 restart landeiro-chat-ia
+```
+
+#### Verificar IP da VPS
+
+```bash
+# Ver IP público da VPS
+curl ifconfig.me
+# ou
+hostname -I
+```
+
+**Acesso temporário**: `http://SEU_IP` ou `http://SEU_IP:5000` (dependendo da opção escolhida)
+
+**⚠️ Lembre-se**: Após o DNS propagar, atualize `VITE_FRONTEND_URL` para o domínio e remova a configuração temporária do IP.
+
+### 7. Configurar DNS
 
 Antes de configurar SSL, certifique-se de que o DNS está apontando corretamente:
 
@@ -269,7 +443,7 @@ nslookup pcs.fernandalandeiro.com.br
 
 3. **Aguardar propagação**: Pode levar de alguns minutos a 24 horas (geralmente 5-30 minutos)
 
-### 7. Configurar SSL com Let's Encrypt
+### 8. Configurar SSL com Let's Encrypt
 
 **Importante**: Configure o DNS primeiro antes de executar este passo!
 
@@ -286,7 +460,7 @@ sudo certbot --nginx -d pcs.fernandalandeiro.com.br
 
 **Nota**: Se preferir começar com HTTP primeiro (sem SSL), você pode pular este passo e configurar SSL depois. Nesse caso, use `http://pcs.fernandalandeiro.com.br` na variável `VITE_FRONTEND_URL`.
 
-### 8. Configurar Firewall (UFW)
+### 9. Configurar Firewall (UFW)
 
 ```bash
 # Habilitar UFW
@@ -428,6 +602,48 @@ add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 
 
 ## 🐛 Troubleshooting
 
+### Erro do PM2: "module is not defined" ou "Unexpected token 'export'"
+
+Este erro ocorre quando há confusão entre CommonJS e ES modules no arquivo de configuração do PM2.
+
+**Sintomas**:
+- `ReferenceError: module is not defined in ES module scope`
+- `SyntaxError: Unexpected token 'export'`
+
+**Solução**:
+
+1. **Verificar qual arquivo você tem**:
+```bash
+ls -la ecosystem.config.*
+```
+
+2. **Se você tem `ecosystem.config.cjs`** (extensão .cjs):
+   - DEVE usar `module.exports = { ... }` (CommonJS)
+   - NÃO pode usar `export default { ... }`
+
+3. **Se você tem `ecosystem.config.js`** (extensão .js):
+   - DEVE usar `export default { ... }` (ES module)
+   - NÃO pode usar `module.exports = { ... }`
+
+4. **Corrigir o arquivo**:
+```bash
+# Se você tem .cjs mas está usando export default, corrija:
+nano ecosystem.config.cjs
+# Use: module.exports = { ... }
+
+# OU se você tem .js mas está usando module.exports, corrija:
+nano ecosystem.config.js
+# Use: export default { ... }
+```
+
+5. **Reiniciar PM2**:
+```bash
+pm2 delete all
+pm2 start ecosystem.config.cjs  # ou ecosystem.config.js
+```
+
+**Recomendação**: Use a Opção 1 (`.cjs` com `module.exports`) que é mais compatível com PM2.
+
 ### Aplicação não inicia
 
 ```bash
@@ -517,3 +733,25 @@ Em caso de problemas:
 
 **Última atualização**: 2025-01-27
 
+
+
+
+# Ultimo caso
+
+# Parar PM2
+pm2 stop landeiro-chat-ia
+
+# Limpar build anterior
+rm -rf dist
+
+# Build com variáveis explícitas
+VITE_SUPABASE_URL=..  \
+VITE_SUPABASE_ANON_KEY=... \
+VITE_FRONTEND_URL=http://5.78.140.27:5000 \
+npm run build
+
+# Verificar se funcionou
+grep -r "fnprdocklfpmndailkoo" dist/public/ | head -3
+
+# Reiniciar PM2
+pm2 start ecosystem.config.cjs

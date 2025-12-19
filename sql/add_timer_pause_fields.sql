@@ -12,3 +12,6 @@ COMMENT ON COLUMN chat_threads.timer_paused_time IS 'Tempo restante em milissegu
 
 
 
+
+
+
