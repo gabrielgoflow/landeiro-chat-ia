@@ -8,6 +8,7 @@ Script para criar os dois usuários administradores do sistema.
 
 - **admin@goflow.digital** - Senha: `!@#GOflow2700`
 - **admin@nexialab.com.br** - Senha: `rBeupVpv4iju@E6`
+- **admin@fernandalandeiro.com.br** - Senha: `#IUgdk!@%623g`
 
 ### Uso
 
@@ -231,4 +232,66 @@ Por padrão, o arquivo é salvo como `usuarios-email-senhas-YYYY-MM-DD.csv` na r
 ### Processamento
 
 O script processa todas as linhas do CSV sequencialmente, gerando as senhas a partir do CPF usando a mesma lógica do script de importação.
+
+---
+
+## Atualização de Data Final de Acesso
+
+Script para atualizar a coluna `data_final_acesso` na tabela `user_metadata` baseado no período de acesso informado no CSV.
+
+### Uso
+
+#### Atualizar datas de acesso
+```bash
+npm run update:access-dates
+```
+
+#### Modo dry-run (simulação, não atualiza)
+```bash
+npm run update:access-dates:dry-run
+```
+
+#### Especificar arquivo CSV customizado
+```bash
+npm run update:access-dates -- "caminho/para/arquivo.csv"
+```
+
+### Formato do CSV
+
+O arquivo CSV deve ter as seguintes colunas:
+- **E-mail**: Email do usuário (obrigatório)
+- **Período de Acesso**: Período de acesso (obrigatório)
+
+### Mapeamento de Períodos
+
+O script mapeia os seguintes períodos para dias:
+- `'1 ano de acesso'` → +365 dias
+- `'6 meses'` → +184 dias
+- `'3 meses'` → +92 dias (aproximado)
+- `'2 anos'` → +730 dias
+
+### Funcionalidades
+
+- Busca usuários no Supabase Auth por email
+- Calcula data final baseado no período informado
+- Atualiza ou cria registro na tabela `user_metadata`
+- Processa em lotes para melhor performance
+- Relatório detalhado com estatísticas
+
+### Quando Usar
+
+- Quando precisa atualizar as datas de acesso de múltiplos usuários
+- Após importar novos usuários do CSV
+- Para sincronizar datas de acesso com dados externos
+
+### Processamento
+
+O script:
+1. Carrega todos os usuários do Supabase Auth em memória (mapa email → userId)
+2. Processa o CSV linha por linha
+3. Para cada linha:
+   - Busca usuário por email
+   - Calcula data final baseado no período
+   - Atualiza `data_final_acesso` na tabela `user_metadata`
+4. Gera relatório final com estatísticas
 

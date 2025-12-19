@@ -1,5 +1,4 @@
-const TOKEN = process.env.MAILTRAP_API_TOKEN || "4b9631bf568ec0a31265e6b183598650";
-const TEST_INBOX_ID = process.env.MAILTRAP_TEST_INBOX_ID || "4266022";
+const TOKEN = process.env.MAILTRAP_API_TOKEN || "189fd7f75c14c3ccfe14879f9f25a414";
 
 const sender = {
   email: "hello@example.com",
@@ -74,34 +73,77 @@ Este é um email automático, por favor não responda.
   `.trim();
 
   try {
-    // Usar a API REST do Mailtrap diretamente
-    // POST https://sandbox.api.mailtrap.io/api/send/{inbox_id}
-    const response = await fetch(`https://sandbox.api.mailtrap.io/api/send/${TEST_INBOX_ID}`, {
+    // Usar a API REST do Mailtrap de produção
+    // POST https://send.api.mailtrap.io/api/send
+    // Documentação: https://api-docs.mailtrap.io/docs/send-email
+    const requestBody = {
+      from: sender,
+      to: recipients,
+      subject: "Redefinir Senha - Landeiro Chat IA",
+      text: textContent,
+      html: htmlContent,
+      category: "Password Reset",
+    };
+
+    console.log("📧 Enviando email via Mailtrap API...");
+    console.log("🔗 URL: https://send.api.mailtrap.io/api/send");
+    console.log("🔑 Token length:", TOKEN.length);
+
+    // Tentar primeiro com Api-Token (formato recomendado na documentação)
+    const response = await fetch(`https://send.api.mailtrap.io/api/send`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
         "Api-Token": TOKEN,
       },
-      body: JSON.stringify({
-        from: sender,
-        to: recipients,
-        subject: "Redefinir Senha - Landeiro Chat IA",
-        text: textContent,
-        html: htmlContent,
-        category: "Password Reset",
-      }),
+      body: JSON.stringify(requestBody),
     });
 
+    const responseText = await response.text();
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Mailtrap API error: ${response.status} - ${errorText}`);
+      console.error("❌ Erro na resposta do Mailtrap:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: responseText,
+      });
+      
+      // Se der 401, tentar com Authorization Bearer como fallback
+      if (response.status === 401) {
+        console.log("🔄 Tentando com Authorization Bearer...");
+        const retryResponse = await fetch(`https://send.api.mailtrap.io/api/send`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": `Bearer ${TOKEN}`,
+          },
+          body: JSON.stringify(requestBody),
+        });
+        
+        const retryResponseText = await retryResponse.text();
+        if (!retryResponse.ok) {
+          console.error("❌ Erro também com Authorization Bearer:", {
+            status: retryResponse.status,
+            body: retryResponseText,
+          });
+          throw new Error(`Mailtrap API error: ${retryResponse.status} - ${retryResponseText}`);
+        }
+        
+        const retryResult = JSON.parse(retryResponseText);
+        console.log(`✅ Email de reset de senha enviado para: ${email}`, retryResult);
+        return;
+      }
+      
+      throw new Error(`Mailtrap API error: ${response.status} - ${responseText}`);
     }
 
-    const result = await response.json();
-    console.log(`Email de reset de senha enviado para: ${email}`, result);
+    const result = JSON.parse(responseText);
+    console.log(`✅ Email de reset de senha enviado para: ${email}`, result);
   } catch (error: any) {
-    console.error("Erro ao enviar email de reset de senha:", error);
+    console.error("❌ Erro ao enviar email de reset de senha:", error);
     throw new Error(`Falha ao enviar email: ${error.message || "Erro desconhecido"}`);
   }
 }

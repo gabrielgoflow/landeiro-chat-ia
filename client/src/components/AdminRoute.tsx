@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br"];
+const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br", "admin@fernandalandeiro.com.br"];
 
 const isAdminEmail = (email: string | undefined): boolean => {
   return email ? ADMIN_EMAILS.includes(email) : false;

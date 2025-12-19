@@ -23,6 +23,11 @@ const ADMINS: AdminUser[] = [
     password: 'rBeupVpv4iju@E6',
     fullName: 'Admin NexiaLab',
   },
+  {
+    email: 'admin@fernandalandeiro.com.br',
+    password: '#IUgdk!@%623g',
+    fullName: 'Admin Fernanda Landeiro',
+  },
 ];
 
 /**

@@ -833,7 +833,7 @@ export default function Chat() {
         </div>
 
         {/* Debug Info (Admin only) */}
-        {user?.email && ["admin@goflow.digital", "admin@nexialab.com.br"].includes(user.email) && (
+        {user?.email && ["admin@goflow.digital", "admin@nexialab.com.br", "admin@fernandalandeiro.com.br"].includes(user.email) && (
           <div className="px-2 sm:px-4 pb-2">
             <Button
               variant="ghost"

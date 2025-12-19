@@ -19,8 +19,11 @@
     "export:users-passwords": "tsx scripts/exportUsersPasswords.ts",
     "create:admins": "tsx scripts/createAdmins.ts",
     "create:admins:update-password": "tsx scripts/createAdmins.ts --update-password",
+    "check:admin": "tsx scripts/checkAdminStatus.ts",
     "export:users-passwords:existing": "tsx scripts/exportUsersPasswords.ts --only-existing",
-    "export:users-passwords:new": "tsx scripts/exportUsersPasswords.ts --only-new"
+    "export:users-passwords:new": "tsx scripts/exportUsersPasswords.ts --only-new",
+    "update:access-dates": "tsx scripts/updateAccessDates.ts",
+    "update:access-dates:dry-run": "tsx scripts/updateAccessDates.ts --dry-run"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.17.0",

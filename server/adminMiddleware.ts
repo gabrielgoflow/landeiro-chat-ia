@@ -5,7 +5,7 @@ import { userMetadata } from "../shared/schema";
 import { eq } from "drizzle-orm";
 
 // Admin emails (fallback if user_metadata doesn't exist)
-const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br"];
+const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br", "admin@fernandalandeiro.com.br"];
 
 /**
  * Get Supabase client for auth verification
