@@ -84,6 +84,7 @@ export const userMetadata = pgTable("user_metadata", {
   userId: uuid("user_id").notNull().unique(),
   fullName: varchar("full_name"),
   role: varchar("role").default("user"),
+  status: varchar("status").default("ativo"),
   dataFinalAcesso: timestamp("data_final_acesso"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -171,6 +172,7 @@ export const insertUserMetadataSchema = createInsertSchema(userMetadata).pick({
   userId: true,
   fullName: true,
   role: true,
+  status: true,
   dataFinalAcesso: true,
 });
 

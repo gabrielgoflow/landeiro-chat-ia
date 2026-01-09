@@ -39,5 +39,19 @@ export const auth = {
   // Listen to auth changes
   onAuthStateChange: (callback) => {
     return supabase.auth.onAuthStateChange(callback)
+  },
+
+  // Get user status
+  getUserStatus: async (userId) => {
+    try {
+      const response = await fetch(`/api/auth/user-status/${userId}`);
+      if (!response.ok) {
+        return { status: "ativo" }; // Default to active if error
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Error getting user status:", error);
+      return { status: "ativo" }; // Default to active if error
+    }
   }
 }

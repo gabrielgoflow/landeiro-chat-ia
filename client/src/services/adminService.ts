@@ -326,6 +326,109 @@ export const adminService = {
       body: JSON.stringify({ dataFinalAcesso }),
     });
   },
+
+  async deleteUser(userId: string) {
+    return apiRequest(`/users/${userId}`, {
+      method: "DELETE",
+    });
+  },
+
+  async createUser(data: {
+    email: string;
+    password?: string;
+    fullName?: string;
+    dataFinalAcesso?: string;
+    status?: string;
+  }): Promise<{
+    userId: string;
+    email: string;
+    password?: string;
+    metadata: any;
+  }> {
+    return apiRequest("/users", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async bulkUpdateUserStatus(file: File): Promise<{
+    total: number;
+    success: number;
+    failed: number;
+    results: Array<{
+      email: string;
+      success: boolean;
+      error?: string;
+      userId?: string;
+    }>;
+  }> {
+    const text = await file.text();
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error("Não autenticado");
+    }
+
+    const response = await fetch(`${API_BASE}/users/bulk-update-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ csvData: text }),
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
+      } else {
+        throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
+
+    return response.json();
+  },
+
+  async bulkCreateUsers(file: File): Promise<{
+    total: number;
+    success: number;
+    failed: number;
+    results: Array<{
+      email: string;
+      success: boolean;
+      error?: string;
+      userId?: string;
+      generatedPassword?: string;
+    }>;
+  }> {
+    const text = await file.text();
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error("Não autenticado");
+    }
+
+    const response = await fetch(`${API_BASE}/users/bulk-create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ csvData: text }),
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const error = await response.json();
+        throw new Error(error.error || `HTTP ${response.status}`);
+      } else {
+        throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
+
+    return response.json();
+  },
 };
 
 

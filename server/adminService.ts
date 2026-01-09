@@ -109,6 +109,7 @@ export class AdminService {
           email: authUser.email,
           fullName: metadata?.fullName || authUser.user_metadata?.full_name || null,
           role: metadata?.role || "user",
+          status: metadata?.status || "ativo",
           createdAt: authUser.created_at,
           lastSignIn: authUser.last_sign_in_at,
           emailConfirmed: authUser.email_confirmed_at !== null,
@@ -903,6 +904,381 @@ export class AdminService {
       .orderBy(asc(diagnosticos.nome));
 
     return stats;
+  }
+
+  /**
+   * Generate a random password
+   */
+  static generatePassword(): string {
+    const length = 12;
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return password;
+  }
+
+  /**
+   * Create a new user in Supabase Auth and user_metadata
+   */
+  static async createUser(data: {
+    email: string;
+    password?: string;
+    fullName?: string;
+    dataFinalAcesso?: Date;
+    status?: string;
+  }) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      const supabase = getSupabaseAdminClient();
+
+      // Generate password if not provided
+      const password = data.password || AdminService.generatePassword();
+
+      // Create user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: data.email,
+        password: password,
+        email_confirm: true,
+        user_metadata: data.fullName ? { full_name: data.fullName } : undefined,
+      });
+
+      if (authError) {
+        throw new Error(`Failed to create user in Supabase Auth: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error("User creation failed: no user data returned");
+      }
+
+      const userId = authData.user.id;
+
+      // Create or update user metadata
+      const existing = await db
+        .select()
+        .from(userMetadata)
+        .where(eq(userMetadata.userId, userId))
+        .limit(1);
+
+      const metadataData: Partial<InsertUserMetadata> = {
+        userId,
+        fullName: data.fullName,
+        status: data.status || "ativo",
+        dataFinalAcesso: data.dataFinalAcesso,
+      };
+
+      let metadata;
+      if (existing && existing.length > 0) {
+        // Update existing
+        const result = await db
+          .update(userMetadata)
+          .set({ ...metadataData, updatedAt: new Date() })
+          .where(eq(userMetadata.userId, userId))
+          .returning();
+        metadata = result[0];
+      } else {
+        // Create new
+        const result = await db
+          .insert(userMetadata)
+          .values(metadataData)
+          .returning();
+        metadata = result[0];
+      }
+
+      return {
+        userId,
+        email: data.email,
+        password: data.password ? undefined : password, // Return generated password only if it was auto-generated
+        metadata,
+      };
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      throw new Error(`Failed to create user: ${error.message}`);
+    }
+  }
+
+  /**
+   * Bulk update user status from array of email/status pairs
+   */
+  static async bulkUpdateUserStatus(updates: Array<{ email: string; status: string }>) {
+    if (!db) throw new Error("Database not connected");
+
+    const supabase = getSupabaseAdminClient();
+    const results: Array<{
+      email: string;
+      success: boolean;
+      error?: string;
+      userId?: string;
+    }> = [];
+
+    // Get all users from Supabase to map emails to user IDs
+    const { data: usersData, error: listError } = await supabase.auth.admin.listUsers();
+    
+    if (listError) {
+      throw new Error(`Failed to list users: ${listError.message}`);
+    }
+
+    const emailToUserId = new Map<string, string>();
+    usersData?.users.forEach((user) => {
+      if (user.email) {
+        emailToUserId.set(user.email.toLowerCase(), user.id);
+      }
+    });
+
+    // Process each update
+    for (const update of updates) {
+      try {
+        // Validate status
+        if (update.status !== "ativo" && update.status !== "inadimplente") {
+          results.push({
+            email: update.email,
+            success: false,
+            error: `Status inválido: ${update.status}. Deve ser 'ativo' ou 'inadimplente'`,
+          });
+          continue;
+        }
+
+        const userId = emailToUserId.get(update.email.toLowerCase());
+        if (!userId) {
+          results.push({
+            email: update.email,
+            success: false,
+            error: "Usuário não encontrado",
+          });
+          continue;
+        }
+
+        // Update or create metadata
+        const existing = await db
+          .select()
+          .from(userMetadata)
+          .where(eq(userMetadata.userId, userId))
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          await db
+            .update(userMetadata)
+            .set({ status: update.status, updatedAt: new Date() })
+            .where(eq(userMetadata.userId, userId));
+        } else {
+          await db.insert(userMetadata).values({
+            userId,
+            status: update.status,
+          });
+        }
+
+        results.push({
+          email: update.email,
+          success: true,
+          userId,
+        });
+      } catch (error: any) {
+        results.push({
+          email: update.email,
+          success: false,
+          error: error.message || "Erro desconhecido",
+        });
+      }
+    }
+
+    return {
+      total: updates.length,
+      success: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+      results,
+    };
+  }
+
+  /**
+   * Bulk create users from array of user data
+   */
+  static async bulkCreateUsers(users: Array<{
+    email: string;
+    password?: string;
+    fullName?: string;
+    dataFinalAcesso?: string;
+  }>) {
+    if (!db) throw new Error("Database not connected");
+
+    const supabase = getSupabaseAdminClient();
+    const results: Array<{
+      email: string;
+      success: boolean;
+      error?: string;
+      userId?: string;
+    }> = [];
+
+    // Get existing users to check for duplicates
+    const { data: existingUsersData } = await supabase.auth.admin.listUsers();
+    const existingEmails = new Set(
+      existingUsersData?.users.map((u) => u.email?.toLowerCase()).filter(Boolean) || []
+    );
+
+      // Process each user
+      for (const userData of users) {
+        try {
+          // Validate email
+          if (!userData.email || !userData.email.includes("@")) {
+            results.push({
+              email: userData.email || "N/A",
+              success: false,
+              error: "Email inválido",
+            });
+            continue;
+          }
+
+          // Check if user already exists
+          if (existingEmails.has(userData.email.toLowerCase())) {
+            results.push({
+              email: userData.email,
+              success: false,
+              error: "Usuário já existe",
+            });
+            continue;
+          }
+
+          // Generate password if not provided
+          const password = userData.password || AdminService.generatePassword();
+
+          // Create user
+          const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email: userData.email,
+            password: password,
+            email_confirm: true,
+            user_metadata: userData.fullName ? { full_name: userData.fullName } : undefined,
+          });
+
+        if (authError) {
+          results.push({
+            email: userData.email,
+            success: false,
+            error: `Erro ao criar usuário: ${authError.message}`,
+          });
+          continue;
+        }
+
+        if (!authData.user) {
+          results.push({
+            email: userData.email,
+            success: false,
+            error: "Falha ao criar usuário: nenhum dado retornado",
+          });
+          continue;
+        }
+
+        const userId = authData.user.id;
+
+        // Parse dataFinalAcesso if provided
+        let dataFinalAcesso: Date | undefined;
+        if (userData.dataFinalAcesso) {
+          dataFinalAcesso = new Date(userData.dataFinalAcesso);
+          if (isNaN(dataFinalAcesso.getTime())) {
+            results.push({
+              email: userData.email,
+              success: false,
+              error: "Data final de acesso inválida",
+            });
+            continue;
+          }
+        }
+
+        // Create metadata
+        await db.insert(userMetadata).values({
+          userId,
+          fullName: userData.fullName,
+          status: "ativo",
+          dataFinalAcesso,
+        });
+
+        // Add to existing emails set to prevent duplicates in same batch
+        existingEmails.add(userData.email.toLowerCase());
+
+        results.push({
+          email: userData.email,
+          success: true,
+          userId,
+          generatedPassword: userData.password ? undefined : password, // Include generated password if auto-generated
+        });
+      } catch (error: any) {
+        results.push({
+          email: userData.email,
+          success: false,
+          error: error.message || "Erro desconhecido",
+        });
+      }
+    }
+
+    return {
+      total: users.length,
+      success: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+      results,
+    };
+  }
+
+  /**
+   * Get user status by userId
+   */
+  static async getUserStatus(userId: string): Promise<string> {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      const metadata = await db
+        .select({ status: userMetadata.status })
+        .from(userMetadata)
+        .where(eq(userMetadata.userId, userId))
+        .limit(1);
+
+      // Se não tiver metadata, retorna "ativo" como padrão
+      return metadata[0]?.status || "ativo";
+    } catch (error: any) {
+      console.error("Error getting user status:", error);
+      // Em caso de erro, retorna "ativo" para não bloquear usuários
+      return "ativo";
+    }
+  }
+
+  /**
+   * Delete a user from Supabase Auth and user_metadata
+   */
+  static async deleteUser(userId: string) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      const supabase = getSupabaseAdminClient();
+
+      // Get user info before deletion for audit
+      const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+      const email = authUser?.user?.email || "Unknown";
+
+      // Delete user metadata first (if exists)
+      try {
+        await db
+          .delete(userMetadata)
+          .where(eq(userMetadata.userId, userId));
+      } catch (metadataError: any) {
+        console.warn("Error deleting user metadata (may not exist):", metadataError);
+        // Continue with user deletion even if metadata deletion fails
+      }
+
+      // Delete user from Supabase Auth
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
+
+      if (deleteError) {
+        throw new Error(`Failed to delete user from Supabase Auth: ${deleteError.message}`);
+      }
+
+      return {
+        success: true,
+        userId,
+        email,
+      };
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      throw new Error(`Failed to delete user: ${error.message}`);
+    }
   }
 }
 

@@ -22,6 +22,17 @@ import { randomUUID } from "crypto";
 import { sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Get user status (public endpoint for checking user status)
+  app.get("/api/auth/user-status/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const status = await AdminService.getUserStatus(userId);
+      res.json({ status });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Password Reset Endpoints
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
@@ -883,6 +894,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
         targetUserId: userId,
         details: { dataFinalAcesso },
       });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create user
+  app.post("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const { email, password, fullName, dataFinalAcesso, status } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email é obrigatório" });
+      }
+
+      const result = await AdminService.createUser({
+        email,
+        password: password || undefined, // Senha será gerada automaticamente se não fornecida
+        fullName,
+        dataFinalAcesso: dataFinalAcesso ? new Date(dataFinalAcesso) : undefined,
+        status: status || "ativo",
+      });
+
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "create_user",
+        targetUserId: result.userId,
+        details: { email, fullName, passwordGenerated: !password },
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Bulk update user status from CSV
+  app.post("/api/admin/users/bulk-update-status", isAdmin, async (req, res) => {
+    try {
+      const { csvData } = req.body;
+      
+      if (!csvData || typeof csvData !== "string") {
+        return res.status(400).json({ error: "CSV data is required" });
+      }
+
+      // Parse CSV using papaparse
+      const Papa = (await import("papaparse")).default;
+      const parsed = Papa.parse(csvData, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.trim().toLowerCase(),
+      });
+
+      if (parsed.errors.length > 0) {
+        return res.status(400).json({
+          error: "Erro ao processar CSV",
+          details: parsed.errors,
+        });
+      }
+
+      // Validate headers
+      const headers = parsed.meta.fields || [];
+      if (!headers.includes("email") || !headers.includes("status")) {
+        return res.status(400).json({
+          error: "CSV deve conter as colunas: email, status",
+        });
+      }
+
+      // Extract updates
+      const updates = parsed.data
+        .filter((row: any) => row.email && row.status)
+        .map((row: any) => ({
+          email: row.email.trim(),
+          status: row.status.trim().toLowerCase(),
+        }));
+
+      if (updates.length === 0) {
+        return res.status(400).json({ error: "Nenhum registro válido encontrado no CSV" });
+      }
+
+      const result = await AdminService.bulkUpdateUserStatus(updates);
+
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "bulk_update_user_status",
+        details: {
+          total: result.total,
+          success: result.success,
+          failed: result.failed,
+        },
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Bulk create users from CSV
+  app.post("/api/admin/users/bulk-create", isAdmin, async (req, res) => {
+    try {
+      const { csvData } = req.body;
+      
+      if (!csvData || typeof csvData !== "string") {
+        return res.status(400).json({ error: "CSV data is required" });
+      }
+
+      // Parse CSV using papaparse
+      const Papa = (await import("papaparse")).default;
+      const parsed = Papa.parse(csvData, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.trim().toLowerCase(),
+      });
+
+      if (parsed.errors.length > 0) {
+        return res.status(400).json({
+          error: "Erro ao processar CSV",
+          details: parsed.errors,
+        });
+      }
+
+      // Validate headers
+      const headers = parsed.meta.fields || [];
+      if (!headers.includes("email")) {
+        return res.status(400).json({
+          error: "CSV deve conter a coluna: email (obrigatório). Colunas opcionais: senha, nome, datafinalacesso",
+        });
+      }
+
+      // Extract users - senha é opcional, será gerada automaticamente se não fornecida
+      const users = parsed.data
+        .filter((row: any) => row.email)
+        .map((row: any) => ({
+          email: row.email.trim(),
+          password: row.senha?.trim() || undefined, // Senha opcional
+          fullName: row.nome?.trim() || undefined,
+          dataFinalAcesso: row.datafinalacesso?.trim() || undefined,
+        }));
+
+      if (users.length === 0) {
+        return res.status(400).json({ error: "Nenhum registro válido encontrado no CSV" });
+      }
+
+      const result = await AdminService.bulkCreateUsers(users);
+
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "bulk_create_users",
+        details: {
+          total: result.total,
+          success: result.success,
+          failed: result.failed,
+        },
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete user
+  app.delete("/api/admin/users/:userId", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const result = await AdminService.deleteUser(userId);
+
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "delete_user",
+        targetUserId: userId,
+        details: { email: result.email },
+      });
+
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

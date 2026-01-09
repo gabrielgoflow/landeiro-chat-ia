@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabaseService } from "@/services/supabaseService";
+import { supabase } from "@/lib/supabase.js";
 import { Plus, MessageSquare, Calendar, User, LogOut, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DiagnosticFilterSidebar } from "@/components/DiagnosticFilterSidebar.jsx";
@@ -27,6 +28,7 @@ export default function ChatsPage() {
   const [chatReviews, setChatReviews] = useState({});
   const [selectedDiagnostico, setSelectedDiagnostico] = useState(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
+  const [diagnosticosMap, setDiagnosticosMap] = useState({});
   const isMobile = useIsMobile();
   
   // Refs para evitar chamadas duplicadas
@@ -45,6 +47,16 @@ export default function ChatsPage() {
     
     // Outros diagnósticos têm limite de 10 sessões
     return 10;
+  };
+
+  // Função auxiliar para formatar nome do diagnóstico (abreviar "Transtorno" para "T.")
+  const formatDiagnosticoName = (nome) => {
+    if (!nome) return "Diagnóstico";
+    // Se começar com "Transtorno", substitui por "T."
+    if (nome.toLowerCase().startsWith('transtorno')) {
+      return nome.replace(/^transtorno\s+/i, 'T. ');
+    }
+    return nome;
   };
 
   // Memoizar loadUserChats para evitar recriações desnecessárias
@@ -114,6 +126,34 @@ export default function ChatsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Carregar diagnósticos para mapear código -> nome
+  useEffect(() => {
+    const loadDiagnosticos = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("diagnosticos")
+          .select("codigo, nome")
+          .eq("ativo", true);
+
+        if (error) {
+          console.error("Erro ao carregar diagnósticos:", error);
+          return;
+        }
+
+        // Criar mapa de código para nome
+        const map = {};
+        (data || []).forEach((d) => {
+          map[d.codigo] = d.nome;
+        });
+        setDiagnosticosMap(map);
+      } catch (error) {
+        console.error("Erro ao carregar diagnósticos:", error);
+      }
+    };
+
+    loadDiagnosticos();
+  }, []);
+
   const handleSignOut = async () => {
     const { error } = await signOut();
     if (error) {
@@ -144,14 +184,18 @@ export default function ChatsPage() {
   // LOG para depuração da home de chats
   console.log("ChatsPage userChats:", userChats);
 
-  // Agrupa por thread_id, mantendo apenas a sessão mais alta
+  // Agrupa por chat_id (ou thread_id se disponível), mantendo apenas a sessão mais alta
+  // Usa chat_id como chave principal pois thread_id pode estar vazio
   const latestThreads = {};
   userChats.forEach((chat) => {
+    // Usa thread_id se disponível, senão usa chat_id como chave de agrupamento
+    const groupKey = chat.thread_id || chat.chat_id;
+    
     if (
-      !latestThreads[chat.thread_id] ||
-      chat.sessao > latestThreads[chat.thread_id].sessao
+      !latestThreads[groupKey] ||
+      chat.sessao > latestThreads[groupKey].sessao
     ) {
-      latestThreads[chat.thread_id] = chat;
+      latestThreads[groupKey] = chat;
     }
   });
   let chatsToShow = Object.values(latestThreads);
@@ -324,7 +368,7 @@ export default function ChatsPage() {
                         <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 flex-shrink-0 mt-1" />
                         <div className="flex flex-col space-y-1.5 sm:space-y-2 ml-2 sm:ml-3 flex-1">
                           <Badge variant="secondary" className="w-fit">
-                            {(chat.diagnostico || "Diagnóstico").toUpperCase()}
+                            {formatDiagnosticoName(diagnosticosMap[chat.diagnostico] || chat.diagnostico || "Diagnóstico").toUpperCase()}
                           </Badge>
                           <Badge variant="outline" className="w-fit">
                             {(chat.protocolo || "Protocolo").toUpperCase()}

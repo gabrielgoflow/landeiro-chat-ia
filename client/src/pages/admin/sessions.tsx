@@ -58,7 +58,8 @@ export default function AdminSessions() {
   const loadDiagnosticos = async () => {
     try {
       const data = await adminService.getDiagnosticos();
-      setDiagnosticos(data || []);
+      // Filtrar apenas diagnósticos ativos para manter consistência com o sidebar
+      setDiagnosticos((data || []).filter((d: any) => d.ativo));
     } catch (error: any) {
       console.error("Erro ao carregar diagnósticos:", error);
     }
@@ -155,13 +156,14 @@ export default function AdminSessions() {
                   className="w-64"
                 />
                 <Select 
-                  value={diagnostico || undefined} 
-                  onValueChange={(value) => setDiagnostico(value || "")}
+                  value={diagnostico || "todos"} 
+                  onValueChange={(value) => setDiagnostico(value === "todos" ? "" : value)}
                 >
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Todos os diagnósticos" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="todos">Todos os diagnósticos</SelectItem>
                     {diagnosticos.map((diag) => (
                       <SelectItem key={diag.id} value={diag.codigo}>
                         {diag.nome}

@@ -43,6 +43,16 @@ export function ChatSidebar({
     return 10;
   };
 
+  // Função auxiliar para formatar nome do diagnóstico (abreviar "Transtorno" para "T.")
+  const formatDiagnosticoName = (nome) => {
+    if (!nome) return "Diagnóstico";
+    // Se começar com "Transtorno", substitui por "T."
+    if (nome.toLowerCase().startsWith('transtorno')) {
+      return nome.replace(/^transtorno\s+/i, 'T. ');
+    }
+    return nome;
+  };
+
   const handleSignOut = async () => {
     const { error } = await signOut();
     if (error) {
@@ -308,7 +318,7 @@ export function ChatSidebar({
                       <div className="flex-1 min-w-0 pr-16 sm:pr-24">
                         <div className="flex flex-col space-y-0.5 sm:space-y-1 mb-1.5 sm:mb-2">
                           <Badge variant="secondary" className="w-fit text-[10px] sm:text-xs">
-                            {(diagnosticosMap[chat.diagnostico] || chat.diagnostico || "Diagnóstico").toUpperCase()}
+                            {formatDiagnosticoName(diagnosticosMap[chat.diagnostico] || chat.diagnostico || "Diagnóstico").toUpperCase()}
                           </Badge>
                           <Badge variant="outline" className="w-fit text-[10px] sm:text-xs">
                             {(chat.protocolo || "Protocolo").toUpperCase()}
