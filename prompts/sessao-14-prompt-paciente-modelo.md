@@ -39,3 +39,4 @@ Demonstre compreensão de que a terapia é como um exercício, como entrar em fo
 
 
 
+

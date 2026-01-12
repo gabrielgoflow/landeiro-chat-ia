@@ -1097,14 +1097,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/diagnosticos/:id", isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { ativo } = req.body;
-      const updated = await AdminService.updateDiagnostico(id, { ativo });
+      const { ativo, apenas_teste } = req.body;
+      const updated = await AdminService.updateDiagnostico(id, { 
+        ativo, 
+        apenasTeste: apenas_teste 
+      });
       await AdminService.createAuditLog({
         adminUserId: (req as any).user.id,
         action: "update_diagnostico",
-        details: { diagnosticoId: id, ativo },
+        details: { diagnosticoId: id, ativo, apenas_teste },
       });
       res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/diagnosticos", isAdmin, async (req, res) => {
+    try {
+      const { nome, codigo, ativo, apenas_teste } = req.body;
+
+      if (!nome || !codigo) {
+        return res.status(400).json({ error: "Nome e código são obrigatórios" });
+      }
+
+      const created = await AdminService.createDiagnostico({
+        nome,
+        codigo,
+        ativo: ativo ?? true,
+        apenasTeste: apenas_teste ?? false,
+      });
+
+      await AdminService.createAuditLog({
+        adminUserId: (req as any).user.id,
+        action: "create_diagnostico",
+        details: { diagnosticoId: created.id, nome, codigo, ativo, apenas_teste },
+      });
+
+      res.status(201).json(created);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

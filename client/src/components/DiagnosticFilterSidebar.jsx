@@ -6,6 +6,13 @@ import { supabase } from "@/lib/supabase.js";
 import { Filter, X } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
+import { useAuth } from "@/hooks/useAuth";
+
+const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br", "admin@fernandalandeiro.com.br"];
+
+const isAdminEmail = (email) => {
+  return email ? ADMIN_EMAILS.includes(email) : false;
+};
 
 export function DiagnosticFilterSidebar({ 
   selectedDiagnostico, 
@@ -16,11 +23,60 @@ export function DiagnosticFilterSidebar({
 }) {
   const [diagnosticos, setDiagnosticos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const { user } = useAuth();
   const isMobile = useIsMobile();
 
+  // Verificar se usuário é admin
   useEffect(() => {
-    loadDiagnosticos();
-  }, []);
+    const checkAdmin = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        setCheckingAdmin(false);
+        return;
+      }
+
+      // Check if user is admin by email
+      if (isAdminEmail(user.email)) {
+        setIsAdmin(true);
+        setCheckingAdmin(false);
+        return;
+      }
+
+      // Check user_metadata table for admin role
+      try {
+        const { data, error } = await supabase
+          .from("user_metadata")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (!error && data && data.role === "admin") {
+          setIsAdmin(true);
+        } else {
+          // Se não tem metadata ou role não é admin, verificar novamente por email (fallback)
+          if (isAdminEmail(user.email)) {
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        // Em caso de erro, verificar por email como fallback
+        if (isAdminEmail(user.email)) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } finally {
+        setCheckingAdmin(false);
+      }
+    };
+
+    checkAdmin();
+  }, [user]);
 
   const loadDiagnosticos = async () => {
     try {
@@ -42,7 +98,14 @@ export function DiagnosticFilterSidebar({
       
       // Filtrar apenas os ativos no cliente como segurança adicional
       // (a política RLS já faz isso, mas é uma camada extra de segurança)
-      setDiagnosticos((data || []).filter(d => d.ativo));
+      // Se não for admin, excluir diagnósticos de teste
+      let filtered = (data || []).filter(d => d.ativo);
+      
+      if (!isAdmin) {
+        filtered = filtered.filter(d => !d.apenas_teste);
+      }
+      
+      setDiagnosticos(filtered);
     } catch (error) {
       console.error("Erro ao carregar diagnosticos:", error);
       setDiagnosticos([]);
@@ -50,6 +113,13 @@ export function DiagnosticFilterSidebar({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!checkingAdmin) {
+      loadDiagnosticos();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkingAdmin, isAdmin]);
 
   // Contar chats por diagnóstico
   const getChatCountByDiagnostico = (codigo) => {

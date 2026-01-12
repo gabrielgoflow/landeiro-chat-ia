@@ -15,10 +15,27 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export default function AdminDiagnosticos() {
   const [diagnosticos, setDiagnosticos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formData, setFormData] = useState({
+    nome: "",
+    codigo: "",
+    ativo: true,
+    apenas_teste: false,
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -58,6 +75,54 @@ export default function AdminDiagnosticos() {
     }
   };
 
+  const handleToggleApenasTeste = async (id: string, currentApenasTeste: boolean) => {
+    try {
+      await adminService.updateDiagnostico(id, { apenas_teste: !currentApenasTeste });
+      toast({
+        title: "Sucesso",
+        description: `Transtorno ${!currentApenasTeste ? "marcado como teste" : "removido de teste"} com sucesso`,
+      });
+      loadDiagnosticos();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar transtorno",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateDiagnostico = async () => {
+    if (!formData.nome || !formData.codigo) {
+      toast({
+        title: "Erro",
+        description: "Nome e código são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setCreating(true);
+      await adminService.createDiagnostico(formData);
+      toast({
+        title: "Sucesso",
+        description: "Transtorno criado com sucesso",
+      });
+      setShowCreateDialog(false);
+      setFormData({ nome: "", codigo: "", ativo: true, apenas_teste: false });
+      loadDiagnosticos();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao criar transtorno",
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -70,7 +135,12 @@ export default function AdminDiagnosticos() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Transtornos Disponíveis</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Transtornos Disponíveis</CardTitle>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                Novo Diagnóstico
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -82,6 +152,7 @@ export default function AdminDiagnosticos() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Código</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Apenas Teste</TableHead>
                     <TableHead>Usuários com Acesso</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
@@ -89,7 +160,7 @@ export default function AdminDiagnosticos() {
                 <TableBody>
                   {diagnosticos.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                         Nenhum transtorno encontrado
                       </TableCell>
                     </TableRow>
@@ -115,6 +186,26 @@ export default function AdminDiagnosticos() {
                           >
                             {diagnostico.ativo ? "Ativo" : "Inativo"}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id={`toggle-teste-${diagnostico.diagnosticoId}`}
+                              checked={diagnostico.apenas_teste || false}
+                              onCheckedChange={() =>
+                                handleToggleApenasTeste(
+                                  diagnostico.diagnosticoId,
+                                  diagnostico.apenas_teste || false
+                                )
+                              }
+                            />
+                            <Label
+                              htmlFor={`toggle-teste-${diagnostico.diagnosticoId}`}
+                              className="text-sm text-gray-600"
+                            >
+                              {diagnostico.apenas_teste ? "Sim" : "Não"}
+                            </Label>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <span className="text-gray-600">
@@ -149,6 +240,77 @@ export default function AdminDiagnosticos() {
             )}
           </CardContent>
         </Card>
+
+        {/* Modal de Criação */}
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Novo Diagnóstico</DialogTitle>
+              <DialogDescription>
+                Preencha os dados para criar um novo transtorno
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="nome">Nome</Label>
+                <Input
+                  id="nome"
+                  value={formData.nome}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome: e.target.value })
+                  }
+                  placeholder="Ex: Depressão"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="codigo">Código</Label>
+                <Input
+                  id="codigo"
+                  value={formData.codigo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, codigo: e.target.value })
+                  }
+                  placeholder="Ex: depressao"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="ativo"
+                  checked={formData.ativo}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, ativo: checked })
+                  }
+                />
+                <Label htmlFor="ativo" className="text-sm">
+                  Ativo
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="apenas_teste"
+                  checked={formData.apenas_teste}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, apenas_teste: checked })
+                  }
+                />
+                <Label htmlFor="apenas_teste" className="text-sm">
+                  Apenas Teste
+                </Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateDialog(false)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateDiagnostico} disabled={creating}>
+                {creating ? "Criando..." : "Criar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

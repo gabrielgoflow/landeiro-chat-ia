@@ -22,6 +22,12 @@ import { supabase } from "@/lib/supabase.js";
 import { useToast } from "@/hooks/use-toast";
 import { supabaseService } from "@/services/supabaseService";
 
+const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br", "admin@fernandalandeiro.com.br"];
+
+const isAdminEmail = (email) => {
+  return email ? ADMIN_EMAILS.includes(email) : false;
+};
+
 export function NewChatDialog({ open, onOpenChange, onConfirm }) {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -35,13 +41,68 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
   const [validating, setValidating] = useState(false);
   const [userChats, setUserChats] = useState([]);
   const [loadingChats, setLoadingChats] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
+
+  // Verificar se usuário é admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        setCheckingAdmin(false);
+        return;
+      }
+
+      // Check if user is admin by email
+      if (isAdminEmail(user.email)) {
+        setIsAdmin(true);
+        setCheckingAdmin(false);
+        return;
+      }
+
+      // Check user_metadata table for admin role
+      try {
+        const { data, error } = await supabase
+          .from("user_metadata")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (!error && data && data.role === "admin") {
+          setIsAdmin(true);
+        } else {
+          // Se não tem metadata ou role não é admin, verificar novamente por email (fallback)
+          if (isAdminEmail(user.email)) {
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        // Em caso de erro, verificar por email como fallback
+        if (isAdminEmail(user.email)) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } finally {
+        setCheckingAdmin(false);
+      }
+    };
+
+    if (open && user) {
+      checkAdmin();
+    }
+  }, [open, user]);
 
   useEffect(() => {
-    if (open && user) {
+    if (open && user && !checkingAdmin) {
       loadDiagnosticos();
       loadUserChats();
     }
-  }, [open, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user, checkingAdmin, isAdmin]);
 
   const loadDiagnosticos = async () => {
     try {
@@ -53,7 +114,16 @@ export function NewChatDialog({ open, onOpenChange, onConfirm }) {
         .order("nome");
 
       if (error) throw error;
-      setDiagnosticos(data || []);
+      
+      // Filtrar diagnósticos de teste se não for admin
+      // A política RLS já faz isso, mas é uma camada extra de segurança
+      let filtered = data || [];
+      
+      if (!isAdmin) {
+        filtered = filtered.filter(d => !d.apenas_teste);
+      }
+      
+      setDiagnosticos(filtered);
     } catch (error) {
       console.error("Erro ao carregar diagnosticos:", error);
       toast({

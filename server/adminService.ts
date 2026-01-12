@@ -776,15 +776,49 @@ export class AdminService {
   }
 
   /**
-   * Update diagnostico (activate/deactivate)
+   * Update diagnostico (activate/deactivate, apenas_teste)
    */
-  static async updateDiagnostico(id: string, data: { ativo?: boolean }) {
+  static async updateDiagnostico(id: string, data: { ativo?: boolean; apenasTeste?: boolean }) {
     if (!db) throw new Error("Database not connected");
+
+    const updateData: any = { updatedAt: new Date() };
+    if (data.ativo !== undefined) updateData.ativo = data.ativo;
+    if (data.apenasTeste !== undefined) updateData.apenasTeste = data.apenasTeste;
 
     const result = await db
       .update(diagnosticos)
-      .set({ ...data, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(diagnosticos.id, id))
+      .returning();
+
+    return result[0];
+  }
+
+  /**
+   * Create diagnostico
+   */
+  static async createDiagnostico(data: { nome: string; codigo: string; ativo?: boolean; apenasTeste?: boolean }) {
+    if (!db) throw new Error("Database not connected");
+
+    // Check if codigo already exists
+    const existing = await db
+      .select()
+      .from(diagnosticos)
+      .where(eq(diagnosticos.codigo, data.codigo))
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      throw new Error("Código de diagnóstico já existe");
+    }
+
+    const result = await db
+      .insert(diagnosticos)
+      .values({
+        nome: data.nome,
+        codigo: data.codigo,
+        ativo: data.ativo ?? true,
+        apenasTeste: data.apenasTeste ?? false,
+      })
       .returning();
 
     return result[0];
@@ -896,11 +930,12 @@ export class AdminService {
         nome: diagnosticos.nome,
         codigo: diagnosticos.codigo,
         ativo: diagnosticos.ativo,
+        apenas_teste: diagnosticos.apenasTeste,
         totalUsuarios: sql<number>`count(distinct ${userDiagnosticos.userId})`,
       })
       .from(diagnosticos)
       .leftJoin(userDiagnosticos, eq(diagnosticos.id, userDiagnosticos.diagnosticoId))
-      .groupBy(diagnosticos.id, diagnosticos.nome, diagnosticos.codigo, diagnosticos.ativo)
+      .groupBy(diagnosticos.id, diagnosticos.nome, diagnosticos.codigo, diagnosticos.ativo, diagnosticos.apenasTeste)
       .orderBy(asc(diagnosticos.nome));
 
     return stats;

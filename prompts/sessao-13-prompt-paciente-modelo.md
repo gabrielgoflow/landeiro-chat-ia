@@ -40,3 +40,4 @@ Quando o terapeuta identificar gatilhos de recaída, reaja naturalmente e demons
 
 
 
+
