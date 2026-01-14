@@ -166,22 +166,76 @@ export default function Chat() {
         } else {
           // Chat ID not found in current threads, try to load from Supabase
           console.log(
-            "Thread not found locally, trying to load from Supabase:",
+            "Thread not found locally, trying to load from Supabase (chat_id):",
             chatId,
           );
           const createdThread = await createThreadFromSupabase(chatId);
           if (createdThread) {
             console.log(
-              "Thread created from Supabase, now selecting:",
+              "Thread created from Supabase using chat_id, now selecting:",
               createdThread.chat_id || chatId,
             );
             await selectThread(createdThread.chat_id || chatId, 1); // Sempre seleciona a sessão 1 ao abrir
           } else {
             console.warn(
-              "Chat ID not found in Supabase, redirecting to new chat:",
+              "Chat ID not found by chat_id. Trying fallback search by thread_id:",
               chatId,
             );
-            setShowNewChatDialog(true);
+
+            // Fallback: tentar interpretar o parâmetro como thread_id e buscar qualquer sessão
+            try {
+              const { data: fallbackSessions, error: fallbackError } = await supabase
+                .from("chat_threads")
+                .select("*")
+                .eq("thread_id", chatId)
+                .order("sessao", { ascending: false })
+                .limit(1);
+
+              if (!fallbackError && fallbackSessions && fallbackSessions.length > 0) {
+                const fallback = fallbackSessions[0];
+                console.log(
+                  "[FALLBACK] Encontrado chat usando thread_id. Usando chat_id alternativo:",
+                  fallback.chat_id,
+                  "sessao:",
+                  fallback.sessao,
+                );
+                const createdFromFallback = await createThreadFromSupabase(
+                  fallback.chat_id,
+                );
+                if (createdFromFallback) {
+                  await selectThread(
+                    createdFromFallback.chat_id || fallback.chat_id,
+                    1,
+                  );
+                  return;
+                }
+              } else {
+                if (fallbackError) {
+                  console.error(
+                    "[FALLBACK] Erro ao buscar sessão por thread_id:",
+                    fallbackError,
+                  );
+                } else {
+                  console.warn(
+                    "[FALLBACK] Nenhuma sessão encontrada para thread_id:",
+                    chatId,
+                  );
+                }
+              }
+            } catch (fallbackException) {
+              console.error(
+                "[FALLBACK] Exceção ao tentar buscar sessão por thread_id:",
+                fallbackException,
+              );
+            }
+
+            console.warn(
+              "Chat não encontrado nem por chat_id nem por thread_id. Redirecionando para novo chat:",
+              chatId,
+            );
+            // Redireciona em vez de apenas abrir dialog para evitar loop infinito
+            navigate("/chat/new");
+            return; // Importante para evitar continuar
           }
         }
       } else if (threads.length === 0 && !chatId) {
@@ -192,7 +246,7 @@ export default function Chat() {
     };
 
     initializeChat();
-  }, [chatId]);
+  }, [chatId, threads.length, currentThread?.id, navigate, selectThread, createThreadFromSupabase]);
 
   // Extract threadId from current thread
   useEffect(() => {

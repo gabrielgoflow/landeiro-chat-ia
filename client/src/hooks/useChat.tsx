@@ -41,41 +41,109 @@ export function useChat() {
   const createThreadFromSupabase = useCallback(
     async (chatId) => {
       try {
-        if (!user) return null;
-
-        console.log("Creating thread from Supabase data for:", chatId);
-        const userChats = await SupabaseService.getUserChats(user.id);
-        const chatData = userChats.find((chat) => chat.chat_id === chatId);
-
-        if (!chatData) {
-          console.warn("Chat not found in Supabase:", chatId);
+        if (!user) {
+          console.warn("[createThreadFromSupabase] Usuário não autenticado");
           return null;
         }
 
-        const newThread = {
-          id: chatData.chat_id, // Força o id a ser igual ao chat_id
-          title: `${chatData.diagnostico} - TCC`,
-          threadId: chatData.thread_id,
-          openaiChatId: chatData.chat_id, // This is the OpenAI chat_id for webhook
-          sessionData: {
-            diagnostico: chatData.diagnostico,
-            protocolo: "tcc", // Always TCC
-            sessao: chatData.sessao,
-          },
-          createdAt: new Date(chatData.created_at),
-          updatedAt: new Date(chatData.created_at),
-        };
+        console.log("[createThreadFromSupabase] Buscando thread para chatId:", chatId);
+        
+        // 1. Primeira tentativa: buscar pelo chat_id exato (sessão mais recente)
+        const { data: threadsData, error: threadError } = await supabase
+          .from("chat_threads")
+          .select("*")
+          .eq("chat_id", chatId)
+          .order("sessao", { ascending: false })
+          .limit(1);
 
-        // Add thread to local storage
-        setChatHistory((prev) => ({
-          threads: [newThread, ...prev.threads.filter((t) => t.id !== chatId)],
-          messages: { ...prev.messages, [chatId]: [] },
-        }));
+        if (threadsData && threadsData.length > 0) {
+          const threadData = threadsData[0];
+          console.log("[createThreadFromSupabase] Thread encontrado pelo chat_id:", threadData);
 
-        console.log("Thread created from Supabase:", newThread);
-        return newThread;
+          const newThread = {
+            id: threadData.chat_id,
+            title: `${threadData.diagnostico} - TCC`,
+            threadId: threadData.thread_id,
+            openaiChatId: threadData.chat_id,
+            sessionData: {
+              diagnostico: threadData.diagnostico,
+              protocolo: "tcc",
+              sessao: threadData.sessao,
+              sessionStartedAt: threadData.session_started_at,
+            },
+            createdAt: new Date(threadData.created_at),
+            updatedAt: new Date(threadData.created_at),
+          };
+
+          setChatHistory((prev) => ({
+            threads: [newThread, ...prev.threads.filter((t) => t.id !== chatId)],
+            messages: { ...prev.messages, [chatId]: [] },
+          }));
+
+          console.log("[createThreadFromSupabase] Thread criado com sucesso:", newThread);
+          return newThread;
+        }
+
+        // 2. Segunda tentativa: verificar se o chat_id existe em user_chats (pode ser chat órfão)
+        console.log("[createThreadFromSupabase] Chat_id não encontrado em chat_threads, verificando user_chats...");
+        const { data: userChatData, error: userChatError } = await supabase
+          .from("user_chats")
+          .select("chat_id, thread_id")
+          .eq("chat_id", chatId)
+          .maybeSingle();
+
+        if (userChatData) {
+          console.warn("[createThreadFromSupabase] Chat_id encontrado em user_chats mas não em chat_threads (chat órfão):", chatId);
+          
+          // Se tiver thread_id, tentar buscar outras sessões com mesmo thread_id
+          if (userChatData.thread_id) {
+            console.log("[createThreadFromSupabase] Tentando buscar sessões com thread_id:", userChatData.thread_id);
+            const { data: threadSessions, error: threadSessionsError } = await supabase
+              .from("chat_threads")
+              .select("*")
+              .eq("thread_id", userChatData.thread_id)
+              .order("sessao", { ascending: false })
+              .limit(1);
+
+            if (threadSessions && threadSessions.length > 0) {
+              const threadData = threadSessions[0];
+              console.log("[createThreadFromSupabase] Sessão encontrada pelo thread_id:", threadData);
+
+              const newThread = {
+                id: threadData.chat_id,
+                title: `${threadData.diagnostico} - TCC`,
+                threadId: threadData.thread_id,
+                openaiChatId: threadData.chat_id,
+                sessionData: {
+                  diagnostico: threadData.diagnostico,
+                  protocolo: "tcc",
+                  sessao: threadData.sessao,
+                  sessionStartedAt: threadData.session_started_at,
+                },
+                createdAt: new Date(threadData.created_at),
+                updatedAt: new Date(threadData.created_at),
+              };
+
+              setChatHistory((prev) => ({
+                threads: [newThread, ...prev.threads.filter((t) => t.id !== chatId)],
+                messages: { ...prev.messages, [chatId]: [] },
+              }));
+
+              console.log("[createThreadFromSupabase] Thread criado usando thread_id:", newThread);
+              return newThread;
+            }
+          }
+        }
+
+        // 3. Se não encontrou nada, retornar null com log detalhado
+        console.error("[createThreadFromSupabase] Chat não encontrado após todas as tentativas:", {
+          chatId,
+          threadError: threadError?.message,
+          userChatError: userChatError?.message,
+        });
+        return null;
       } catch (error) {
-        console.error("Error creating thread from Supabase:", error);
+        console.error("[createThreadFromSupabase] Erro ao criar thread do Supabase:", error);
         return null;
       }
     },

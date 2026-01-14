@@ -22,7 +22,7 @@ import { supabase } from "@/lib/supabase.js";
 import { useToast } from "@/hooks/use-toast";
 import { supabaseService } from "@/services/supabaseService";
 
-const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br", "admin@fernandalandeiro.com.br"];
+const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br", "admin@fernandalandeiro.com.br", "terapeuta@teste"];
 
 const isAdminEmail = (email) => {
   return email ? ADMIN_EMAILS.includes(email) : false;

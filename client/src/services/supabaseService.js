@@ -337,34 +337,71 @@ export class SupabaseService {
   // Buscar chats do usuário agrupados por thread_id (apenas sessão mais recente)
   static async getUserChats(userId) {
     try {
+      console.log("[getUserChats] Buscando chats para userId:", userId);
+      
       // 1. Buscar todos os chat_id do usuário
       const { data: userChats, error: userChatsError } = await supabase
         .from("user_chats")
         .select("chat_id")
         .eq("user_id", userId);
 
-      if (userChatsError) throw userChatsError;
+      if (userChatsError) {
+        console.error("[getUserChats] Erro ao buscar user_chats:", userChatsError);
+        throw userChatsError;
+      }
+      
       const chatIds = userChats.map((uc) => uc.chat_id);
+      console.log("[getUserChats] Chat IDs encontrados em user_chats:", chatIds.length);
 
-      // 2. Buscar os dados na view chat_overview
-      let chats = [];
+      // 2. Verificar quais chat_ids realmente têm sessões válidas em chat_threads
+      let validChatIds = [];
       if (chatIds.length > 0) {
+        const { data: validThreads, error: threadsError } = await supabase
+          .from("chat_threads")
+          .select("chat_id")
+          .in("chat_id", chatIds);
+
+        if (threadsError) {
+          console.error("[getUserChats] Erro ao verificar chat_threads:", threadsError);
+          throw threadsError;
+        }
+
+        // Extrair chat_ids únicos que têm sessões válidas
+        validChatIds = [...new Set((validThreads || []).map(t => t.chat_id))];
+        console.log("[getUserChats] Chat IDs com sessões válidas:", validChatIds.length);
+        
+        // Log de chats órfãos (existem em user_chats mas não em chat_threads)
+        const orphanChats = chatIds.filter(id => !validChatIds.includes(id));
+        if (orphanChats.length > 0) {
+          console.warn("[getUserChats] Chats órfãos encontrados (existem em user_chats mas não em chat_threads):", orphanChats);
+        }
+      }
+
+      // 3. Buscar os dados na view chat_overview apenas para chats válidos
+      let chats = [];
+      if (validChatIds.length > 0) {
         const { data: overviewData, error: overviewError } = await supabase
           .from("v_chat_overview")
           .select("*")
-          .in("chat_id", chatIds);
+          .in("chat_id", validChatIds);
 
-        if (overviewError) throw overviewError;
+        if (overviewError) {
+          console.error("[getUserChats] Erro ao buscar v_chat_overview:", overviewError);
+          throw overviewError;
+        }
         chats = overviewData || [];
+        console.log("[getUserChats] Chats retornados da view:", chats.length);
       }
 
-      // 3. Ordenar por data da última mensagem
+      // 4. Ordenar por data da última mensagem
       chats.sort(
         (a, b) => new Date(b.last_message_at) - new Date(a.last_message_at),
       );
+      
+      console.log("[getUserChats] Total de chats retornados:", chats.length);
       return chats;
     } catch (error) {
-      console.error("Error getting user chats from chat_overview:", error);
+      console.error("[getUserChats] Erro ao buscar chats do usuário:", error);
       return [];
     }
   }
@@ -390,12 +427,72 @@ export class SupabaseService {
   // Deletar chat thread
   static async deleteChatThread(chatId) {
     try {
+      console.log("[deleteChatThread] Iniciando deleção de chat thread:", chatId);
+      
+      // Buscar informações do thread antes de deletar para o audit log
+      const { data: threadData, error: selectError } = await supabase
+        .from("chat_threads")
+        .select("chat_id, diagnostico, protocolo, sessao")
+        .eq("chat_id", chatId);
+
+      if (selectError) {
+        console.error("[deleteChatThread] Erro ao buscar informações do thread:", selectError);
+        throw selectError;
+      }
+
+      const sessionCount = threadData?.length || 0;
+      console.log("[deleteChatThread] Total de sessões que serão deletadas:", sessionCount);
+
+      if (sessionCount === 0) {
+        console.warn("[deleteChatThread] Nenhuma sessão encontrada para este chat_id:", chatId);
+        return { error: "Nenhuma sessão encontrada para este chat" };
+      }
+
+      // Usar o primeiro registro para o audit log (ou todos se necessário)
+      const firstThread = threadData?.[0];
+
       const { error } = await supabase
         .from("chat_threads")
         .delete()
         .eq("chat_id", chatId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("[deleteChatThread] Erro ao deletar thread:", error);
+        throw error;
+      }
+
+      console.log("[deleteChatThread] Thread deletado com sucesso:", chatId);
+
+      // Criar audit log
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const token = (await supabase.auth.getSession()).data.session?.access_token;
+          if (token) {
+            await fetch("/api/audit-logs", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                action: "delete_thread",
+                details: {
+                  chatId: chatId,
+                  diagnostico: firstThread?.diagnostico || null,
+                  protocolo: firstThread?.protocolo || null,
+                  sessao: firstThread?.sessao || null,
+                  sessionCount: sessionCount,
+                },
+              }),
+            });
+          }
+        }
+      } catch (auditError) {
+        // Não falhar a operação se o audit log falhar
+        console.error("[deleteChatThread] Erro ao criar audit log:", auditError);
+      }
+
       return { error: null };
     } catch (error) {
       console.error("Error deleting chat thread:", error);
@@ -406,13 +503,82 @@ export class SupabaseService {
   // Deletar uma sessão específica (chat_id + sessao)
   static async deleteSession(chatId, sessao) {
     try {
+      console.log("[deleteSession] Iniciando deleção de sessão:", { chatId, sessao });
+      
+      // Verificar quantas sessões existem para este chat_id
+      const { data: allSessions, error: countError } = await supabase
+        .from("chat_threads")
+        .select("sessao")
+        .eq("chat_id", chatId);
+
+      if (countError) {
+        console.error("[deleteSession] Erro ao contar sessões:", countError);
+        throw countError;
+      }
+
+      const sessionCount = allSessions?.length || 0;
+      console.log("[deleteSession] Total de sessões para este chat_id:", sessionCount);
+
+      // Se for a última sessão, avisar (mas não impedir - deixar o usuário decidir)
+      if (sessionCount === 1) {
+        console.warn("[deleteSession] ATENÇÃO: Esta é a última sessão do chat_id. A deleção removerá o chat completamente.");
+      }
+
+      // Buscar informações da sessão antes de deletar para o audit log
+      const { data: sessionData } = await supabase
+        .from("chat_threads")
+        .select("chat_id, diagnostico, protocolo, sessao")
+        .eq("chat_id", chatId)
+        .eq("sessao", sessao)
+        .maybeSingle();
+
+      if (!sessionData) {
+        console.warn("[deleteSession] Sessão não encontrada:", { chatId, sessao });
+        return { error: "Sessão não encontrada" };
+      }
+
       const { error } = await supabase
         .from("chat_threads")
         .delete()
         .eq("chat_id", chatId)
         .eq("sessao", sessao);
 
-      if (error) throw error;
+      if (error) {
+        console.error("[deleteSession] Erro ao deletar sessão:", error);
+        throw error;
+      }
+
+      console.log("[deleteSession] Sessão deletada com sucesso:", { chatId, sessao });
+
+      // Criar audit log
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const token = (await supabase.auth.getSession()).data.session?.access_token;
+          if (token) {
+            await fetch("/api/audit-logs", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                action: "delete_session",
+                details: {
+                  chatId: chatId,
+                  sessao: sessao,
+                  diagnostico: sessionData?.diagnostico || null,
+                  protocolo: sessionData?.protocolo || null,
+                },
+              }),
+            });
+          }
+        }
+      } catch (auditError) {
+        // Não falhar a operação se o audit log falhar
+        console.error("Error creating audit log:", auditError);
+      }
+
       return { error: null };
     } catch (error) {
       console.error("Error deleting session:", error);
@@ -423,6 +589,13 @@ export class SupabaseService {
   // Deletar chat do usuário (e dados relacionados)
   static async deleteUserChat(userId, chatId) {
     try {
+      // Buscar informações do thread antes de deletar para o audit log
+      const { data: threadData } = await supabase
+        .from("chat_threads")
+        .select("chat_id, diagnostico, protocolo, sessao")
+        .eq("chat_id", chatId)
+        .maybeSingle();
+
       // First delete the review if it exists
       await supabase.from("chat_reviews").delete().eq("chat_id", chatId);
 
@@ -442,6 +615,36 @@ export class SupabaseService {
         .eq("chat_id", chatId);
 
       if (chatThreadError) throw chatThreadError;
+
+      // Criar audit log
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const token = (await supabase.auth.getSession()).data.session?.access_token;
+          if (token) {
+            await fetch("/api/audit-logs", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                action: "delete_user_chat",
+                targetUserId: userId,
+                details: {
+                  chatId: chatId,
+                  diagnostico: threadData?.diagnostico || null,
+                  protocolo: threadData?.protocolo || null,
+                  sessao: threadData?.sessao || null,
+                },
+              }),
+            });
+          }
+        }
+      } catch (auditError) {
+        // Não falhar a operação se o audit log falhar
+        console.error("Error creating audit log:", auditError);
+      }
 
       return { error: null };
     } catch (error) {

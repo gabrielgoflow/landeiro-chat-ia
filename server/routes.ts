@@ -10,7 +10,7 @@ import {
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage.js";
 import { ObjectPermission } from "./objectAcl.js";
 import { SupabaseStorageService } from "./supabaseStorage.js";
-import { isAdmin } from "./adminMiddleware.js";
+import { isAdmin, requireAuth } from "./adminMiddleware.js";
 import { AdminService } from "./adminService.js";
 import { AccessValidator } from "./accessValidator.js";
 import { trackChatCost } from "./costTracker.js";
@@ -777,6 +777,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessions = await storage.getThreadSessions(threadId);
       res.json(sessions);
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ===========================================
+  // AUDIT LOGS
+  // ===========================================
+
+  // Create audit log (for user actions like delete thread)
+  app.post("/api/audit-logs", requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const { action, targetUserId, details } = req.body;
+
+      if (!action) {
+        return res.status(400).json({ error: "Action é obrigatório" });
+      }
+
+      const auditLog = await AdminService.createAuditLog({
+        adminUserId: user.id, // Usa o userId do usuário autenticado
+        action: action,
+        targetUserId: targetUserId || null,
+        details: details || {},
+      });
+
+      res.json(auditLog);
+    } catch (error: any) {
+      console.error("[Audit Log] Error creating audit log:", error);
       res.status(500).json({ error: error.message });
     }
   });

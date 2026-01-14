@@ -8,7 +8,7 @@ import { Logo } from "@/components/Logo";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
 import { useAuth } from "@/hooks/useAuth";
 
-const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br", "admin@fernandalandeiro.com.br"];
+const ADMIN_EMAILS = ["admin@goflow.digital", "admin@nexialab.com.br", "admin@fernandalandeiro.com.br", "terapeuta@teste"];
 
 const isAdminEmail = (email) => {
   return email ? ADMIN_EMAILS.includes(email) : false;
