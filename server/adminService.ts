@@ -776,14 +776,15 @@ export class AdminService {
   }
 
   /**
-   * Update diagnostico (activate/deactivate, apenas_teste)
+   * Update diagnostico (activate/deactivate, apenas_teste, max_sessoes)
    */
-  static async updateDiagnostico(id: string, data: { ativo?: boolean; apenasTeste?: boolean }) {
+  static async updateDiagnostico(id: string, data: { ativo?: boolean; apenasTeste?: boolean; maxSessoes?: number }) {
     if (!db) throw new Error("Database not connected");
 
     const updateData: any = { updatedAt: new Date() };
     if (data.ativo !== undefined) updateData.ativo = data.ativo;
     if (data.apenasTeste !== undefined) updateData.apenasTeste = data.apenasTeste;
+    if (data.maxSessoes !== undefined) updateData.maxSessoes = data.maxSessoes;
 
     const result = await db
       .update(diagnosticos)
@@ -797,7 +798,7 @@ export class AdminService {
   /**
    * Create diagnostico
    */
-  static async createDiagnostico(data: { nome: string; codigo: string; ativo?: boolean; apenasTeste?: boolean }) {
+  static async createDiagnostico(data: { nome: string; codigo: string; ativo?: boolean; apenasTeste?: boolean; maxSessoes?: number }) {
     if (!db) throw new Error("Database not connected");
 
     // Check if codigo already exists
@@ -818,6 +819,7 @@ export class AdminService {
         codigo: data.codigo,
         ativo: data.ativo ?? true,
         apenasTeste: data.apenasTeste ?? false,
+        maxSessoes: data.maxSessoes ?? 10,
       })
       .returning();
 
@@ -931,11 +933,12 @@ export class AdminService {
         codigo: diagnosticos.codigo,
         ativo: diagnosticos.ativo,
         apenas_teste: diagnosticos.apenasTeste,
+        max_sessoes: diagnosticos.maxSessoes,
         totalUsuarios: sql<number>`count(distinct ${userDiagnosticos.userId})`,
       })
       .from(diagnosticos)
       .leftJoin(userDiagnosticos, eq(diagnosticos.id, userDiagnosticos.diagnosticoId))
-      .groupBy(diagnosticos.id, diagnosticos.nome, diagnosticos.codigo, diagnosticos.ativo, diagnosticos.apenasTeste)
+      .groupBy(diagnosticos.id, diagnosticos.nome, diagnosticos.codigo, diagnosticos.ativo, diagnosticos.apenasTeste, diagnosticos.maxSessoes)
       .orderBy(asc(diagnosticos.nome));
 
     return stats;

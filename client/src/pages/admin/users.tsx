@@ -910,7 +910,7 @@ export default function AdminUsers() {
                                       </div>
                                       <div className="flex justify-between">
                                         <span className="text-gray-600">Custo Total:</span>
-                                        <span>R$ {userDetails.totalCost?.toFixed(2) || "0,00"}</span>
+                                        <span>$ {userDetails.totalCost?.toFixed(2) || "0,00"}</span>
                                       </div>
                                     </div>
                                   </div>

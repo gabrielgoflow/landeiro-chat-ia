@@ -73,7 +73,7 @@ export default function AdminCosts() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  R$ {Number(summary.totalCost || 0).toFixed(2)}
+                  $ {Number(summary.totalCost || 0).toFixed(2)}
                 </div>
               </CardContent>
             </Card>
@@ -149,7 +149,7 @@ export default function AdminCosts() {
                         </TableCell>
                         <TableCell>{cost.sessao || "N/A"}</TableCell>
                         <TableCell className="font-semibold">
-                          R$ {Number(cost.costAmount || 0).toFixed(2)}
+                          $ {Number(cost.costAmount || 0).toFixed(2)}
                         </TableCell>
                         <TableCell>
                           {Number(cost.tokensInput || 0).toLocaleString()} /{" "}

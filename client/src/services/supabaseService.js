@@ -1,7 +1,12 @@
 import { supabase } from "@/lib/supabase.js";
 
+// Cache para max_sessoes por diagnóstico (evita queries repetidas)
+const maxSessoesCache = new Map();
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutos
+
 export class SupabaseService {
   // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  // DEPRECATED: Use getMaxSessionsForDiagnosticoAsync para buscar do banco
   static getMaxSessionsForDiagnostico(diagnosticoCodigo) {
     // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
     const normalizedCodigo = diagnosticoCodigo?.toLowerCase() || '';
@@ -13,6 +18,62 @@ export class SupabaseService {
     
     // Outros diagnósticos têm limite de 10 sessões
     return 10;
+  }
+
+  // Função assíncrona para buscar max_sessoes do banco de dados
+  static async getMaxSessionsForDiagnosticoAsync(diagnosticoCodigo) {
+    if (!diagnosticoCodigo) {
+      return 10; // Default
+    }
+
+    const normalizedCodigo = diagnosticoCodigo?.toLowerCase()?.trim() || '';
+    
+    // Verificar cache primeiro
+    const cacheKey = normalizedCodigo;
+    const cached = maxSessoesCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION_MS) {
+      return cached.value;
+    }
+
+    try {
+      // Buscar do banco de dados
+      const { data, error } = await supabase
+        .from("diagnosticos")
+        .select("max_sessoes")
+        .eq("codigo", normalizedCodigo)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error("Erro ao buscar max_sessoes:", error);
+        // Usar fallback
+        const fallback = this.getMaxSessionsForDiagnostico(diagnosticoCodigo);
+        maxSessoesCache.set(cacheKey, { value: fallback, timestamp: Date.now() });
+        return fallback;
+      }
+
+      if (data && data.max_sessoes) {
+        const maxSessoes = data.max_sessoes;
+        // Atualizar cache
+        maxSessoesCache.set(cacheKey, { value: maxSessoes, timestamp: Date.now() });
+        return maxSessoes;
+      }
+
+      // Se não encontrou, usar fallback
+      const fallback = this.getMaxSessionsForDiagnostico(diagnosticoCodigo);
+      maxSessoesCache.set(cacheKey, { value: fallback, timestamp: Date.now() });
+      return fallback;
+    } catch (error) {
+      console.error("Erro ao buscar max_sessoes do banco:", error);
+      // Usar fallback em caso de erro
+      const fallback = this.getMaxSessionsForDiagnostico(diagnosticoCodigo);
+      maxSessoesCache.set(cacheKey, { value: fallback, timestamp: Date.now() });
+      return fallback;
+    }
+  }
+
+  // Limpar cache (útil quando admin atualiza max_sessoes)
+  static clearMaxSessoesCache() {
+    maxSessoesCache.clear();
   }
 
   // Incrementar sessão de um chat existente (para "Iniciar Próxima Sessão")
@@ -32,8 +93,8 @@ export class SupabaseService {
       const currentSession = lastSession?.sessao || 0;
       const nextSession = currentSession + 1;
       
-      // Obter limite máximo baseado no diagnóstico
-      const maxSessions = this.getMaxSessionsForDiagnostico(lastSession?.diagnostico);
+      // Obter limite máximo baseado no diagnóstico (buscar do banco)
+      const maxSessions = await this.getMaxSessionsForDiagnosticoAsync(lastSession?.diagnostico);
 
       // Verificar se já atingiu o limite de sessões para este diagnóstico
       if (currentSession >= maxSessions) {

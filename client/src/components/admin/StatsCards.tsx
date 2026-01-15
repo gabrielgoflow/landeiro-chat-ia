@@ -36,7 +36,7 @@ export function StatsCards({ stats, loading }: StatsCardsProps) {
     },
     {
       title: "Custo Total",
-      value: stats.totalCost ? `R$ ${stats.totalCost.toFixed(2)}` : "R$ 0,00",
+      value: stats.totalCost ? `$ ${stats.totalCost.toFixed(2)}` : "$ 0,00",
       icon: DollarSign,
       color: "text-orange-600",
       bgColor: "bg-orange-50",

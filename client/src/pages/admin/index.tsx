@@ -67,7 +67,7 @@ export default function AdminDashboard() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Custo Total:</span>
                   <span className="font-semibold">
-                    R$ {stats.totalCost.toFixed(2)}
+                    $ {stats.totalCost.toFixed(2)}
                   </span>
                 </div>
               </div>

@@ -654,7 +654,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           aiResponseText,
           aiData.cost, // Use actual cost if provided by API
           aiData.tokens_input, // Use actual input tokens if provided
-          aiData.tokens_output // Use actual output tokens if provided
+          aiData.tokens_output, // Use actual output tokens if provided
+          aiData.tokens_cached_input || aiData.tokens_cached // Use cached input tokens if provided
         ).catch((error) => {
           console.error("Error tracking cost:", error);
         });
@@ -1125,15 +1126,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/diagnosticos/:id", isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { ativo, apenas_teste } = req.body;
+      const { ativo, apenas_teste, max_sessoes } = req.body;
       const updated = await AdminService.updateDiagnostico(id, { 
         ativo, 
-        apenasTeste: apenas_teste 
+        apenasTeste: apenas_teste,
+        maxSessoes: max_sessoes
       });
       await AdminService.createAuditLog({
         adminUserId: (req as any).user.id,
         action: "update_diagnostico",
-        details: { diagnosticoId: id, ativo, apenas_teste },
+        details: { diagnosticoId: id, ativo, apenas_teste, max_sessoes },
       });
       res.json(updated);
     } catch (error: any) {
@@ -1143,7 +1145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/diagnosticos", isAdmin, async (req, res) => {
     try {
-      const { nome, codigo, ativo, apenas_teste } = req.body;
+      const { nome, codigo, ativo, apenas_teste, max_sessoes } = req.body;
 
       if (!nome || !codigo) {
         return res.status(400).json({ error: "Nome e código são obrigatórios" });
@@ -1154,12 +1156,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         codigo,
         ativo: ativo ?? true,
         apenasTeste: apenas_teste ?? false,
+        maxSessoes: max_sessoes ?? 10,
       });
 
       await AdminService.createAuditLog({
         adminUserId: (req as any).user.id,
         action: "create_diagnostico",
-        details: { diagnosticoId: created.id, nome, codigo, ativo, apenas_teste },
+        details: { diagnosticoId: created.id, nome, codigo, ativo, apenas_teste, max_sessoes },
       });
 
       res.status(201).json(created);

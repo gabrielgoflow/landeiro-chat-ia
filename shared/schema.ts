@@ -96,6 +96,7 @@ export const diagnosticos = pgTable("diagnosticos", {
   codigo: varchar("codigo").notNull().unique(),
   ativo: boolean("ativo").default(true),
   apenasTeste: boolean("apenas_teste").default(false),
+  maxSessoes: integer("max_sessoes").default(10),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -182,6 +183,7 @@ export const insertDiagnosticoSchema = createInsertSchema(diagnosticos).pick({
   codigo: true,
   ativo: true,
   apenasTeste: true,
+  maxSessoes: true,
 });
 
 export const insertUserDiagnosticoSchema = createInsertSchema(userDiagnosticos).pick({

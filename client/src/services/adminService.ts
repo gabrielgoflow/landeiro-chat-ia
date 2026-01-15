@@ -302,7 +302,7 @@ export const adminService = {
     return apiRequest("/diagnosticos/stats");
   },
 
-  async updateDiagnostico(id: string, data: { ativo?: boolean; apenas_teste?: boolean }) {
+  async updateDiagnostico(id: string, data: { ativo?: boolean; apenas_teste?: boolean; max_sessoes?: number }) {
     return apiRequest(`/diagnosticos/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
@@ -314,6 +314,7 @@ export const adminService = {
     codigo: string;
     ativo?: boolean;
     apenas_teste?: boolean;
+    max_sessoes?: number;
   }) {
     return apiRequest("/diagnosticos", {
       method: "POST",

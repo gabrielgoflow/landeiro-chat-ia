@@ -4,19 +4,30 @@ import { userChats, chatThreads, sessionCosts } from "../shared/schema";
 import { eq } from "drizzle-orm";
 
 /**
- * Estimate cost based on message length (rough estimation)
- * This is a placeholder - in production, you'd get actual costs from the AI service
+ * Estimate cost based on GPT-4o-mini pricing
+ * Pricing (per 1M tokens): 
+ * - Input: $0.15 per 1M tokens
+ * - Cached input: $0.075 per 1M tokens
+ * - Output: $0.60 per 1M tokens
  */
-function estimateCost(inputTokens?: number, outputTokens?: number): number {
-  // Rough estimation: $0.002 per 1K input tokens, $0.006 per 1K output tokens (GPT-4 pricing example)
-  // Adjust these values based on your actual AI service pricing
-  const inputCostPer1K = 0.002;
-  const outputCostPer1K = 0.006;
+function estimateCost(
+  inputTokens?: number, 
+  outputTokens?: number, 
+  cachedInputTokens?: number
+): number {
+  // GPT-4o-mini pricing (per 1M tokens):
+  // Input: $0.15 per 1M = $0.00015 per 1K tokens
+  // Cached input: $0.075 per 1M = $0.000075 per 1K tokens
+  // Output: $0.60 per 1M = $0.0006 per 1K tokens
+  const inputCostPer1K = 0.00015; // $0.15 / 1000
+  const cachedInputCostPer1K = 0.000075; // $0.075 / 1000
+  const outputCostPer1K = 0.0006; // $0.60 / 1000
 
   const inputCost = inputTokens ? (inputTokens / 1000) * inputCostPer1K : 0;
+  const cachedInputCost = cachedInputTokens ? (cachedInputTokens / 1000) * cachedInputCostPer1K : 0;
   const outputCost = outputTokens ? (outputTokens / 1000) * outputCostPer1K : 0;
 
-  return inputCost + outputCost;
+  return inputCost + cachedInputCost + outputCost;
 }
 
 /**
@@ -37,7 +48,8 @@ export async function trackSessionCost(
   aiResponse: string,
   actualCost?: number,
   actualTokensInput?: number,
-  actualTokensOutput?: number
+  actualTokensOutput?: number,
+  actualTokensCachedInput?: number
 ): Promise<void> {
   try {
     if (!db) {
@@ -48,11 +60,7 @@ export async function trackSessionCost(
     // Calculate or use provided tokens
     const tokensInput = actualTokensInput || estimateTokens(userMessage);
     const tokensOutput = actualTokensOutput || estimateTokens(aiResponse);
-
-    // Calculate or use provided cost
-    const costAmount = actualCost !== undefined
-      ? actualCost
-      : estimateCost(tokensInput, tokensOutput);
+    const tokensCachedInput = actualTokensCachedInput || 0;
 
     // Check if cost record already exists for this session
     const existingCost = await db
@@ -60,6 +68,11 @@ export async function trackSessionCost(
       .from(sessionCosts)
       .where(eq(sessionCosts.chatId, chatId))
       .limit(1);
+    
+    // Calculate or use provided cost
+    const costAmount = actualCost !== undefined
+      ? actualCost
+      : estimateCost(tokensInput, tokensOutput, tokensCachedInput);
 
     if (existingCost.length > 0) {
       // Update existing cost record
@@ -160,7 +173,8 @@ export async function trackChatCost(
   aiResponse: string,
   actualCost?: number,
   actualTokensInput?: number,
-  actualTokensOutput?: number
+  actualTokensOutput?: number,
+  actualTokensCachedInput?: number
 ): Promise<void> {
   try {
     const userId = await getUserIdFromChatId(chatId);
@@ -178,7 +192,8 @@ export async function trackChatCost(
       aiResponse,
       actualCost,
       actualTokensInput,
-      actualTokensOutput
+      actualTokensOutput,
+      actualTokensCachedInput
     );
   } catch (error) {
     console.error("Error in trackChatCost:", error);

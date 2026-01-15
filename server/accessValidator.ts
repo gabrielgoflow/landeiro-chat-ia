@@ -18,31 +18,27 @@ export class AccessValidator {
     return 10;
   }
 
-  // Função assíncrona para consultar o banco via MCP Supabase e determinar o limite
+  // Função assíncrona para consultar o banco e obter max_sessoes
   static async getMaxSessionsForDiagnosticoAsync(diagnosticoCodigo: string): Promise<number> {
     if (!diagnosticoCodigo) {
       return 10; // Default
     }
 
     try {
-      // Consultar a tabela diagnosticos para verificar se é depressão
+      // Consultar a tabela diagnosticos para obter max_sessoes
       // Usando Drizzle ORM que já está configurado
       if (db) {
+        const normalizedCodigo = diagnosticoCodigo?.toLowerCase()?.trim() || '';
         const diagnosticoResult = await db
-          .select()
+          .select({ maxSessoes: diagnosticos.maxSessoes })
           .from(diagnosticos)
-          .where(eq(diagnosticos.codigo, diagnosticoCodigo))
+          .where(eq(diagnosticos.codigo, normalizedCodigo))
           .limit(1);
 
         if (diagnosticoResult && diagnosticoResult.length > 0) {
           const diagnostico = diagnosticoResult[0];
-          const normalizedCodigo = diagnostico.codigo?.toLowerCase() || '';
-          const normalizedNome = diagnostico.nome?.toLowerCase() || '';
-          
-          // Verificar se é depressão pelo código ou nome
-          if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao' ||
-              normalizedNome.includes('depressão') || normalizedNome.includes('depressao')) {
-            return 14;
+          if (diagnostico.maxSessoes !== null && diagnostico.maxSessoes !== undefined) {
+            return diagnostico.maxSessoes;
           }
         }
       }
@@ -52,8 +48,8 @@ export class AccessValidator {
       return this.getMaxSessionsForDiagnostico(diagnosticoCodigo);
     }
 
-    // Default: 10 sessões para outros diagnósticos
-    return 10;
+    // Default: usar versão síncrona como fallback
+    return this.getMaxSessionsForDiagnostico(diagnosticoCodigo);
   }
   /**
    * Verifica se o usuário pode acessar um diagnóstico específico

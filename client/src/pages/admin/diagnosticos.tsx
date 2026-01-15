@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { adminService } from "@/services/adminService";
+import { supabaseService } from "@/services/supabaseService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,10 @@ export default function AdminDiagnosticos() {
     codigo: "",
     ativo: true,
     apenas_teste: false,
+    max_sessoes: 10,
   });
+  const [editingMaxSessoes, setEditingMaxSessoes] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState<number>(10);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -92,11 +96,49 @@ export default function AdminDiagnosticos() {
     }
   };
 
+  const handleUpdateMaxSessoes = async (id: string, newValue: number) => {
+    if (newValue < 1 || newValue > 100) {
+      toast({
+        title: "Erro",
+        description: "O número de sessões deve estar entre 1 e 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await adminService.updateDiagnostico(id, { max_sessoes: newValue });
+      // Limpar cache para forçar atualização
+      supabaseService.clearMaxSessoesCache();
+      toast({
+        title: "Sucesso",
+        description: `Máximo de sessões atualizado para ${newValue}`,
+      });
+      setEditingMaxSessoes(null);
+      loadDiagnosticos();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar máximo de sessões",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleCreateDiagnostico = async () => {
     if (!formData.nome || !formData.codigo) {
       toast({
         title: "Erro",
         description: "Nome e código são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.max_sessoes < 1 || formData.max_sessoes > 100) {
+      toast({
+        title: "Erro",
+        description: "O número de sessões deve estar entre 1 e 100",
         variant: "destructive",
       });
       return;
@@ -110,7 +152,7 @@ export default function AdminDiagnosticos() {
         description: "Transtorno criado com sucesso",
       });
       setShowCreateDialog(false);
-      setFormData({ nome: "", codigo: "", ativo: true, apenas_teste: false });
+      setFormData({ nome: "", codigo: "", ativo: true, apenas_teste: false, max_sessoes: 10 });
       loadDiagnosticos();
     } catch (error: any) {
       toast({
@@ -153,14 +195,15 @@ export default function AdminDiagnosticos() {
                     <TableHead>Código</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Apenas Teste</TableHead>
-                    <TableHead>Usuários com Acesso</TableHead>
+                    <TableHead>Máx. Sessões</TableHead>
+                    {/* <TableHead>Usuários com Acesso</TableHead> */}
                     <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {diagnosticos.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                         Nenhum transtorno encontrado
                       </TableCell>
                     </TableRow>
@@ -208,10 +251,60 @@ export default function AdminDiagnosticos() {
                           </div>
                         </TableCell>
                         <TableCell>
+                          {editingMaxSessoes === diagnostico.diagnosticoId ? (
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                type="number"
+                                min="1"
+                                max="100"
+                                value={editingValue}
+                                onChange={(e) => setEditingValue(parseInt(e.target.value) || 10)}
+                                className="w-20"
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    handleUpdateMaxSessoes(diagnostico.diagnosticoId, editingValue);
+                                  } else if (e.key === "Escape") {
+                                    setEditingMaxSessoes(null);
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleUpdateMaxSessoes(diagnostico.diagnosticoId, editingValue)}
+                              >
+                                ✓
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setEditingMaxSessoes(null)}
+                              >
+                                ✕
+                              </Button>
+                            </div>
+                          ) : (
+                            <div 
+                              className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded"
+                              onClick={() => {
+                                setEditingMaxSessoes(diagnostico.diagnosticoId);
+                                setEditingValue(diagnostico.max_sessoes || diagnostico.maxSessoes || 10);
+                              }}
+                              title="Clique para editar"
+                            >
+                              <span className="text-gray-700 font-medium">
+                                {diagnostico.max_sessoes || diagnostico.maxSessoes || 10}
+                              </span>
+                              <span className="text-gray-400 text-xs">✎</span>
+                            </div>
+                          )}
+                        </TableCell>
+                        {/* <TableCell>
                           <span className="text-gray-600">
                             {diagnostico.totalUsuarios || 0} usuário(s)
                           </span>
-                        </TableCell>
+                        </TableCell> */}
                         <TableCell>
                           <div className="flex items-center space-x-2">
                             <Switch
@@ -296,6 +389,23 @@ export default function AdminDiagnosticos() {
                 <Label htmlFor="apenas_teste" className="text-sm">
                   Apenas Teste
                 </Label>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="max_sessoes">Máximo de Sessões</Label>
+                <Input
+                  id="max_sessoes"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={formData.max_sessoes}
+                  onChange={(e) =>
+                    setFormData({ ...formData, max_sessoes: parseInt(e.target.value) || 10 })
+                  }
+                  placeholder="10"
+                />
+                <p className="text-xs text-gray-500">
+                  Número máximo de sessões permitidas para este diagnóstico (1-100)
+                </p>
               </div>
             </div>
             <DialogFooter>

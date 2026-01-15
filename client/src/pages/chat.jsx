@@ -38,6 +38,8 @@ export default function Chat() {
   const [selectedSessaoNumber, setSelectedSessaoNumber] = useState(null);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
   const [maxSessionNumber, setMaxSessionNumber] = useState(0);
+  const [maxSessoesForDiagnostico, setMaxSessoesForDiagnostico] = useState(null);
+  const [sessionTabsRefreshKey, setSessionTabsRefreshKey] = useState(0);
   
   // Usar useCallback para evitar recriação da função e loops
   const handlePauseChange = useCallback((paused) => {
@@ -48,6 +50,137 @@ export default function Chat() {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Preservar estado ao mudar tabs usando sessionStorage
+  const storageKeyRef = useRef(`chat_state_${chatId || 'new'}`);
+  const hasRestoredStateRef = useRef(false);
+  
+  // Atualizar storageKey quando chatId mudar
+  useEffect(() => {
+    storageKeyRef.current = `chat_state_${chatId || 'new'}`;
+    // Resetar flag de restauração quando chatId mudar
+    hasRestoredStateRef.current = false;
+  }, [chatId]);
+  
+  // Função para salvar estado completo
+  const saveStateToStorage = useCallback(() => {
+    if (!chatId || chatId === 'new') return;
+    
+    const stateToSave = {
+      selectedSessionId,
+      selectedSessaoNumber,
+      threadId,
+      lastChatId: lastChatIdRef.current,
+      timestamp: Date.now()
+    };
+    
+    try {
+      sessionStorage.setItem(storageKeyRef.current, JSON.stringify(stateToSave));
+      console.log('Estado salvo no sessionStorage:', stateToSave);
+    } catch (error) {
+      console.error('Erro ao salvar estado no sessionStorage:', error);
+    }
+  }, [chatId, selectedSessionId, selectedSessaoNumber, threadId]);
+  
+  // Salvar estado quando mudar de tab ou navegar
+  useEffect(() => {
+    saveStateToStorage();
+  }, [saveStateToStorage]);
+  
+  // Restaurar estado ANTES de qualquer inicialização (executar quando chatId mudar)
+  useEffect(() => {
+    if (!chatId || chatId === 'new') return;
+    
+    // Verificar se já restaurou para este chatId
+    const restoreKey = `restored_${chatId}`;
+    if (hasRestoredStateRef.current === restoreKey) {
+      return;
+    }
+    
+    try {
+      const savedState = sessionStorage.getItem(storageKeyRef.current);
+      if (savedState) {
+        const state = JSON.parse(savedState);
+        // Só restaurar se o estado foi salvo recentemente (últimos 30 minutos)
+        const isRecent = Date.now() - state.timestamp < 30 * 60 * 1000;
+        
+        if (isRecent && state.selectedSessionId === chatId) {
+          console.log('Restaurando estado do sessionStorage:', state);
+          
+          // Restaurar lastChatIdRef primeiro para evitar reinicialização
+          if (state.lastChatId) {
+            lastChatIdRef.current = state.lastChatId;
+          }
+          
+          // Restaurar estados (mesmo se já tiverem valores, pois podem estar incorretos)
+          if (state.selectedSessionId) {
+            setSelectedSessionId(state.selectedSessionId);
+          }
+          if (state.selectedSessaoNumber) {
+            setSelectedSessaoNumber(state.selectedSessaoNumber);
+          }
+          if (state.threadId) {
+            setThreadId(state.threadId);
+          }
+          
+          hasRestoredStateRef.current = restoreKey;
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao restaurar estado do sessionStorage:', error);
+    }
+  }, [chatId]); // Executar quando chatId mudar
+  
+  // Visibility API: Salvar estado quando página perde foco
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Página perdeu foco - salvar estado
+        console.log('Página perdeu foco, salvando estado');
+        saveStateToStorage();
+      } else {
+        // Página voltou ao foco - restaurar estado se necessário
+        console.log('Página voltou ao foco');
+        if (!hasRestoredStateRef.current && chatId && chatId !== 'new') {
+          try {
+            const savedState = sessionStorage.getItem(storageKeyRef.current);
+            if (savedState) {
+              const state = JSON.parse(savedState);
+              const isRecent = Date.now() - state.timestamp < 30 * 60 * 1000;
+              
+              if (isRecent && state.selectedSessionId === chatId) {
+                console.log('Restaurando estado após voltar ao foco:', state);
+                const restoreKey = `restored_${chatId}`;
+                if (hasRestoredStateRef.current !== restoreKey) {
+                  if (state.lastChatId) {
+                    lastChatIdRef.current = state.lastChatId;
+                  }
+                  if (state.selectedSessionId) {
+                    setSelectedSessionId(state.selectedSessionId);
+                  }
+                  if (state.selectedSessaoNumber) {
+                    setSelectedSessaoNumber(state.selectedSessaoNumber);
+                  }
+                  if (state.threadId) {
+                    setThreadId(state.threadId);
+                  }
+                  hasRestoredStateRef.current = restoreKey;
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Erro ao restaurar estado após voltar ao foco:', error);
+          }
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [chatId, saveStateToStorage]);
 
   const {
     threads,
@@ -65,19 +198,28 @@ export default function Chat() {
     clearError,
   } = useChat();
 
-  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
-  const getMaxSessionsForDiagnostico = (diagnosticoCodigo) => {
-    // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
-    const normalizedCodigo = diagnosticoCodigo?.toLowerCase()?.trim() || '';
-    
-    // Depressão tem limite de 14 sessões (contando com a sessão extra)
-    if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
-      return 14;
-    }
-    
-    // Outros diagnósticos têm limite de 10 sessões
-    return 10;
-  };
+  // Buscar max_sessoes do banco quando o diagnóstico mudar
+  useEffect(() => {
+    const fetchMaxSessoes = async () => {
+      if (!currentThread?.sessionData?.diagnostico) {
+        setMaxSessoesForDiagnostico(null);
+        return;
+      }
+
+      try {
+        const maxSessoes = await supabaseService.getMaxSessionsForDiagnosticoAsync(
+          currentThread.sessionData.diagnostico
+        );
+        setMaxSessoesForDiagnostico(maxSessoes);
+      } catch (error) {
+        console.error("Erro ao buscar max_sessoes:", error);
+        // Fallback para 10
+        setMaxSessoesForDiagnostico(10);
+      }
+    };
+
+    fetchMaxSessoes();
+  }, [currentThread?.sessionData?.diagnostico]);
   
   // Verificar se atingiu o limite de sessões (será movido para depois da declaração de currentSessao)
 
@@ -171,7 +313,8 @@ export default function Chat() {
       return false;
     }
     
-    const maxSessions = getMaxSessionsForDiagnostico(currentThread.sessionData.diagnostico);
+    // Usar max_sessoes do banco se disponível, senão usar fallback
+    const maxSessions = maxSessoesForDiagnostico ?? supabaseService.getMaxSessionsForDiagnostico(currentThread.sessionData.diagnostico);
     const reached = sessionNumberToCheck >= maxSessions;
     console.log('[DEBUG] hasReachedMaxSessions: Verificação FINAL', {
       sessionNumberToCheck,
@@ -183,7 +326,7 @@ export default function Chat() {
       sessaoFromThread: currentThread?.sessionData?.sessao
     });
     return reached;
-  }, [currentThread, maxSessionNumber, currentSessao]);
+  }, [currentThread, maxSessionNumber, currentSessao, maxSessoesForDiagnostico]);
   
   const { timeRemaining, isExpired: isSessionExpired } = useSessionTimer(
     currentChatId,
@@ -214,17 +357,28 @@ export default function Chat() {
 
   // Initialize based on chatId parameter
   useEffect(() => {
-    // Permite re-inicialização quando lastChatIdRef foi limpo (nova conversa)
-    if (lastChatIdRef.current === chatId && lastChatIdRef.current !== null) {
-      return;
-    }
-    
+    // Aguardar um pouco para dar tempo da restauração do sessionStorage executar
+    // Isso garante que selectedSessaoNumber seja restaurado antes da inicialização
     const initializeChat = async () => {
+      // Pequeno delay para permitir que a restauração do sessionStorage execute primeiro
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Evitar re-inicialização se o chatId não mudou e já temos um thread carregado
+      if (lastChatIdRef.current === chatId && lastChatIdRef.current !== null) {
+        // Se já temos o thread carregado para este chatId, não reinicializar
+        if (currentThread && currentThread.id === chatId) {
+          console.log('Chat já inicializado para chatId:', chatId, '- Pulando reinicialização');
+          return;
+        }
+      }
+      
       console.log('Initializing chat with chatId:', chatId, '| Last chatId:', lastChatIdRef.current);
       lastChatIdRef.current = chatId;
       
-      // Reset session finalized state when navigating
-      setIsCurrentSessionFinalized(false);
+      // Reset session finalized state only when navigating to a different chat
+      if (currentThread?.id !== chatId) {
+        setIsCurrentSessionFinalized(false);
+      }
       
       if (chatId === 'new') {
         // Always show dialog for /chat/new
@@ -237,12 +391,32 @@ export default function Chat() {
         // Close any open dialog when loading specific chat
         setShowNewChatDialog(false);
         
+        // Verificar se há sessão salva no sessionStorage OU se já temos selectedSessaoNumber restaurado
+        let savedSessao = selectedSessaoNumber; // Usar selectedSessaoNumber se já foi restaurado
+        if (!savedSessao) {
+          try {
+            const savedState = sessionStorage.getItem(storageKeyRef.current);
+            if (savedState) {
+              const state = JSON.parse(savedState);
+              if (state.selectedSessionId === chatId && state.selectedSessaoNumber) {
+                savedSessao = state.selectedSessaoNumber;
+                console.log('Sessão salva encontrada no sessionStorage:', savedSessao);
+              }
+            }
+          } catch (error) {
+            console.error('Erro ao verificar sessão salva:', error);
+          }
+        } else {
+          console.log('Usando selectedSessaoNumber já restaurado:', savedSessao);
+        }
+        
         // Load specific chat by ID
         const existingThread = threads.find((t) => t.id === chatId);
         if (existingThread) {
           console.log('Found existing thread locally:', chatId);
-          // Usa a sessão do thread existente, ou 1 se não tiver sessão definida
-          const sessao = existingThread.sessionData?.sessao || 1;
+          // Usar sessão salva/restaurada se disponível, senão usar a sessão do thread, ou 1 como fallback
+          const sessao = savedSessao || existingThread.sessionData?.sessao || 1;
+          console.log('Selecionando thread com sessão:', sessao, savedSessao ? '(da sessão salva/restaurada)' : '(do thread)');
           await selectThread(existingThread.id, sessao);
         } else {
           // Chat ID not found in current threads, try to load from Supabase
@@ -253,9 +427,11 @@ export default function Chat() {
           const createdThread = await createThreadFromSupabase(chatId);
           if (createdThread) {
             console.log('Thread created from Supabase using chat_id, now selecting:', createdThread.chat_id || chatId);
-            // Usa a sessão do thread criado (que já é a mais recente)
-            const sessao = createdThread.sessionData?.sessao || 1;
-            await selectThread(createdThread.chat_id || chatId, sessao);
+            // Usar sessão salva/restaurada se disponível, senão usar a sessão do thread criado, ou 1 como fallback
+            // Verificar novamente se selectedSessaoNumber foi atualizado durante a busca
+            const sessaoToUse = selectedSessaoNumber || savedSessao || createdThread.sessionData?.sessao || 1;
+            console.log('Selecionando thread com sessão:', sessaoToUse, (selectedSessaoNumber || savedSessao) ? '(da sessão salva/restaurada)' : '(do thread criado)');
+            await selectThread(createdThread.chat_id || chatId, sessaoToUse);
           } else {
             console.warn(
               "Chat ID not found by chat_id. Trying fallback search by thread_id:",
@@ -283,7 +459,23 @@ export default function Chat() {
                   fallback.chat_id,
                 );
                 if (createdFromFallback) {
-                  const sessao = createdFromFallback.sessionData?.sessao || fallback.sessao || 1;
+                  // Verificar se há sessão salva para este chat_id
+                  let savedSessaoForFallback = null;
+                  try {
+                    const fallbackStorageKey = `chat_state_${fallback.chat_id}`;
+                    const savedState = sessionStorage.getItem(fallbackStorageKey);
+                    if (savedState) {
+                      const state = JSON.parse(savedState);
+                      if (state.selectedSessionId === fallback.chat_id && state.selectedSessaoNumber) {
+                        savedSessaoForFallback = state.selectedSessaoNumber;
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Erro ao verificar sessão salva no fallback:', error);
+                  }
+                  
+                  const sessao = savedSessaoForFallback || createdFromFallback.sessionData?.sessao || fallback.sessao || 1;
+                  console.log('Selecionando thread fallback com sessão:', sessao, savedSessaoForFallback ? '(da sessão salva)' : '(do thread)');
                   await selectThread(
                     createdFromFallback.chat_id || fallback.chat_id,
                     sessao,
@@ -525,16 +717,8 @@ export default function Chat() {
         // Redireciona IMEDIATAMENTE para a URL do novo chat
         navigate(`/chat/${newChatId}`);
         
-        // Força atualização da URL se necessário (backup)
-        setTimeout(() => {
-          const expectedPath = `/chat/${newChatId}`;
-          if (window.location.pathname !== expectedPath) {
-            console.log('URL não atualizada, forçando:', expectedPath);
-            window.history.replaceState(null, '', expectedPath);
-            // Força re-render se necessário
-            window.location.reload();
-          }
-        }, 200);
+        // Selecionar o thread recém-criado para carregar os dados
+        await selectThread(newChatId, 1);
         
         console.log('Redirecionamento concluído para:', `/chat/${newChatId}`);
       } else {
@@ -818,6 +1002,9 @@ export default function Chat() {
         // Selecionar a nova sessão diretamente sem reload
         await selectThread(currentThread.id, newSession);
         
+        // Forçar refresh do SessionTabs para que ele recarregue as sessões e mostre a nova
+        setSessionTabsRefreshKey(prev => prev + 1);
+        
         // Atualizar o estado local da sessão
         setCurrentSessionData((prev) => ({
           ...prev,
@@ -828,12 +1015,14 @@ export default function Chat() {
           await window.refreshSidebar();
         }
         
-        // Refresh na URL atual para atualizar os dados após criar a nova sessão
-        // Pequeno delay para garantir que o banco foi atualizado antes do reload
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Atualizar URL para refletir a nova sessão (sem reload)
+        navigate(`/chat/${currentThread.id}`);
         
-        // Recarregar a página para atualizar todos os dados
-        window.location.reload();
+        // Pequeno delay para garantir que o banco foi atualizado
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Forçar atualização dos dados sem reload da página
+        // O selectThread já foi chamado acima, então os dados devem estar atualizados
       } else {
         console.error('Erro ao criar nova sessão: sem newSession');
         toast({
@@ -1077,6 +1266,8 @@ export default function Chat() {
             onSessionChange={handleSessionChange}
             onNewSession={handleNewSessionFromTabs}
             className="border-b"
+            selectedSessaoNumber={selectedSessaoNumber}
+            refreshKey={sessionTabsRefreshKey}
           />
         ) : null}
 

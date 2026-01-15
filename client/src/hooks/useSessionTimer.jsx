@@ -418,7 +418,7 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
       try {
         const { data, error } = await supabase
           .from("chat_threads")
-          .select("timer_paused, timer_paused_time")
+          .select("timer_paused, timer_paused_time, session_started_at")
           .eq("chat_id", chatId)
           .eq("sessao", sessao)
           .single();
@@ -427,9 +427,39 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
           const wasPaused = isPausedRef.current;
           const newIsPaused = data.timer_paused || false;
           const newPausedTime = data.timer_paused_time || null;
+          const newSessionStartedAt = data.session_started_at;
           
           // Detectar retomada: estava pausado e agora não está mais
           const isResuming = wasPaused && !newIsPaused;
+          
+          // Verificar se session_started_at mudou (indicando que foi ajustado ao retomar)
+          const sessionStartedAtChanged = newSessionStartedAt && 
+            lastInitializedRef.current.sessionStartedAt !== newSessionStartedAt;
+          
+          // Se session_started_at mudou (retomada), recalcular timeRemaining baseado no novo valor
+          if (sessionStartedAtChanged && !newIsPaused) {
+            const startTime = new Date(newSessionStartedAt).getTime();
+            const now = new Date().getTime();
+            const endTime = startTime + SESSION_DURATION_MS;
+            const newRemaining = endTime - now;
+            
+            console.log("useSessionTimer: session_started_at mudou (retomada detectada), recalculando:", {
+              chatId,
+              sessao,
+              oldSessionStartedAt: lastInitializedRef.current.sessionStartedAt,
+              newSessionStartedAt,
+              newRemaining,
+              newRemainingMinutes: Math.floor(newRemaining / 60000)
+            });
+            
+            // Atualizar refs e estado
+            isPausedRef.current = false;
+            pausedTimeRef.current = null;
+            setTimeRemaining(Math.max(0, newRemaining));
+            setIsExpired(newRemaining <= 0);
+            lastInitializedRef.current.sessionStartedAt = newSessionStartedAt;
+            return; // Não processar mais nada nesta iteração
+          }
           
           // Só atualizar se:
           // 1. O estado realmente mudou E
@@ -439,16 +469,22 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
           const wouldOverridePausedState = wasPaused && !newIsPaused && pausedTimeRef.current !== null && !isResuming;
           
           if (stateChanged && !wouldOverridePausedState) {
-            // Se está retomando, salvar o tempo pausado antes de limpar
-            if (isResuming && pausedTimeRef.current !== null) {
-              lastPausedTimeBeforeResumeRef.current = pausedTimeRef.current;
-              console.log("useSessionTimer: Timer retomado, salvando tempo pausado:", {
-                pausedTime: pausedTimeRef.current,
-                pausedTimeMinutes: Math.floor(pausedTimeRef.current / 60000)
+            // Se está retomando, recalcular baseado no session_started_at se disponível
+            if (isResuming && newSessionStartedAt) {
+              const startTime = new Date(newSessionStartedAt).getTime();
+              const now = new Date().getTime();
+              const endTime = startTime + SESSION_DURATION_MS;
+              const newRemaining = endTime - now;
+              
+              console.log("useSessionTimer: Timer retomado, recalculando baseado em session_started_at:", {
+                sessionStartedAt: newSessionStartedAt,
+                newRemaining,
+                newRemainingMinutes: Math.floor(newRemaining / 60000)
               });
               
-              // Usar o tempo pausado como base para continuar
-              setTimeRemaining(pausedTimeRef.current);
+              setTimeRemaining(Math.max(0, newRemaining));
+              setIsExpired(newRemaining <= 0);
+              lastInitializedRef.current.sessionStartedAt = newSessionStartedAt;
             }
             
             console.log("useSessionTimer: Estado pausado mudou no banco:", {
@@ -486,8 +522,8 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
       checkPausedState();
     }, 1000);
     
-    // Verificar a cada 3 segundos (menos frequente para não sobrecarregar)
-    const interval = setInterval(checkPausedState, 3000);
+    // Verificar a cada 2 segundos (mais frequente para detectar retomada mais rápido)
+    const interval = setInterval(checkPausedState, 2000);
     
     return () => {
       clearTimeout(initialTimeout);

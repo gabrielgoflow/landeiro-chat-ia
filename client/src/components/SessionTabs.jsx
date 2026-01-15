@@ -14,39 +14,26 @@ export function SessionTabs({
   onNewSession,
   className = "",
   refreshKey = 0, // Nova prop para forçar refresh
+  selectedSessaoNumber = null, // Sessão selecionada pelo componente pai
 }) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSession, setActiveSession] = useState(null);
   const [diagnosticosMap, setDiagnosticosMap] = useState({});
+  const [maxSessoesMap, setMaxSessoesMap] = useState({});
   const lastThreadIdRef = useRef(null);
   const lastChatIdRef = useRef(null);
   const lastRefreshKeyRef = useRef(0);
   const isLoadingRef = useRef(false);
 
-  // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
-  const getMaxSessionsForDiagnostico = useMemo(() => {
-    return (diagnosticoCodigo) => {
-      // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
-      const normalizedCodigo = diagnosticoCodigo?.toLowerCase()?.trim() || '';
-      
-      // Depressão tem limite de 14 sessões (contando com a sessão extra)
-      if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
-        return 14;
-      }
-      
-      // Outros diagnósticos têm limite de 10 sessões
-      return 10;
-    };
-  }, []);
 
-  // Carregar diagnósticos para mapear código -> nome
+  // Carregar diagnósticos para mapear código -> nome e max_sessoes
   useEffect(() => {
     const loadDiagnosticos = async () => {
       try {
         const { data, error } = await supabase
           .from("diagnosticos")
-          .select("codigo, nome")
+          .select("codigo, nome, max_sessoes")
           .eq("ativo", true);
 
         if (error) {
@@ -55,11 +42,15 @@ export function SessionTabs({
         }
 
         // Criar mapa de código para nome
-        const map = {};
+        const nomeMap = {};
+        const maxSessoesMapLocal = {};
         (data || []).forEach((d) => {
-          map[d.codigo] = d.nome;
+          nomeMap[d.codigo] = d.nome;
+          const normalizedCodigo = d.codigo?.toLowerCase()?.trim() || '';
+          maxSessoesMapLocal[normalizedCodigo] = d.max_sessoes || 10;
         });
-        setDiagnosticosMap(map);
+        setDiagnosticosMap(nomeMap);
+        setMaxSessoesMap(prev => ({ ...prev, ...maxSessoesMapLocal }));
       } catch (error) {
         console.error("Erro ao carregar diagnósticos:", error);
       }
@@ -108,27 +99,85 @@ export function SessionTabs({
     }
   }, [threadId, currentChatId, refreshKey, sessions.length]);
 
-  // Atualizar activeSession quando currentChatId mudar
+  // Atualizar activeSession quando currentChatId ou selectedSessaoNumber mudar
   const lastActiveSessionRef = useRef(null);
   const lastChatIdRefForActiveSession = useRef(null);
+  const lastSelectedSessaoNumberRef = useRef(null);
   useEffect(() => {
     if (currentChatId && sessions.length > 0) {
-      const currentSession = sessions.find(
-        (s) => s.chat_id === currentChatId,
-      );
-      if (currentSession) {
-        const newActiveSession = currentSession.sessao.toString();
-        // Atualizar sempre que currentChatId mudar, mesmo que activeSession seja o mesmo
-        // Isso garante que a sessão correta seja mostrada quando navegamos entre sessões
-        if (lastChatIdRefForActiveSession.current !== currentChatId || 
-            lastActiveSessionRef.current !== newActiveSession) {
-          setActiveSession(newActiveSession);
-          lastActiveSessionRef.current = newActiveSession;
-          lastChatIdRefForActiveSession.current = currentChatId;
+      // PRIORIDADE 1: Se temos selectedSessaoNumber, sempre tentar encontrar essa sessão primeiro
+      let currentSession = null;
+      if (selectedSessaoNumber) {
+        currentSession = sessions.find(
+          (s) => s.chat_id === currentChatId && s.sessao === selectedSessaoNumber,
+        );
+        
+        if (currentSession) {
+          const newActiveSession = currentSession.sessao.toString();
+          // Atualizar se mudou currentChatId, selectedSessaoNumber ou activeSession
+          const shouldUpdate = 
+            lastChatIdRefForActiveSession.current !== currentChatId || 
+            lastSelectedSessaoNumberRef.current !== selectedSessaoNumber ||
+            lastActiveSessionRef.current !== newActiveSession;
+          
+          if (shouldUpdate) {
+            console.log('SessionTabs: Atualizando sessão ativa (via selectedSessaoNumber):', {
+              newActiveSession,
+              selectedSessaoNumber,
+              currentChatId,
+              previous: lastActiveSessionRef.current
+            });
+            setActiveSession(newActiveSession);
+            lastActiveSessionRef.current = newActiveSession;
+            lastChatIdRefForActiveSession.current = currentChatId;
+            lastSelectedSessaoNumberRef.current = selectedSessaoNumber;
+            return; // Sair cedo se encontramos a sessão
+          }
+        } else {
+          // selectedSessaoNumber está definido mas a sessão não foi encontrada ainda
+          // Isso pode acontecer quando uma nova sessão foi criada mas ainda não está na lista
+          console.log('SessionTabs: selectedSessaoNumber definido mas sessão não encontrada na lista ainda:', {
+            selectedSessaoNumber,
+            availableSessions: sessions.map(s => s.sessao),
+            currentChatId
+          });
+          // Não atualizar - aguardar que a sessão apareça na lista
+          return;
+        }
+      }
+      
+      // PRIORIDADE 2: Se não temos selectedSessaoNumber ou não encontrou, tentar apenas com currentChatId
+      // Mas só se selectedSessaoNumber não estava definido
+      if (!selectedSessaoNumber) {
+        // Ordenar por sessão descendente para pegar a mais recente primeiro
+        const sortedSessions = [...sessions].sort((a, b) => b.sessao - a.sessao);
+        currentSession = sortedSessions.find(
+          (s) => s.chat_id === currentChatId,
+        );
+        
+        if (currentSession) {
+          const newActiveSession = currentSession.sessao.toString();
+          // Atualizar se mudou currentChatId ou activeSession
+          const shouldUpdate = 
+            lastChatIdRefForActiveSession.current !== currentChatId ||
+            lastActiveSessionRef.current !== newActiveSession;
+          
+          if (shouldUpdate) {
+            console.log('SessionTabs: Atualizando sessão ativa (via currentChatId):', {
+              newActiveSession,
+              selectedSessaoNumber,
+              currentChatId,
+              previous: lastActiveSessionRef.current
+            });
+            setActiveSession(newActiveSession);
+            lastActiveSessionRef.current = newActiveSession;
+            lastChatIdRefForActiveSession.current = currentChatId;
+            lastSelectedSessaoNumberRef.current = selectedSessaoNumber;
+          }
         }
       }
     }
-  }, [currentChatId, sessions]); // Removido activeSession das dependências para evitar loop
+  }, [currentChatId, sessions, selectedSessaoNumber]); // Adicionado selectedSessaoNumber nas dependências
 
   // Buscar sessões por chat_id (quando thread_id está vazio)
   const loadSessionsByChatId = async () => {
@@ -151,11 +200,12 @@ export function SessionTabs({
       }
 
       // Buscar todas as sessões com o mesmo chat_id
+      // Ordenar por sessão descendente para que a mais recente seja encontrada primeiro
       const { data: chatThreads, error: threadsError } = await supabase
         .from("chat_threads")
         .select("*")
         .eq("chat_id", currentChatId)
-        .order("sessao", { ascending: true });
+        .order("sessao", { ascending: false });
 
       if (threadsError) {
         console.error("SessionTabs: Erro ao buscar chat_threads por chat_id:", threadsError);
@@ -216,20 +266,62 @@ export function SessionTabs({
     console.log("SessionTabs: Sessions with status:", sessionsWithStatus);
     setSessions(sessionsWithStatus);
 
-    // Encontrar a sessão atual baseada no currentChatId
-    const currentSession = sessionsWithStatus.find(
-      (s) => s.chat_id === currentChatId,
-    );
+    // Encontrar a sessão atual baseada no currentChatId e selectedSessaoNumber
+    // IMPORTANTE: Sempre verificar selectedSessaoNumber PRIMEIRO
+    let currentSession = null;
+    
+    // PRIORIDADE 1: Se temos selectedSessaoNumber, usar ele para encontrar a sessão correta
+    if (selectedSessaoNumber) {
+      currentSession = sessionsWithStatus.find(
+        (s) => s.chat_id === currentChatId && s.sessao === selectedSessaoNumber,
+      );
+      console.log('SessionTabs: Buscando sessão com selectedSessaoNumber:', selectedSessaoNumber, 'encontrada:', !!currentSession);
+      
+      // Se selectedSessaoNumber está definido mas a sessão não foi encontrada,
+      // NÃO definir sessão ativa - aguardar que o useEffect que monitora selectedSessaoNumber
+      // defina a sessão correta quando ela aparecer na lista
+      if (!currentSession) {
+        console.log('SessionTabs: selectedSessaoNumber definido mas sessão não encontrada ainda. Aguardando...', {
+          selectedSessaoNumber,
+          availableSessions: sessionsWithStatus.map(s => s.sessao),
+          currentChatId
+        });
+        // Não definir sessão ativa aqui - deixar o useEffect fazer isso
+        return;
+      }
+    }
+    
+    // PRIORIDADE 2: Se não temos selectedSessaoNumber ou não encontrou, tentar apenas com currentChatId
+    // Mas só se selectedSessaoNumber não estava definido
+    if (!currentSession && !selectedSessaoNumber) {
+      // Ordenar por sessão descendente para pegar a mais recente primeiro
+      const sortedSessions = [...sessionsWithStatus].sort((a, b) => b.sessao - a.sessao);
+      currentSession = sortedSessions.find(
+        (s) => s.chat_id === currentChatId,
+      );
+    }
+    
     if (currentSession) {
       const newActiveSession = currentSession.sessao.toString();
       // Sempre atualizar para garantir sincronização
       setActiveSession(newActiveSession);
       lastActiveSessionRef.current = newActiveSession;
       lastChatIdRefForActiveSession.current = currentChatId;
-    } else if (sessionsWithStatus.length > 0) {
-      const firstSession = sessionsWithStatus[0].sessao.toString();
-      setActiveSession(firstSession);
-      lastActiveSessionRef.current = firstSession;
+      console.log('SessionTabs: Sessão ativa definida para:', newActiveSession, {
+        selectedSessaoNumber,
+        foundBy: selectedSessaoNumber ? 'selectedSessaoNumber' : 'currentChatId'
+      });
+    } else if (sessionsWithStatus.length > 0 && !selectedSessaoNumber) {
+      // Se não encontrou e não temos selectedSessaoNumber, usar a sessão mais recente (maior número)
+      const sortedSessions = [...sessionsWithStatus].sort((a, b) => b.sessao - a.sessao);
+      const latestSession = sortedSessions[0].sessao.toString();
+      setActiveSession(latestSession);
+      lastActiveSessionRef.current = latestSession;
+      console.log('SessionTabs: Nenhuma sessão encontrada, usando mais recente:', latestSession);
+    } else if (selectedSessaoNumber) {
+      // Se temos selectedSessaoNumber mas não encontramos a sessão, não fazer nada
+      // O useEffect que monitora selectedSessaoNumber vai atualizar quando a sessão aparecer
+      console.log('SessionTabs: selectedSessaoNumber definido mas sessão não encontrada. Mantendo sessão atual ou aguardando...');
     }
   };
 
@@ -253,11 +345,12 @@ export function SessionTabs({
       }
 
       // Buscar sessões diretamente das tabelas
+      // Ordenar por sessão descendente para que a mais recente seja encontrada primeiro
       const { data: chatThreads, error: threadsError } = await supabase
         .from("chat_threads")
         .select("*")
         .eq("thread_id", threadId)
-        .order("sessao", { ascending: true });
+        .order("sessao", { ascending: false });
 
       if (threadsError) {
         console.error("SessionTabs: Erro ao buscar chat_threads:", threadsError);
@@ -290,6 +383,11 @@ export function SessionTabs({
   const handleNewSession = () => {
     onNewSession?.();
   };
+
+  // Ordenar sessões em ordem ascendente para exibição (sessão 1 primeiro)
+  const sortedSessions = useMemo(() => {
+    return [...sessions].sort((a, b) => a.sessao - b.sessao);
+  }, [sessions]);
 
   // Encontrar a sessão atual para verificar se está finalizada
   // IMPORTANTE: Hooks devem ser chamados antes de qualquer return condicional
@@ -372,7 +470,7 @@ export function SessionTabs({
         <div className="flex items-center justify-between px-4 py-2 gap-4" style={{overflowX: 'scroll', maxWidth: '80vw'}}>
           <div className="flex-1 min-w-0 overflow-x-auto">
             <TabsList className="inline-flex justify-start bg-gray-50 min-w-max">
-              {sessions.map((session) => {
+              {sortedSessions.map((session) => {
                 const isActive = activeSession === session.sessao.toString();
                 // console.log("SessionTab:", session, "Status:", session.status); // Removido para evitar logs excessivos
                 return (
@@ -451,7 +549,7 @@ export function SessionTabs({
         </div>
 
         {/* Content das sessões */}
-        {sessions.map((session) => (
+        {sortedSessions.map((session) => (
           <TabsContent
             key={session.sessao}
             value={session.sessao.toString()}
@@ -461,7 +559,7 @@ export function SessionTabs({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4 text-sm">
                   <span className="font-medium">
-                    Sessão {session.sessao}/{getMaxSessionsForDiagnostico(session.diagnostico || '')} - {diagnosticosMap[session.diagnostico] || session.diagnostico || 'N/A'} (
+                    Sessão {session.sessao}/{maxSessoesMap[session.diagnostico?.toLowerCase()?.trim() || ''] || supabaseService.getMaxSessionsForDiagnostico(session.diagnostico || '')} - {diagnosticosMap[session.diagnostico] || session.diagnostico || 'N/A'} (
                     {session.protocolo?.toUpperCase() || 'TCC'})
                   </span>
                   <span className="text-gray-500">
