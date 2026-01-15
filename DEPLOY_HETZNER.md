@@ -747,7 +747,7 @@ rm -rf dist
 # Build com variáveis explícitas
 VITE_SUPABASE_URL=..  \
 VITE_SUPABASE_ANON_KEY=... \
-VITE_FRONTEND_URL=http://5.78.140.27:5000 \
+VITE_FRONTEND_URL=https://pcs.fernandalandeiro.com.br \
 npm run build
 
 # Verificar se funcionou

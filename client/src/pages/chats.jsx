@@ -29,6 +29,7 @@ export default function ChatsPage() {
   const [selectedDiagnostico, setSelectedDiagnostico] = useState(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
   const [diagnosticosMap, setDiagnosticosMap] = useState({});
+  const [maxSessoesMap, setMaxSessoesMap] = useState({});
   const isMobile = useIsMobile();
   
   // Refs para evitar chamadas duplicadas
@@ -36,11 +37,19 @@ export default function ChatsPage() {
   const lastUserIdRef = useRef(null);
 
   // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
+  // Agora usa o valor do banco se disponível, senão usa fallback
   const getMaxSessionsForDiagnostico = (diagnosticoCodigo) => {
-    // Normalizar o código do diagnóstico para comparar (considerar ambos com e sem acento)
-    const normalizedCodigo = diagnosticoCodigo?.toLowerCase() || '';
+    if (!diagnosticoCodigo) return 10;
     
-    // Depressão tem limite de 14 sessões (contando com a sessão extra)
+    // Normalizar o código do diagnóstico para comparar
+    const normalizedCodigo = diagnosticoCodigo?.toLowerCase()?.trim() || '';
+    
+    // Usar valor do banco se disponível
+    if (maxSessoesMap[normalizedCodigo]) {
+      return maxSessoesMap[normalizedCodigo];
+    }
+    
+    // Fallback para valores hardcoded (compatibilidade)
     if (normalizedCodigo === 'depressão' || normalizedCodigo === 'depressao') {
       return 14;
     }
@@ -126,13 +135,13 @@ export default function ChatsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Carregar diagnósticos para mapear código -> nome
+  // Carregar diagnósticos para mapear código -> nome e max_sessoes
   useEffect(() => {
     const loadDiagnosticos = async () => {
       try {
         const { data, error } = await supabase
           .from("diagnosticos")
-          .select("codigo, nome")
+          .select("codigo, nome, max_sessoes")
           .eq("ativo", true);
 
         if (error) {
@@ -140,12 +149,16 @@ export default function ChatsPage() {
           return;
         }
 
-        // Criar mapa de código para nome
-        const map = {};
+        // Criar mapa de código para nome e max_sessoes
+        const nomeMap = {};
+        const maxSessoesMapLocal = {};
         (data || []).forEach((d) => {
-          map[d.codigo] = d.nome;
+          nomeMap[d.codigo] = d.nome;
+          const normalizedCodigo = d.codigo?.toLowerCase()?.trim() || '';
+          maxSessoesMapLocal[normalizedCodigo] = d.max_sessoes || 10;
         });
-        setDiagnosticosMap(map);
+        setDiagnosticosMap(nomeMap);
+        setMaxSessoesMap(maxSessoesMapLocal);
       } catch (error) {
         console.error("Erro ao carregar diagnósticos:", error);
       }
