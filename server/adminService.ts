@@ -1818,9 +1818,18 @@ export class AdminService {
 
         case 'messages':
           // Agrupar por chat_id e sessao
+          // Não podemos usar MAX() em UUID diretamente, então usamos ANY(deleted_by) ou subconsulta
           const messagesResult = await db.execute(sql`
-            SELECT chat_id, sessao, COUNT(*) as message_count, MAX(deleted_at) as deleted_at, MAX(deleted_by) as deleted_by,
-                   (SELECT COUNT(DISTINCT chat_id || '-' || sessao) FROM deleted_chat_messages) as total_count
+            SELECT 
+              chat_id, 
+              sessao, 
+              COUNT(*) as message_count, 
+              MAX(deleted_at) as deleted_at,
+              (SELECT deleted_by FROM deleted_chat_messages d2 
+               WHERE d2.chat_id = deleted_chat_messages.chat_id 
+               AND d2.sessao = deleted_chat_messages.sessao 
+               LIMIT 1) as deleted_by,
+              (SELECT COUNT(DISTINCT chat_id || '-' || sessao::text) FROM deleted_chat_messages) as total_count
             FROM deleted_chat_messages
             GROUP BY chat_id, sessao
             ORDER BY MAX(deleted_at) DESC

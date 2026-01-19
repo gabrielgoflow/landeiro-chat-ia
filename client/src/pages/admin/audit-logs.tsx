@@ -39,6 +39,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { History, RotateCcw, Search, Filter, Trash2, MessageSquare, FileText, User } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface AuditLog {
   id: string;
@@ -81,6 +82,12 @@ export default function AdminAuditLogs() {
   
   const { toast } = useToast();
 
+  // Função auxiliar para obter o token de autenticação
+  const getAuthToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || "";
+  };
+
   useEffect(() => {
     loadActions();
   }, []);
@@ -95,9 +102,10 @@ export default function AdminAuditLogs() {
 
   const loadActions = async () => {
     try {
+      const token = await getAuthToken();
       const response = await fetch("/api/admin/audit-logs/actions", {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("supabase.auth.token") || ""}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       if (response.ok) {
@@ -119,9 +127,10 @@ export default function AdminAuditLogs() {
       if (fromDate) params.append("from", fromDate);
       if (toDate) params.append("to", toDate);
 
+      const token = await getAuthToken();
       const response = await fetch(`/api/admin/audit-logs?${params}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("supabase.auth.token") || ""}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -150,9 +159,10 @@ export default function AdminAuditLogs() {
       params.append("page", page.toString());
       params.append("limit", "25");
 
+      const token = await getAuthToken();
       const response = await fetch(`/api/admin/deleted/${deletedType}?${params}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("supabase.auth.token") || ""}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -195,11 +205,12 @@ export default function AdminAuditLogs() {
           break;
       }
 
+      const token = await getAuthToken();
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("supabase.auth.token") || ""}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(body),
       });
