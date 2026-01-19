@@ -20,6 +20,7 @@ import AdminSessionsPage from "@/pages/admin/AdminSessionsPage";
 import AdminUsagePage from "@/pages/admin/AdminUsagePage";
 import AdminCostsPage from "@/pages/admin/AdminCostsPage";
 import AdminExportPage from "@/pages/admin/AdminExportPage";
+import AdminAuditLogsPage from "@/pages/admin/audit-logs";
 
 function Router() {
   const [, navigate] = useLocation();
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/admin/usage" component={AdminUsagePage} />
       <Route path="/admin/costs" component={AdminCostsPage} />
       <Route path="/admin/export" component={AdminExportPage} />
+      <Route path="/admin/audit-logs" component={AdminAuditLogsPage} />
       <Route path="/admin" component={AdminDashboardPage} />
       <Route path="/chats">
         <ProtectedRoute>

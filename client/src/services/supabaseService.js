@@ -5,6 +5,35 @@ const maxSessoesCache = new Map();
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutos
 
 export class SupabaseService {
+  // Função auxiliar para registrar falhas em audit_logs
+  static async logFailure(action, details) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        if (token) {
+          await fetch("/api/audit-logs", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: action,
+              details: {
+                ...details,
+                timestamp: new Date().toISOString(),
+                type: "failure",
+              },
+            }),
+          });
+        }
+      }
+    } catch (auditError) {
+      console.warn('[logFailure] Erro ao registrar falha em audit_logs:', auditError);
+    }
+  }
+
   // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
   // DEPRECATED: Use getMaxSessionsForDiagnosticoAsync para buscar do banco
   static getMaxSessionsForDiagnostico(diagnosticoCodigo) {
@@ -351,7 +380,81 @@ export class SupabaseService {
       return { data, error: null };
     } catch (error) {
       console.error("Error creating chat thread:", error);
+      // Registrar falha em audit_logs
+      await this.logFailure("create_thread_failed", {
+        chatId,
+        threadId,
+        diagnostico,
+        protocolo,
+        sessao,
+        errorMessage: error.message,
+      });
       return { data: null, error: error.message };
+    }
+  }
+
+  // Garantir que o registro em chat_threads existe (previne chats órfãos)
+  // Se não existir, tenta criar com os dados fornecidos
+  static async ensureChatThreadExists(chatId, diagnostico, protocolo, sessao = 1) {
+    try {
+      console.log("[ensureChatThreadExists] Verificando existência de chat_thread:", { chatId, sessao });
+      
+      // Verificar se já existe
+      const { data: existingThread, error: selectError } = await supabase
+        .from("chat_threads")
+        .select("id, chat_id, diagnostico, protocolo, sessao")
+        .eq("chat_id", chatId)
+        .eq("sessao", sessao)
+        .maybeSingle();
+
+      if (selectError && selectError.code !== "PGRST116") {
+        console.error("[ensureChatThreadExists] Erro ao verificar existência:", selectError);
+        throw selectError;
+      }
+
+      // Se já existe, retornar os dados existentes
+      if (existingThread) {
+        console.log("[ensureChatThreadExists] Registro já existe:", existingThread.id);
+        return { data: existingThread, error: null, created: false };
+      }
+
+      // Se não existe, criar novo registro
+      console.warn("[ensureChatThreadExists] Registro não encontrado, criando novo...", { chatId, diagnostico, protocolo, sessao });
+      
+      const { data: newThread, error: createError } = await this.createChatThread(
+        chatId,
+        "", // thread_id vazio - será preenchido depois
+        diagnostico,
+        protocolo,
+        sessao,
+      );
+
+      if (createError) {
+        console.error("[ensureChatThreadExists] Erro ao criar registro:", createError);
+        // Registrar falha em audit_logs
+        await this.logFailure("ensure_thread_failed", {
+          chatId,
+          diagnostico,
+          protocolo,
+          sessao,
+          errorMessage: createError,
+        });
+        return { data: null, error: createError, created: false };
+      }
+
+      console.log("[ensureChatThreadExists] Novo registro criado com sucesso:", newThread?.id);
+      return { data: newThread, error: null, created: true };
+    } catch (error) {
+      console.error("[ensureChatThreadExists] Erro:", error);
+      // Registrar falha em audit_logs
+      await this.logFailure("ensure_thread_failed", {
+        chatId,
+        diagnostico,
+        protocolo,
+        sessao,
+        errorMessage: error.message,
+      });
+      return { data: null, error: error.message, created: false };
     }
   }
 
@@ -512,6 +615,47 @@ export class SupabaseService {
       // Usar o primeiro registro para o audit log (ou todos se necessário)
       const firstThread = threadData?.[0];
 
+      // BACKUP: Fazer backup de cada sessão, mensagens e reviews antes de deletar
+      try {
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        if (token) {
+          // Backup de todas as sessões do thread
+          for (const thread of threadData) {
+            await fetch("/api/admin/backup/thread", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({ chatId: thread.chat_id, sessao: thread.sessao }),
+            });
+
+            // Backup das mensagens de cada sessão
+            await fetch("/api/admin/backup/messages", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({ chatId: thread.chat_id, sessao: thread.sessao }),
+            });
+
+            // Backup da review de cada sessão (se existir)
+            await fetch("/api/admin/backup/review", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({ chatId: thread.chat_id, sessao: thread.sessao }),
+            });
+          }
+          console.log("[deleteChatThread] Backup realizado para todas as sessões");
+        }
+      } catch (backupError) {
+        console.warn("[deleteChatThread] Erro ao fazer backup (continuando com delete):", backupError);
+      }
+
       const { error } = await supabase
         .from("chat_threads")
         .delete()
@@ -598,6 +742,46 @@ export class SupabaseService {
         return { error: "Sessão não encontrada" };
       }
 
+      // BACKUP: Fazer backup da sessão, mensagens e review antes de deletar
+      try {
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        if (token) {
+          // Backup da sessão
+          await fetch("/api/admin/backup/thread", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ chatId, sessao }),
+          });
+
+          // Backup das mensagens
+          await fetch("/api/admin/backup/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ chatId, sessao }),
+          });
+
+          // Backup da review (se existir)
+          await fetch("/api/admin/backup/review", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ chatId, sessao }),
+          });
+
+          console.log("[deleteSession] Backup realizado para a sessão:", { chatId, sessao });
+        }
+      } catch (backupError) {
+        console.warn("[deleteSession] Erro ao fazer backup (continuando com delete):", backupError);
+      }
+
       const { error } = await supabase
         .from("chat_threads")
         .delete()
@@ -647,15 +831,57 @@ export class SupabaseService {
     }
   }
 
-  // Deletar chat do usuário (e dados relacionados)
+  // Deletar chat do usuário (e dados relacionados) - com backup automático
   static async deleteUserChat(userId, chatId) {
     try {
-      // Buscar informações do thread antes de deletar para o audit log
-      const { data: threadData } = await supabase
+      // Buscar todas as sessões do thread para fazer backup
+      const { data: allThreads } = await supabase
         .from("chat_threads")
         .select("chat_id, diagnostico, protocolo, sessao")
-        .eq("chat_id", chatId)
-        .maybeSingle();
+        .eq("chat_id", chatId);
+
+      const threadData = allThreads?.[0];
+
+      // BACKUP: Fazer backup de todas as sessões, mensagens e reviews antes de deletar
+      try {
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        if (token && allThreads && allThreads.length > 0) {
+          for (const thread of allThreads) {
+            // Backup da sessão
+            await fetch("/api/admin/backup/thread", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({ chatId: thread.chat_id, sessao: thread.sessao }),
+            });
+
+            // Backup das mensagens
+            await fetch("/api/admin/backup/messages", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({ chatId: thread.chat_id, sessao: thread.sessao }),
+            });
+
+            // Backup da review
+            await fetch("/api/admin/backup/review", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({ chatId: thread.chat_id, sessao: thread.sessao }),
+            });
+          }
+          console.log("[deleteUserChat] Backup realizado para todas as sessões:", { chatId, sessionCount: allThreads.length });
+        }
+      } catch (backupError) {
+        console.warn("[deleteUserChat] Erro ao fazer backup (continuando com delete):", backupError);
+      }
 
       // First delete the review if it exists
       await supabase.from("chat_reviews").delete().eq("chat_id", chatId);

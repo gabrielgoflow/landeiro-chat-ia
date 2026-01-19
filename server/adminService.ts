@@ -1318,6 +1318,573 @@ export class AdminService {
       throw new Error(`Failed to delete user: ${error.message}`);
     }
   }
+
+  // ==========================================
+  // BACKUP FUNCTIONS - Para salvar dados antes de deletar
+  // ==========================================
+
+  /**
+   * Backup chat thread antes de deletar
+   */
+  static async backupChatThread(chatId: string, sessao: number, deletedBy: string) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      // Buscar dados do thread
+      const threads = await db
+        .select()
+        .from(chatThreads)
+        .where(and(
+          eq(chatThreads.chatId, chatId),
+          eq(chatThreads.sessao, sessao)
+        ));
+
+      if (threads.length === 0) {
+        console.warn("[backupChatThread] Thread não encontrado:", { chatId, sessao });
+        return { success: false, error: "Thread não encontrado" };
+      }
+
+      const thread = threads[0];
+
+      // Inserir no backup
+      await db.execute(sql`
+        INSERT INTO deleted_chat_threads (original_id, chat_id, thread_id, diagnostico, protocolo, sessao, session_started_at, deleted_by, original_created_at)
+        VALUES (${thread.id}, ${thread.chatId}, ${thread.threadId}, ${thread.diagnostico}, ${thread.protocolo}, ${thread.sessao}, ${thread.sessionStartedAt}, ${deletedBy}, ${thread.createdAt})
+      `);
+
+      console.log("[backupChatThread] Backup criado para thread:", { chatId, sessao });
+      return { success: true };
+    } catch (error: any) {
+      console.error("[backupChatThread] Erro:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Backup todas as mensagens de um chat antes de deletar
+   */
+  static async backupChatMessages(chatId: string, deletedBy: string, sessao?: number) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      // Buscar mensagens
+      let query = db.select().from(chatMessages).where(eq(chatMessages.chatId, chatId));
+      
+      if (sessao !== undefined) {
+        query = db.select().from(chatMessages).where(
+          and(eq(chatMessages.chatId, chatId), eq(chatMessages.sessao, sessao))
+        );
+      }
+
+      const messages = await query;
+
+      if (messages.length === 0) {
+        console.warn("[backupChatMessages] Nenhuma mensagem encontrada:", { chatId, sessao });
+        return { success: true, count: 0 };
+      }
+
+      // Inserir no backup em lote
+      for (const msg of messages) {
+        await db.execute(sql`
+          INSERT INTO deleted_chat_messages (original_id, chat_id, thread_id, sessao, message_id, sender, content, message_type, audio_url, metadata, deleted_by, original_created_at)
+          VALUES (${msg.id}, ${msg.chatId}, ${msg.threadId}, ${msg.sessao}, ${msg.messageId}, ${msg.sender}, ${msg.content}, ${msg.messageType}, ${msg.audioUrl}, ${JSON.stringify(msg.metadata)}, ${deletedBy}, ${msg.createdAt})
+        `);
+      }
+
+      console.log("[backupChatMessages] Backup criado para mensagens:", { chatId, count: messages.length });
+      return { success: true, count: messages.length };
+    } catch (error: any) {
+      console.error("[backupChatMessages] Erro:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Backup review antes de deletar
+   */
+  static async backupChatReview(chatId: string, sessao: number, deletedBy: string) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      // Buscar review
+      const reviews = await db
+        .select()
+        .from(chatReviews)
+        .where(and(
+          eq(chatReviews.chatId, chatId),
+          eq(chatReviews.sessao, sessao)
+        ));
+
+      if (reviews.length === 0) {
+        console.warn("[backupChatReview] Review não encontrada:", { chatId, sessao });
+        return { success: true }; // Não é erro se não existe review
+      }
+
+      const review = reviews[0];
+
+      // Inserir no backup
+      await db.execute(sql`
+        INSERT INTO deleted_chat_reviews (original_id, chat_id, sessao, resumo_atendimento, feedback_direto, sinais_paciente, pontos_positivos, pontos_negativos, deleted_by, original_created_at)
+        VALUES (${review.id}, ${review.chatId}, ${review.sessao}, ${review.resumoAtendimento}, ${review.feedbackDireto}, ${review.sinaisPaciente}, ${review.pontosPositivos}, ${review.pontosNegativos}, ${deletedBy}, ${review.createdAt})
+      `);
+
+      console.log("[backupChatReview] Backup criado para review:", { chatId, sessao });
+      return { success: true };
+    } catch (error: any) {
+      console.error("[backupChatReview] Erro:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Backup usuário antes de deletar
+   */
+  static async backupUser(userId: string, deletedBy: string) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      const supabase = getSupabaseAdminClient();
+
+      // Buscar dados do usuário do Auth
+      const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+      
+      // Buscar metadata
+      const metadata = await db
+        .select()
+        .from(userMetadata)
+        .where(eq(userMetadata.userId, userId));
+
+      const meta = metadata[0];
+      const email = authUser?.user?.email || "unknown";
+      const fullName = meta?.fullName || authUser?.user?.user_metadata?.full_name || null;
+
+      // Inserir no backup
+      await db.execute(sql`
+        INSERT INTO deleted_users (original_id, email, full_name, role, status, data_final_acesso, deleted_by, original_created_at)
+        VALUES (${userId}, ${email}, ${fullName}, ${meta?.role || 'user'}, ${meta?.status || 'ativo'}, ${meta?.dataFinalAcesso}, ${deletedBy}, ${meta?.createdAt || new Date()})
+      `);
+
+      console.log("[backupUser] Backup criado para usuário:", { userId, email });
+      return { success: true, email };
+    } catch (error: any) {
+      console.error("[backupUser] Erro:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ==========================================
+  // RESTORE FUNCTIONS - Para recuperar dados deletados
+  // ==========================================
+
+  /**
+   * Restaurar chat thread do backup
+   */
+  static async restoreChatThread(backupId: string, restoredBy: string) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      // Buscar dados do backup
+      const backupResult = await db.execute(sql`
+        SELECT * FROM deleted_chat_threads WHERE id = ${backupId}
+      `);
+
+      const backup = (backupResult as any).rows?.[0];
+      if (!backup) {
+        throw new Error("Backup não encontrado");
+      }
+
+      // Verificar se já existe (evitar duplicação)
+      const existing = await db
+        .select()
+        .from(chatThreads)
+        .where(and(
+          eq(chatThreads.chatId, backup.chat_id),
+          eq(chatThreads.sessao, backup.sessao)
+        ));
+
+      if (existing.length > 0) {
+        throw new Error("Thread já existe. Não é possível restaurar.");
+      }
+
+      // Restaurar na tabela original
+      await db.execute(sql`
+        INSERT INTO chat_threads (id, chat_id, thread_id, diagnostico, protocolo, sessao, session_started_at, created_at)
+        VALUES (${backup.original_id}, ${backup.chat_id}, ${backup.thread_id}, ${backup.diagnostico}, ${backup.protocolo}, ${backup.sessao}, ${backup.session_started_at}, ${backup.original_created_at})
+      `);
+
+      // Remover do backup
+      await db.execute(sql`DELETE FROM deleted_chat_threads WHERE id = ${backupId}`);
+
+      // Criar audit log
+      await this.createAuditLog({
+        adminUserId: restoredBy,
+        action: "restore_thread",
+        details: {
+          chatId: backup.chat_id,
+          sessao: backup.sessao,
+          diagnostico: backup.diagnostico,
+        },
+      });
+
+      console.log("[restoreChatThread] Thread restaurado:", { backupId, chatId: backup.chat_id });
+      return { success: true, chatId: backup.chat_id, sessao: backup.sessao };
+    } catch (error: any) {
+      console.error("[restoreChatThread] Erro:", error);
+      throw new Error(`Falha ao restaurar thread: ${error.message}`);
+    }
+  }
+
+  /**
+   * Restaurar mensagens do backup
+   */
+  static async restoreChatMessages(chatId: string, restoredBy: string, sessao?: number) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      // Buscar mensagens do backup
+      let queryStr = sessao !== undefined
+        ? sql`SELECT * FROM deleted_chat_messages WHERE chat_id = ${chatId} AND sessao = ${sessao}`
+        : sql`SELECT * FROM deleted_chat_messages WHERE chat_id = ${chatId}`;
+
+      const backupResult = await db.execute(queryStr);
+      const messages = (backupResult as any).rows || [];
+
+      if (messages.length === 0) {
+        return { success: true, count: 0 };
+      }
+
+      // Restaurar cada mensagem
+      for (const msg of messages) {
+        // Verificar se já existe
+        const existing = await db
+          .select()
+          .from(chatMessages)
+          .where(eq(chatMessages.messageId, msg.message_id));
+
+        if (existing.length === 0) {
+          await db.execute(sql`
+            INSERT INTO chat_messages (id, chat_id, thread_id, sessao, message_id, sender, content, message_type, audio_url, metadata, created_at)
+            VALUES (${msg.original_id}, ${msg.chat_id}, ${msg.thread_id}, ${msg.sessao}, ${msg.message_id}, ${msg.sender}, ${msg.content}, ${msg.message_type}, ${msg.audio_url}, ${msg.metadata}, ${msg.original_created_at})
+          `);
+        }
+      }
+
+      // Remover do backup
+      if (sessao !== undefined) {
+        await db.execute(sql`DELETE FROM deleted_chat_messages WHERE chat_id = ${chatId} AND sessao = ${sessao}`);
+      } else {
+        await db.execute(sql`DELETE FROM deleted_chat_messages WHERE chat_id = ${chatId}`);
+      }
+
+      // Criar audit log
+      await this.createAuditLog({
+        adminUserId: restoredBy,
+        action: "restore_messages",
+        details: { chatId, sessao, count: messages.length },
+      });
+
+      console.log("[restoreChatMessages] Mensagens restauradas:", { chatId, count: messages.length });
+      return { success: true, count: messages.length };
+    } catch (error: any) {
+      console.error("[restoreChatMessages] Erro:", error);
+      throw new Error(`Falha ao restaurar mensagens: ${error.message}`);
+    }
+  }
+
+  /**
+   * Restaurar review do backup
+   */
+  static async restoreChatReview(backupId: string, restoredBy: string) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      // Buscar do backup
+      const backupResult = await db.execute(sql`
+        SELECT * FROM deleted_chat_reviews WHERE id = ${backupId}
+      `);
+
+      const backup = (backupResult as any).rows?.[0];
+      if (!backup) {
+        throw new Error("Backup não encontrado");
+      }
+
+      // Verificar se já existe
+      const existing = await db
+        .select()
+        .from(chatReviews)
+        .where(and(
+          eq(chatReviews.chatId, backup.chat_id),
+          eq(chatReviews.sessao, backup.sessao)
+        ));
+
+      if (existing.length > 0) {
+        throw new Error("Review já existe. Não é possível restaurar.");
+      }
+
+      // Restaurar
+      await db.execute(sql`
+        INSERT INTO chat_reviews (id, chat_id, sessao, resumo_atendimento, feedback_direto, sinais_paciente, pontos_positivos, pontos_negativos, created_at)
+        VALUES (${backup.original_id}, ${backup.chat_id}, ${backup.sessao}, ${backup.resumo_atendimento}, ${backup.feedback_direto}, ${backup.sinais_paciente}, ${backup.pontos_positivos}, ${backup.pontos_negativos}, ${backup.original_created_at})
+      `);
+
+      // Remover do backup
+      await db.execute(sql`DELETE FROM deleted_chat_reviews WHERE id = ${backupId}`);
+
+      // Criar audit log
+      await this.createAuditLog({
+        adminUserId: restoredBy,
+        action: "restore_review",
+        details: { chatId: backup.chat_id, sessao: backup.sessao },
+      });
+
+      console.log("[restoreChatReview] Review restaurada:", { backupId });
+      return { success: true };
+    } catch (error: any) {
+      console.error("[restoreChatReview] Erro:", error);
+      throw new Error(`Falha ao restaurar review: ${error.message}`);
+    }
+  }
+
+  /**
+   * Restaurar usuário do backup (apenas metadata, não recria no Auth)
+   */
+  static async restoreUser(backupId: string, restoredBy: string) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      // Buscar do backup
+      const backupResult = await db.execute(sql`
+        SELECT * FROM deleted_users WHERE id = ${backupId}
+      `);
+
+      const backup = (backupResult as any).rows?.[0];
+      if (!backup) {
+        throw new Error("Backup não encontrado");
+      }
+
+      // Nota: Não é possível recriar usuário no Supabase Auth automaticamente
+      // Este restore apenas recupera os metadados se o usuário for recriado manualmente
+
+      console.warn("[restoreUser] Usuário precisa ser recriado manualmente no Supabase Auth com o mesmo ID:", backup.original_id);
+      
+      // Criar audit log
+      await this.createAuditLog({
+        adminUserId: restoredBy,
+        action: "restore_user_metadata",
+        details: { 
+          originalUserId: backup.original_id, 
+          email: backup.email,
+          note: "Metadados disponíveis para restauração. Usuário precisa ser recriado no Auth."
+        },
+      });
+
+      return { 
+        success: true, 
+        email: backup.email,
+        originalUserId: backup.original_id,
+        metadata: {
+          fullName: backup.full_name,
+          role: backup.role,
+          status: backup.status,
+          dataFinalAcesso: backup.data_final_acesso,
+        },
+        note: "Usuário precisa ser recriado manualmente no Supabase Auth. Use os metadados retornados."
+      };
+    } catch (error: any) {
+      console.error("[restoreUser] Erro:", error);
+      throw new Error(`Falha ao restaurar usuário: ${error.message}`);
+    }
+  }
+
+  // ==========================================
+  // AUDIT LOG QUERIES - Para o painel admin
+  // ==========================================
+
+  /**
+   * Listar audit logs com filtros
+   */
+  static async getAuditLogs(filters: {
+    action?: string;
+    fromDate?: string;
+    toDate?: string;
+    adminUserId?: string;
+    targetUserId?: string;
+    page?: number;
+    limit?: number;
+  } = {}) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      const { action, fromDate, toDate, adminUserId, targetUserId, page = 1, limit = 50 } = filters;
+
+      // Construir condições
+      const conditions = [];
+      
+      if (action) {
+        conditions.push(eq(auditLogs.action, action));
+      }
+      if (adminUserId) {
+        conditions.push(eq(auditLogs.adminUserId, adminUserId));
+      }
+      if (targetUserId) {
+        conditions.push(eq(auditLogs.targetUserId, targetUserId));
+      }
+      if (fromDate) {
+        conditions.push(gte(auditLogs.createdAt, new Date(fromDate)));
+      }
+      if (toDate) {
+        conditions.push(lte(auditLogs.createdAt, new Date(toDate)));
+      }
+
+      // Query com paginação
+      const offset = (page - 1) * limit;
+      
+      let query = db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(limit).offset(offset);
+      
+      if (conditions.length > 0) {
+        query = db.select().from(auditLogs).where(and(...conditions)).orderBy(desc(auditLogs.createdAt)).limit(limit).offset(offset);
+      }
+
+      const logs = await query;
+
+      // Contar total
+      const countResult = conditions.length > 0
+        ? await db.select({ count: sql`COUNT(*)` }).from(auditLogs).where(and(...conditions))
+        : await db.select({ count: sql`COUNT(*)` }).from(auditLogs);
+
+      const total = Number(countResult[0]?.count || 0);
+
+      // Enriquecer com informações do admin
+      const supabase = getSupabaseAdminClient();
+      const enrichedLogs = await Promise.all(logs.map(async (log) => {
+        let adminEmail = null;
+        let targetEmail = null;
+
+        try {
+          if (log.adminUserId) {
+            const { data: adminUser } = await supabase.auth.admin.getUserById(log.adminUserId);
+            adminEmail = adminUser?.user?.email || null;
+          }
+          if (log.targetUserId) {
+            const { data: targetUser } = await supabase.auth.admin.getUserById(log.targetUserId);
+            targetEmail = targetUser?.user?.email || null;
+          }
+        } catch (e) {
+          // Ignorar erros ao buscar emails
+        }
+
+        return {
+          ...log,
+          adminEmail,
+          targetEmail,
+        };
+      }));
+
+      return {
+        logs: enrichedLogs,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error: any) {
+      console.error("[getAuditLogs] Erro:", error);
+      throw new Error(`Falha ao buscar audit logs: ${error.message}`);
+    }
+  }
+
+  /**
+   * Listar itens deletados por tipo
+   */
+  static async getDeletedItems(type: 'threads' | 'messages' | 'reviews' | 'users', page: number = 1, limit: number = 50) {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      const offset = (page - 1) * limit;
+      let items: any[] = [];
+      let total = 0;
+
+      switch (type) {
+        case 'threads':
+          const threadsResult = await db.execute(sql`
+            SELECT *, (SELECT COUNT(*) FROM deleted_chat_threads) as total_count
+            FROM deleted_chat_threads
+            ORDER BY deleted_at DESC
+            LIMIT ${limit} OFFSET ${offset}
+          `);
+          items = (threadsResult as any).rows || [];
+          total = Number(items[0]?.total_count || 0);
+          break;
+
+        case 'messages':
+          // Agrupar por chat_id e sessao
+          const messagesResult = await db.execute(sql`
+            SELECT chat_id, sessao, COUNT(*) as message_count, MAX(deleted_at) as deleted_at, MAX(deleted_by) as deleted_by,
+                   (SELECT COUNT(DISTINCT chat_id || '-' || sessao) FROM deleted_chat_messages) as total_count
+            FROM deleted_chat_messages
+            GROUP BY chat_id, sessao
+            ORDER BY MAX(deleted_at) DESC
+            LIMIT ${limit} OFFSET ${offset}
+          `);
+          items = (messagesResult as any).rows || [];
+          total = Number(items[0]?.total_count || 0);
+          break;
+
+        case 'reviews':
+          const reviewsResult = await db.execute(sql`
+            SELECT *, (SELECT COUNT(*) FROM deleted_chat_reviews) as total_count
+            FROM deleted_chat_reviews
+            ORDER BY deleted_at DESC
+            LIMIT ${limit} OFFSET ${offset}
+          `);
+          items = (reviewsResult as any).rows || [];
+          total = Number(items[0]?.total_count || 0);
+          break;
+
+        case 'users':
+          const usersResult = await db.execute(sql`
+            SELECT *, (SELECT COUNT(*) FROM deleted_users) as total_count
+            FROM deleted_users
+            ORDER BY deleted_at DESC
+            LIMIT ${limit} OFFSET ${offset}
+          `);
+          items = (usersResult as any).rows || [];
+          total = Number(items[0]?.total_count || 0);
+          break;
+      }
+
+      return {
+        items: items.map(item => {
+          const { total_count, ...rest } = item;
+          return rest;
+        }),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error: any) {
+      console.error("[getDeletedItems] Erro:", error);
+      throw new Error(`Falha ao buscar itens deletados: ${error.message}`);
+    }
+  }
+
+  /**
+   * Listar ações distintas nos audit logs (para filtro)
+   */
+  static async getAuditLogActions() {
+    if (!db) throw new Error("Database not connected");
+
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT action FROM audit_logs ORDER BY action
+      `);
+      return (result as any).rows?.map((r: any) => r.action) || [];
+    } catch (error: any) {
+      console.error("[getAuditLogActions] Erro:", error);
+      return [];
+    }
+  }
 }
 
 

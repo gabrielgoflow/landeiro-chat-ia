@@ -811,6 +811,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===========================================
+  // ADMIN AUDIT LOGS & RESTORE
+  // ===========================================
+
+  // Listar audit logs com filtros
+  app.get("/api/admin/audit-logs", isAdmin, async (req, res) => {
+    try {
+      const { action, from, to, adminUserId, targetUserId, page, limit } = req.query;
+      
+      const result = await AdminService.getAuditLogs({
+        action: action as string,
+        fromDate: from as string,
+        toDate: to as string,
+        adminUserId: adminUserId as string,
+        targetUserId: targetUserId as string,
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 50,
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Admin API] Error getting audit logs:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Listar ações distintas nos audit logs
+  app.get("/api/admin/audit-logs/actions", isAdmin, async (req, res) => {
+    try {
+      const actions = await AdminService.getAuditLogActions();
+      res.json(actions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Listar itens deletados por tipo
+  app.get("/api/admin/deleted/:type", isAdmin, async (req, res) => {
+    try {
+      const { type } = req.params;
+      const { page, limit } = req.query;
+
+      if (!['threads', 'messages', 'reviews', 'users'].includes(type)) {
+        return res.status(400).json({ error: "Tipo inválido. Use: threads, messages, reviews, users" });
+      }
+
+      const result = await AdminService.getDeletedItems(
+        type as 'threads' | 'messages' | 'reviews' | 'users',
+        page ? parseInt(page as string) : 1,
+        limit ? parseInt(limit as string) : 50
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Admin API] Error getting deleted items:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Restaurar item deletado
+  app.post("/api/admin/restore/:type/:backupId", isAdmin, async (req, res) => {
+    try {
+      const { type, backupId } = req.params;
+      const adminUserId = (req as any).user.id;
+
+      let result;
+
+      switch (type) {
+        case 'thread':
+          result = await AdminService.restoreChatThread(backupId, adminUserId);
+          break;
+        case 'messages':
+          // Para mensagens, backupId é na verdade chatId
+          const { sessao } = req.body;
+          result = await AdminService.restoreChatMessages(backupId, adminUserId, sessao);
+          break;
+        case 'review':
+          result = await AdminService.restoreChatReview(backupId, adminUserId);
+          break;
+        case 'user':
+          result = await AdminService.restoreUser(backupId, adminUserId);
+          break;
+        default:
+          return res.status(400).json({ error: "Tipo inválido. Use: thread, messages, review, user" });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Admin API] Error restoring item:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Backup manual (útil para testes ou operações manuais)
+  app.post("/api/admin/backup/:type", isAdmin, async (req, res) => {
+    try {
+      const { type } = req.params;
+      const { chatId, sessao, userId } = req.body;
+      const adminUserId = (req as any).user.id;
+
+      let result;
+
+      switch (type) {
+        case 'thread':
+          if (!chatId || sessao === undefined) {
+            return res.status(400).json({ error: "chatId e sessao são obrigatórios" });
+          }
+          result = await AdminService.backupChatThread(chatId, sessao, adminUserId);
+          break;
+        case 'messages':
+          if (!chatId) {
+            return res.status(400).json({ error: "chatId é obrigatório" });
+          }
+          result = await AdminService.backupChatMessages(chatId, adminUserId, sessao);
+          break;
+        case 'review':
+          if (!chatId || sessao === undefined) {
+            return res.status(400).json({ error: "chatId e sessao são obrigatórios" });
+          }
+          result = await AdminService.backupChatReview(chatId, sessao, adminUserId);
+          break;
+        case 'user':
+          if (!userId) {
+            return res.status(400).json({ error: "userId é obrigatório" });
+          }
+          result = await AdminService.backupUser(userId, adminUserId);
+          break;
+        default:
+          return res.status(400).json({ error: "Tipo inválido. Use: thread, messages, review, user" });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Admin API] Error backing up item:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ===========================================
   // ADMIN ROUTES
   // ===========================================
 

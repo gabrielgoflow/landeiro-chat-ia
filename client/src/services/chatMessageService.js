@@ -1,8 +1,39 @@
 import { supabase } from '@/lib/supabase.js'
+import { SupabaseService } from '@/services/supabaseService.js'
 
 export class ChatMessageService {
   
+  // Função auxiliar para registrar falhas em audit_logs
+  static async logFailure(action, details) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        if (token) {
+          await fetch("/api/audit-logs", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              action: action,
+              details: {
+                ...details,
+                timestamp: new Date().toISOString(),
+                type: "failure",
+              },
+            }),
+          });
+        }
+      }
+    } catch (auditError) {
+      console.warn('[logFailure] Erro ao registrar falha em audit_logs:', auditError);
+    }
+  }
+
   // Salvar mensagem no histórico estruturado
+  // Parâmetros opcionais diagnostico e protocolo permitem verificar/criar chat_thread automaticamente
   static async saveMessage({
     chatId,
     threadId,
@@ -12,7 +43,10 @@ export class ChatMessageService {
     content,
     messageType = 'text',
     audioUrl = null,
-    metadata = {}
+    metadata = {},
+    // Parâmetros opcionais para garantir que chat_thread existe (previne chats órfãos)
+    diagnostico = null,
+    protocolo = null
   }) {
     try {
       // Validar campos obrigatórios
@@ -30,6 +64,20 @@ export class ChatMessageService {
       }
       if (!content) {
         throw new Error('content é obrigatório');
+      }
+
+      // Se diagnostico e protocolo foram fornecidos, garantir que chat_thread existe
+      // Isso previne o problema de "chats órfãos" onde mensagens são salvas mas chat_thread não existe
+      if (diagnostico && protocolo) {
+        const { data: threadData, error: threadError, created } = 
+          await SupabaseService.ensureChatThreadExists(chatId, diagnostico, protocolo, sessao);
+        
+        if (threadError) {
+          console.warn('[saveMessage] Não foi possível garantir existência de chat_thread:', threadError);
+          // Continua salvando a mensagem mesmo se falhar (melhor ter mensagem sem thread que não ter nada)
+        } else if (created) {
+          console.log('[saveMessage] chat_thread foi criado automaticamente para prevenir chat órfão');
+        }
       }
 
       console.log('Salvando mensagem:', {
@@ -82,6 +130,17 @@ export class ChatMessageService {
         sender,
         messageType
       });
+
+      // Registrar falha de salvamento em audit_logs
+      await this.logFailure("save_message_failed", {
+        chatId,
+        sessao,
+        sender,
+        messageType,
+        errorMessage: error.message,
+        errorCode: error.code,
+      });
+
       return { data: null, error: error.message || 'Erro desconhecido ao salvar mensagem' }
     }
   }
@@ -141,16 +200,85 @@ export class ChatMessageService {
     }
   }
 
-  // Deletar mensagens de um chat
-  static async deleteChatMessages(chatId) {
+  // Deletar mensagens de um chat (com backup e audit log)
+  static async deleteChatMessages(chatId, sessao = null) {
     try {
-      const { error } = await supabase
+      // Contar mensagens antes de deletar
+      let countQuery = supabase
+        .from('chat_messages')
+        .select('id', { count: 'exact' })
+        .eq('chat_id', chatId);
+      
+      if (sessao !== null) {
+        countQuery = countQuery.eq('sessao', sessao);
+      }
+      
+      const { count: messageCount } = await countQuery;
+
+      if (messageCount === 0) {
+        return { error: null, count: 0 };
+      }
+
+      // Fazer backup das mensagens antes de deletar (via API do servidor)
+      try {
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
+        if (token) {
+          await fetch("/api/admin/backup/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ chatId, sessao }),
+          });
+        }
+      } catch (backupError) {
+        console.warn('[deleteChatMessages] Erro ao fazer backup (continuando com delete):', backupError);
+      }
+
+      // Deletar mensagens
+      let deleteQuery = supabase
         .from('chat_messages')
         .delete()
-        .eq('chat_id', chatId)
+        .eq('chat_id', chatId);
+      
+      if (sessao !== null) {
+        deleteQuery = deleteQuery.eq('sessao', sessao);
+      }
 
-      if (error) throw error
-      return { error: null }
+      const { error } = await deleteQuery;
+
+      if (error) throw error;
+
+      // Criar audit log
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const token = (await supabase.auth.getSession()).data.session?.access_token;
+          if (token) {
+            await fetch("/api/audit-logs", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                action: "delete_messages",
+                details: {
+                  chatId,
+                  sessao,
+                  messageCount,
+                },
+              }),
+            });
+          }
+        }
+      } catch (auditError) {
+        console.warn('[deleteChatMessages] Erro ao criar audit log:', auditError);
+      }
+
+      console.log('[deleteChatMessages] Mensagens deletadas com backup:', { chatId, sessao, count: messageCount });
+      return { error: null, count: messageCount }
     } catch (error) {
       console.error('Error deleting chat messages:', error)
       return { error: error.message }

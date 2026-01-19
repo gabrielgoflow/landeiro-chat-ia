@@ -747,7 +747,7 @@ rm -rf dist
 # Build com variáveis explícitas
 VITE_SUPABASE_URL=..  \
 VITE_SUPABASE_ANON_KEY=... \
-VITE_FRONTEND_URL=https://pcs.fernandalandeiro.com.br \
+VITE_FRONTEND_URL=http://5.78.140.27:5000 \
 npm run build
 
 # Verificar se funcionou
@@ -766,8 +766,8 @@ git pull
 pm2 stop landeiro-chat-ia
 
 # 2. Build com variáveis (SEM barra no final da URL)
-VITE_SUPABASE_URL=... \
-VITE_SUPABASE_ANON_KEY=... \
+VITE_SUPABASE_URL=https://fnprdocklfpmndailkoo.supabase.co \
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucHJkb2NrbGZwbW5kYWlsa29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyMDIxMTAsImV4cCI6MjA3MDc3ODExMH0.qtI8g9qQSoctWj-mGsLKOBkEbUUczGhdwOmrAFYNfGc \
 VITE_FRONTEND_URL=https://pcs.fernandalandeiro.com.br \
 npm run build
 

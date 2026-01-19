@@ -4,9 +4,11 @@ import { SupabaseService } from "@/services/supabaseService.js";
 import { ChatMessageService } from "@/services/chatMessageService.js";
 import { useAuth } from "@/hooks/useAuth.jsx";
 import { supabase } from "@/lib/supabase.js";
+import { useToast } from "@/hooks/use-toast";
 
 export function useChat() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [chatHistory, setChatHistory] = useState({ threads: [], messages: {} });
   const [currentThreadId, setCurrentThreadId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -159,22 +161,55 @@ export function useChat() {
 
       // Save to Supabase if user is authenticated and session data exists
       if (user && sessionData) {
-        try {
-          // Novos chats sempre começam com sessão = 1
-          const sessionNumber = 1;
-          console.log("Creating new chat with session:", sessionNumber);
+        // Novos chats sempre começam com sessão = 1
+        const sessionNumber = 1;
+        console.log("Creating new chat with session:", sessionNumber);
 
-          const { data: chatThreadData, error: chatThreadError } =
-            await SupabaseService.createChatThread(
-              newThread.id, // chat_id (internal thread ID)
-              "", // thread_id will be empty initially - filled later by OpenAI
-              sessionData.diagnostico,
-              sessionData.protocolo,
-              sessionNumber, // sempre começa com sessão 1
-            );
+        // Retry logic with exponential backoff
+        const maxRetries = 3;
+        let chatThreadData = null;
+        let lastError = null;
 
-          if (!chatThreadError && chatThreadData) {
-            // Create user_chat relationship
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            console.log(`[startNewThread] Tentativa ${attempt}/${maxRetries} de criar chat_thread`);
+            
+            const { data, error: chatThreadError } =
+              await SupabaseService.createChatThread(
+                newThread.id, // chat_id (internal thread ID)
+                "", // thread_id will be empty initially - filled later by OpenAI
+                sessionData.diagnostico,
+                sessionData.protocolo,
+                sessionNumber, // sempre começa com sessão 1
+              );
+
+            if (!chatThreadError && data) {
+              chatThreadData = data;
+              console.log(`[startNewThread] chat_thread criado com sucesso na tentativa ${attempt}`);
+              break; // Success, exit retry loop
+            }
+            
+            lastError = chatThreadError;
+            console.warn(`[startNewThread] Falha na tentativa ${attempt}:`, chatThreadError);
+            
+            // Wait before retrying (exponential backoff: 1s, 2s, 3s)
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+          } catch (error) {
+            lastError = error.message || error;
+            console.error(`[startNewThread] Erro na tentativa ${attempt}:`, error);
+            
+            // Wait before retrying
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            }
+          }
+        }
+
+        if (chatThreadData) {
+          // Success - create user_chat relationship
+          try {
             await SupabaseService.createUserChat(
               user.id,
               newThread.id, // using internal chat ID as OpenAI chat_id for now
@@ -197,19 +232,53 @@ export function useChat() {
             console.log(
               `Thread saved to Supabase successfully - Session ${sessionNumber}`,
             );
-          } else {
-            console.error("Error saving to Supabase:", chatThreadError);
+          } catch (userChatError) {
+            console.error("Error creating user_chat relationship:", userChatError);
           }
-        } catch (error) {
-          console.error("Error saving thread to Supabase:", error);
-          // Don't show error to user, just log it
+        } else {
+          // All retries failed - show error to user and log failure
+          console.error("[startNewThread] Todas as tentativas falharam. Último erro:", lastError);
+          
+          // Registrar falha em audit_logs
+          try {
+            const token = (await supabase.auth.getSession()).data.session?.access_token;
+            if (token) {
+              await fetch("/api/audit-logs", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  action: "create_thread_failed",
+                  details: {
+                    chatId: newThread.id,
+                    diagnostico: sessionData.diagnostico,
+                    protocolo: sessionData.protocolo,
+                    sessao: sessionNumber,
+                    errorMessage: lastError,
+                    timestamp: new Date().toISOString(),
+                    type: "failure",
+                  },
+                }),
+              });
+            }
+          } catch (auditError) {
+            console.warn("[startNewThread] Erro ao registrar falha em audit_logs:", auditError);
+          }
+
+          toast({
+            title: "Erro ao iniciar sessão",
+            description: "Não foi possível salvar a sessão no servidor. Suas mensagens podem não ser salvas corretamente. Tente recarregar a página.",
+            variant: "destructive",
+          });
         }
       }
 
       // Return the created thread so it can be used for navigation
       return newThread;
     },
-    [user],
+    [user, toast],
   );
 
   const loadChatHistory = useCallback(
@@ -616,6 +685,7 @@ export function useChat() {
         }
 
         // Save user message to chat_messages table
+        // Inclui diagnostico e protocolo para garantir que chat_thread existe (previne chats órfãos)
         const saveResult = await ChatMessageService.saveMessage({
           chatId: threadId,
           threadId: currentThread?.threadId || "",
@@ -633,6 +703,8 @@ export function useChat() {
               ? content.audioUrl
               : null,
           metadata: metadata,
+          diagnostico: sessionData?.diagnostico || currentThread?.sessionData?.diagnostico,
+          protocolo: sessionData?.protocolo || currentThread?.sessionData?.protocolo || "tcc",
         });
 
         if (saveResult.error) {
@@ -719,6 +791,8 @@ export function useChat() {
               mimeType: aiResponse.mimeType,
               text: aiResponse.text || "Mensagem de áudio",
             },
+            diagnostico: sessionData?.diagnostico || currentThread?.sessionData?.diagnostico,
+            protocolo: sessionData?.protocolo || currentThread?.sessionData?.protocolo || "tcc",
           });
 
           if (saveResult.error) {
@@ -759,6 +833,8 @@ export function useChat() {
             messageType: "text",
             audioUrl: null,
             metadata: {},
+            diagnostico: sessionData?.diagnostico || currentThread?.sessionData?.diagnostico,
+            protocolo: sessionData?.protocolo || currentThread?.sessionData?.protocolo || "tcc",
           });
 
           if (saveResult.error) {

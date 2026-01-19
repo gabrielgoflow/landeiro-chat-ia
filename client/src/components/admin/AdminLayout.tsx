@@ -10,6 +10,7 @@ import {
   Download,
   LogOut,
   Home,
+  Shield,
 } from "lucide-react";
 
 interface AdminLayoutProps {
@@ -26,6 +27,7 @@ const navigation = [
   { name: "Histórico", href: "/admin/usage", icon: History },
   { name: "Custos", href: "/admin/costs", icon: DollarSign },
   { name: "Exportação", href: "/admin/export", icon: Download },
+  { name: "Audit Logs", href: "/admin/audit-logs", icon: Shield },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {

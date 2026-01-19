@@ -328,7 +328,7 @@ export default function Chat() {
     return reached;
   }, [currentThread, maxSessionNumber, currentSessao, maxSessoesForDiagnostico]);
   
-  const { timeRemaining, isExpired: isSessionExpired } = useSessionTimer(
+  const { timeRemaining, isExpired: isSessionExpired, isInitialized: isTimerInitialized } = useSessionTimer(
     currentChatId,
     sessionStartedAt,
     currentSessao
@@ -922,12 +922,40 @@ export default function Chat() {
 
   // Finalização automática quando sessão expira por tempo
   // Importante: não deletar mais sessões automaticamente, apenas finalizar quando houver mensagens
+  // CORREÇÃO: Verificar se o timer foi inicializado corretamente antes de finalizar automaticamente
+  // para evitar finalização prematura devido a race conditions na inicialização
   const hasAutoFinalizedRef = useRef(false);
   const lastExpiredSessionRef = useRef(null);
+  const sessionEntryTimeRef = useRef({}); // Rastreia quando entramos em cada sessão
+  
+  // Registrar quando entramos em uma sessão (para detectar sessões antigas vs expiradas "ao vivo")
+  useEffect(() => {
+    if (selectedSessionId && selectedSessaoNumber) {
+      const sessionKey = `${selectedSessionId}-${selectedSessaoNumber}`;
+      if (!sessionEntryTimeRef.current[sessionKey]) {
+        sessionEntryTimeRef.current[sessionKey] = Date.now();
+      }
+    }
+  }, [selectedSessionId, selectedSessaoNumber]);
   
   useEffect(() => {
+    // IMPORTANTE: Só processar finalização automática se o timer foi inicializado corretamente
+    // Isso evita finalização prematura quando o timer ainda não carregou o session_started_at do banco
+    if (!isTimerInitialized) {
+      return;
+    }
+    
+    // Aguardar verificação de review em andamento (evita race condition)
+    if (isCheckingReviewRef.current) {
+      return;
+    }
+    
+    // Verificar se a sessão realmente expirou (timer inicializado E expirado E tempo calculado)
+    // timeRemaining !== null garante que o cálculo do tempo foi feito corretamente
+    const isReallyExpired = isSessionExpired && timeRemaining !== null && timeRemaining <= 0;
+    
     // Verificar se a sessão expirou e ainda não foi finalizada
-    if (isSessionExpired && !hasReview && currentThread) {
+    if (isReallyExpired && !hasReview && currentThread) {
       const sessionKey = `${selectedSessionId}-${selectedSessaoNumber}`;
       
       // Evitar múltiplas finalizações para a mesma sessão
@@ -935,12 +963,70 @@ export default function Chat() {
         return;
       }
       
-      // Sempre finalizar automaticamente quando expirar e houver pelo menos 1 mensagem
+      // CORREÇÃO: Verificar se a sessão já estava expirada ANTES de entrarmos nela
+      // Isso evita finalizar automaticamente ao navegar para sessões antigas que já deveriam ter review
+      const entryTime = sessionEntryTimeRef.current[sessionKey];
+      const timeSinceEntry = entryTime ? (Date.now() - entryTime) : 0;
+      
+      // Se entramos na sessão há menos de 5 segundos e ela já está expirada,
+      // provavelmente é uma sessão antiga - verificar no banco se já tem review antes de finalizar
+      const SESSION_ENTRY_GRACE_PERIOD = 5000; // 5 segundos de graça após entrar na sessão
+      
+      if (timeSinceEntry < SESSION_ENTRY_GRACE_PERIOD) {
+        // Verificar assincronamente se já existe review no banco antes de finalizar
+        const checkAndMaybeFinalize = async () => {
+          try {
+            const { data: existingReview, error } = await supabase
+              .from('chat_reviews')
+              .select('id')
+              .eq('chat_id', selectedSessionId)
+              .eq('sessao', selectedSessaoNumber)
+              .maybeSingle();
+            
+            if (existingReview && !error) {
+              // Já tem review, atualizar estado e não finalizar
+              console.log('Sessão já tem review no banco, atualizando estado local:', {
+                chatId: selectedSessionId,
+                sessao: selectedSessaoNumber
+              });
+              setHasReview(true);
+              setIsCurrentSessionFinalized(true);
+              return;
+            }
+            
+            // Não tem review, pode finalizar
+            if (currentMessages.length >= 1) {
+              console.log('Sessão expirada automaticamente, finalizando atendimento...', {
+                chatId: selectedSessionId,
+                sessao: selectedSessaoNumber,
+                messageCount: currentMessages.length,
+                timeRemaining,
+                isTimerInitialized,
+                timeSinceEntry
+              });
+              
+              hasAutoFinalizedRef.current = true;
+              lastExpiredSessionRef.current = sessionKey;
+              handleFinalizeChat();
+            }
+          } catch (err) {
+            console.error('Erro ao verificar review antes de finalizar:', err);
+          }
+        };
+        
+        checkAndMaybeFinalize();
+        return;
+      }
+      
+      // Sessão expirou "ao vivo" (estamos nela há mais de 5 segundos)
       if (currentMessages.length >= 1) {
-        console.log('Sessão expirada automaticamente, finalizando atendimento (sem deleção automática de sessão)...', {
+        console.log('Sessão expirada automaticamente (ao vivo), finalizando atendimento...', {
           chatId: selectedSessionId,
           sessao: selectedSessaoNumber,
-          messageCount: currentMessages.length
+          messageCount: currentMessages.length,
+          timeRemaining,
+          isTimerInitialized,
+          timeSinceEntry
         });
         
         hasAutoFinalizedRef.current = true;
@@ -955,14 +1041,14 @@ export default function Chat() {
           sessao: selectedSessaoNumber
         });
       }
-    } else if (!isSessionExpired) {
-      // Resetar flag quando a sessão não está mais expirada (nova sessão)
+    } else if (!isSessionExpired || !isTimerInitialized) {
+      // Resetar flag quando a sessão não está mais expirada (nova sessão) ou timer não inicializado
       const sessionKey = `${selectedSessionId}-${selectedSessaoNumber}`;
       if (lastExpiredSessionRef.current !== sessionKey) {
         hasAutoFinalizedRef.current = false;
       }
     }
-  }, [isSessionExpired, hasReview, currentThread, selectedSessionId, selectedSessaoNumber, currentMessages.length, handleFinalizeChat]);
+  }, [isSessionExpired, isTimerInitialized, timeRemaining, hasReview, currentThread, selectedSessionId, selectedSessaoNumber, currentMessages.length, handleFinalizeChat]);
 
   const handleStartNextSession = async () => {
     if (!currentThread) return;

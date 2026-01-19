@@ -127,18 +127,7 @@ export function ChatSidebar({
                         {formattedTime}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteThread(thread.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive transition-opacity duration-150"
-                      data-testid={`delete-thread-${thread.id}`}
-                    >
-                      <i className="fas fa-trash text-xs"></i>
-                    </Button>
+                    {/* Botão de delete removido - apenas admins podem deletar via painel admin */}
                   </div>
                 );
               })}
