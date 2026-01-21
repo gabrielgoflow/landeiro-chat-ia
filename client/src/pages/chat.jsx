@@ -593,36 +593,32 @@ export default function Chat() {
   }, [currentThread?.id, currentThread?.threadId, selectedSessionId]);
 
   // Check if current chat has a review - CONSOLIDADO e corrigido para usar sessão selecionada
+  // CORREÇÃO: Marcar como "verificando" IMEDIATAMENTE para evitar race condition com auto-finalização
   const lastReviewCheckRef = useRef(null);
   const isCheckingReviewRef = useRef(false);
   
   useEffect(() => {
-    // Evitar execuções duplicadas
-    if (isCheckingReviewRef.current) {
-      return;
-    }
-    
     const checkKey = `${selectedSessionId}-${selectedSessaoNumber}`;
+    
+    // Evitar execuções duplicadas para a mesma sessão
     if (lastReviewCheckRef.current === checkKey) {
       return;
     }
     
+    // CORREÇÃO: Marcar como "verificando" IMEDIATAMENTE (antes do debounce)
+    // Isso evita que o useEffect de auto-finalização execute durante a verificação
+    isCheckingReviewRef.current = true;
+    
     const checkForReview = async () => {
-      // Reset estados primeiro
-      setHasReview(false);
-      setIsCurrentSessionFinalized(false);
-      setCurrentReview(null);
-      
       // Usa selectedSessionId e selectedSessaoNumber para verificar a sessão correta
       if (!selectedSessionId || !selectedSessaoNumber) {
         lastReviewCheckRef.current = checkKey;
+        isCheckingReviewRef.current = false;
         return;
       }
 
       const chatId = selectedSessionId;
       const sessao = selectedSessaoNumber;
-      
-      isCheckingReviewRef.current = true;
       
       try {
         // Usa Supabase diretamente em vez de API dupla
@@ -633,18 +629,28 @@ export default function Chat() {
           .eq('sessao', sessao)
           .single();
           
-        const hasReview = !!review && !error;
+        const reviewExists = !!review && !error;
         
-        if (hasReview) {
+        if (reviewExists) {
           setHasReview(true);
           setIsCurrentSessionFinalized(true);
           setCurrentReview(review);
           setIsFinalizingChat(false);
+        } else {
+          // CORREÇÃO: Só resetar estados se confirmamos que NÃO existe review
+          // Isso evita resetar hasReview prematuramente antes de verificar o banco
+          setHasReview(false);
+          setIsCurrentSessionFinalized(false);
+          setCurrentReview(null);
         }
         
         lastReviewCheckRef.current = checkKey;
       } catch (error) {
         console.error('Error checking review:', error);
+        // Em caso de erro, resetar estados para permitir nova tentativa
+        setHasReview(false);
+        setIsCurrentSessionFinalized(false);
+        setCurrentReview(null);
         lastReviewCheckRef.current = checkKey;
       } finally {
         isCheckingReviewRef.current = false;
@@ -656,6 +662,10 @@ export default function Chat() {
     
     return () => {
       clearTimeout(timeoutId);
+      // CORREÇÃO: Resetar a ref no cleanup apenas se o timeout foi cancelado
+      // (ou seja, a verificação não chegou a executar)
+      // Isso permite que uma nova verificação inicie corretamente
+      isCheckingReviewRef.current = false;
     };
   }, [selectedSessionId, selectedSessaoNumber]);
 
