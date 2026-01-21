@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ChatService } from "@/services/chatService.js";
 import { SupabaseService } from "@/services/supabaseService.js";
 import { ChatMessageService } from "@/services/chatMessageService.js";
@@ -10,9 +10,15 @@ export function useChat() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [chatHistory, setChatHistory] = useState({ threads: [], messages: {} });
+  const chatHistoryRef = useRef(chatHistory);
   const [currentThreadId, setCurrentThreadId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Atualizar ref quando chatHistory mudar
+  useEffect(() => {
+    chatHistoryRef.current = chatHistory;
+  }, [chatHistory]);
 
   // Load chat history from localStorage on mount
   useEffect(() => {
@@ -442,8 +448,10 @@ export function useChat() {
     async (threadId, sessao = null) => {
       console.log("selectThread chamado para:", threadId, "sessao:", sessao);
       let existingThread;
+      // Usar chatHistoryRef.current para acessar o estado mais recente sem adicionar como dependência
+      const currentChatHistory = chatHistoryRef.current;
       if (sessao !== null) {
-        existingThread = chatHistory.threads.find(
+        existingThread = currentChatHistory.threads.find(
           (t) => t.id === threadId && t.sessionData?.sessao === sessao,
         );
         if (!existingThread) {
@@ -482,7 +490,7 @@ export function useChat() {
           }
         }
       } else {
-        existingThread = chatHistory.threads.find((t) => t.id === threadId);
+        existingThread = currentChatHistory.threads.find((t) => t.id === threadId);
       }
       if (!existingThread) {
         console.log("Thread not found locally, creating from Supabase...");
@@ -498,8 +506,9 @@ export function useChat() {
       setError(null);
       // Always load fresh messages from chat_messages table for the specific session
       await loadChatHistory(threadId, sessao);
-      // LOG DE DEPURAÇÃO FINAL
-      const updatedThread = chatHistory.threads.find(
+      // LOG DE DEPURAÇÃO FINAL - usar ref atualizado
+      const updatedChatHistory = chatHistoryRef.current;
+      const updatedThread = updatedChatHistory.threads.find(
         (t) =>
           t.id === threadId &&
           (sessao === null || t.sessionData?.sessao === sessao),
@@ -507,8 +516,6 @@ export function useChat() {
       console.log("selectThread FINAL - currentThread:", updatedThread);
     },
     [
-      chatHistory.threads,
-      chatHistory.messages,
       loadChatHistory,
       createThreadFromSupabase,
     ],

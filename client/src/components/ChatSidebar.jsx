@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,11 @@ export function ChatSidebar({
   const [loadingChats, setLoadingChats] = useState(false);
   const [diagnosticosMap, setDiagnosticosMap] = useState({});
   const [maxSessoesMap, setMaxSessoesMap] = useState({});
+
+  // Refs para evitar chamadas duplicadas
+  const isLoadingChatsRef = useRef(false);
+  const lastUserIdSidebarRef = useRef(null);
+  const lastLoadTimestampSidebarRef = useRef(0);
 
   // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
   // Agora usa o valor do banco se disponível, senão usa fallback
@@ -80,7 +85,26 @@ export function ChatSidebar({
 
   // Function to load user chats from Supabase - memoizada para evitar recriações
   const loadUserChats = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) return;
+
+    // Debounce: evitar chamadas muito frequentes (mínimo 2 segundos entre chamadas)
+    const now = Date.now();
+    const timeSinceLastLoad = now - lastLoadTimestampSidebarRef.current;
+    const MIN_TIME_BETWEEN_LOADS = 2000; // 2 segundos
+
+    if (timeSinceLastLoad < MIN_TIME_BETWEEN_LOADS && lastUserIdSidebarRef.current === user.id) {
+      return; // Ignorar chamada muito recente
+    }
+
+    // Evitar chamadas duplicadas simultâneas
+    if (isLoadingChatsRef.current && lastUserIdSidebarRef.current === user.id) {
+      return; // Já está carregando para este usuário
+    }
+
+    isLoadingChatsRef.current = true;
+    const currentUserId = user.id;
+    lastUserIdSidebarRef.current = currentUserId;
+    lastLoadTimestampSidebarRef.current = now;
 
     try {
       setLoadingChats(true);
@@ -88,28 +112,42 @@ export function ChatSidebar({
       setUserChats(chats);
 
       // Check review status for the latest session of each thread
-      const reviewStatuses = {};
-      for (const chat of chats) {
-        try {
-          // Verifica review para o par chat_id + última sessão
-          const { data: review, error } = await supabaseService.supabase
-            .from("chat_reviews")
-            .select("*")
-            .eq("chat_id", chat.chat_id)
-            .eq("sessao", chat.sessao)
-            .single();
-          reviewStatuses[chat.chat_id] = !!review && !error;
-        } catch (error) {
-          reviewStatuses[chat.chat_id] = false;
-        }
+      if (chats && chats.length > 0) {
+        const reviewStatuses = {};
+        // Processar reviews em paralelo para melhor performance
+        const reviewPromises = chats.map(async (chat) => {
+          try {
+            // Verifica review para o par chat_id + última sessão
+            const { data: review, error } = await supabaseService.supabase
+              .from("chat_reviews")
+              .select("*")
+              .eq("chat_id", chat.chat_id)
+              .eq("sessao", chat.sessao)
+              .single();
+            return { chatId: chat.chat_id, hasReview: !!review && !error };
+          } catch (error) {
+            // Não há review (esperado)
+            return { chatId: chat.chat_id, hasReview: false };
+          }
+        });
+        
+        const reviewResults = await Promise.all(reviewPromises);
+        reviewResults.forEach(({ chatId, hasReview }) => {
+          reviewStatuses[chatId] = hasReview;
+        });
+        
+        setChatReviews(reviewStatuses);
       }
-      setChatReviews(reviewStatuses);
     } catch (error) {
       console.error("Erro ao carregar chats:", error);
     } finally {
       setLoadingChats(false);
+      // Só resetar se ainda for o mesmo usuário
+      if (lastUserIdSidebarRef.current === currentUserId) {
+        isLoadingChatsRef.current = false;
+      }
     }
-  }, [user]);
+  }, [user?.id]);
 
   // Carregar diagnósticos para mapear código -> nome e max_sessoes
   useEffect(() => {
@@ -145,8 +183,18 @@ export function ChatSidebar({
 
   // Load user chats from Supabase on mount and when user changes
   useEffect(() => {
-    loadUserChats();
-  }, [loadUserChats]);
+    // Resetar referências quando o usuário mudar
+    if (user?.id !== lastUserIdSidebarRef.current) {
+      lastUserIdSidebarRef.current = null;
+      isLoadingChatsRef.current = false;
+      lastLoadTimestampSidebarRef.current = 0;
+    }
+
+    // Só carregar se tiver usuário e não estiver carregando
+    if (user?.id && !isLoadingChatsRef.current) {
+      loadUserChats();
+    }
+  }, [user?.id, loadUserChats]);
 
   // Expose refresh function globally for when new chats are created
   useEffect(() => {

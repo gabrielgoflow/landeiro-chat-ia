@@ -131,48 +131,16 @@ export default function Chat() {
     }
   }, [chatId]); // Executar quando chatId mudar
   
-  // Visibility API: Salvar estado quando página perde foco
+  // Visibility API: Salvar estado quando página perde foco (sem restaurar ao voltar)
+  // O estado já está em memória, não precisa restaurar do sessionStorage ao voltar
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // Página perdeu foco - salvar estado
+        // Página perdeu foco - apenas salvar estado
         console.log('Página perdeu foco, salvando estado');
         saveStateToStorage();
-      } else {
-        // Página voltou ao foco - restaurar estado se necessário
-        console.log('Página voltou ao foco');
-        if (!hasRestoredStateRef.current && chatId && chatId !== 'new') {
-          try {
-            const savedState = sessionStorage.getItem(storageKeyRef.current);
-            if (savedState) {
-              const state = JSON.parse(savedState);
-              const isRecent = Date.now() - state.timestamp < 30 * 60 * 1000;
-              
-              if (isRecent && state.selectedSessionId === chatId) {
-                console.log('Restaurando estado após voltar ao foco:', state);
-                const restoreKey = `restored_${chatId}`;
-                if (hasRestoredStateRef.current !== restoreKey) {
-                  if (state.lastChatId) {
-                    lastChatIdRef.current = state.lastChatId;
-                  }
-                  if (state.selectedSessionId) {
-                    setSelectedSessionId(state.selectedSessionId);
-                  }
-                  if (state.selectedSessaoNumber) {
-                    setSelectedSessaoNumber(state.selectedSessaoNumber);
-                  }
-                  if (state.threadId) {
-                    setThreadId(state.threadId);
-                  }
-                  hasRestoredStateRef.current = restoreKey;
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Erro ao restaurar estado após voltar ao foco:', error);
-          }
-        }
       }
+      // Removida a restauração ao voltar ao foco para evitar re-renders desnecessários
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -197,6 +165,16 @@ export default function Chat() {
     reloadThread,
     clearError,
   } = useChat();
+
+  // Refs estáveis para funções do useChat (evitar re-execução de useEffect)
+  const selectThreadRef = useRef(selectThread);
+  const createThreadFromSupabaseRef = useRef(createThreadFromSupabase);
+
+  // Atualizar refs quando funções mudarem (sem disparar useEffect)
+  useEffect(() => {
+    selectThreadRef.current = selectThread;
+    createThreadFromSupabaseRef.current = createThreadFromSupabase;
+  }, [selectThread, createThreadFromSupabase]);
 
   // Buscar max_sessoes do banco quando o diagnóstico mudar
   useEffect(() => {
@@ -417,21 +395,21 @@ export default function Chat() {
           // Usar sessão salva/restaurada se disponível, senão usar a sessão do thread, ou 1 como fallback
           const sessao = savedSessao || existingThread.sessionData?.sessao || 1;
           console.log('Selecionando thread com sessão:', sessao, savedSessao ? '(da sessão salva/restaurada)' : '(do thread)');
-          await selectThread(existingThread.id, sessao);
+          await selectThreadRef.current(existingThread.id, sessao);
         } else {
           // Chat ID not found in current threads, try to load from Supabase
           console.log(
             "Thread not found locally, trying to load from Supabase (chat_id):",
             chatId,
           );
-          const createdThread = await createThreadFromSupabase(chatId);
+          const createdThread = await createThreadFromSupabaseRef.current(chatId);
           if (createdThread) {
             console.log('Thread created from Supabase using chat_id, now selecting:', createdThread.chat_id || chatId);
             // Usar sessão salva/restaurada se disponível, senão usar a sessão do thread criado, ou 1 como fallback
             // Verificar novamente se selectedSessaoNumber foi atualizado durante a busca
             const sessaoToUse = selectedSessaoNumber || savedSessao || createdThread.sessionData?.sessao || 1;
             console.log('Selecionando thread com sessão:', sessaoToUse, (selectedSessaoNumber || savedSessao) ? '(da sessão salva/restaurada)' : '(do thread criado)');
-            await selectThread(createdThread.chat_id || chatId, sessaoToUse);
+            await selectThreadRef.current(createdThread.chat_id || chatId, sessaoToUse);
           } else {
             console.warn(
               "Chat ID not found by chat_id. Trying fallback search by thread_id:",
@@ -455,7 +433,7 @@ export default function Chat() {
                   "sessao:",
                   fallback.sessao,
                 );
-                const createdFromFallback = await createThreadFromSupabase(
+                const createdFromFallback = await createThreadFromSupabaseRef.current(
                   fallback.chat_id,
                 );
                 if (createdFromFallback) {
@@ -476,7 +454,7 @@ export default function Chat() {
                   
                   const sessao = savedSessaoForFallback || createdFromFallback.sessionData?.sessao || fallback.sessao || 1;
                   console.log('Selecionando thread fallback com sessão:', sessao, savedSessaoForFallback ? '(da sessão salva)' : '(do thread)');
-                  await selectThread(
+                  await selectThreadRef.current(
                     createdFromFallback.chat_id || fallback.chat_id,
                     sessao,
                   );
@@ -522,7 +500,7 @@ export default function Chat() {
     };
 
     initializeChat();
-  }, [chatId, threads.length, currentThread?.id, isStartingNextSession, navigate, selectThread, createThreadFromSupabase]);
+  }, [chatId, threads.length, currentThread?.id, isStartingNextSession, navigate, selectedSessaoNumber]);
 
   // Extract threadId from current thread
   const lastThreadIdSearchRef = useRef(null);

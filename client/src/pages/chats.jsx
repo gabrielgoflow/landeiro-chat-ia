@@ -19,12 +19,42 @@ import { useToast } from "@/hooks/use-toast";
 import { DiagnosticFilterSidebar } from "@/components/DiagnosticFilterSidebar.jsx";
 import { useIsMobile } from "@/hooks/use-mobile.jsx";
 
+// Funções para cache persistente (substituem hasLoadedForUserRef)
+const CACHE_KEY_PREFIX = 'chats_loaded_';
+const CACHE_TIMESTAMP_PREFIX = 'chats_loaded_ts_';
+const CACHE_VALIDITY_MS = 30000; // 30 segundos - cache válido por este tempo
+
+const hasLoadedForUser = (userId) => {
+  if (!userId) return false;
+  try {
+    const loaded = sessionStorage.getItem(`${CACHE_KEY_PREFIX}${userId}`);
+    const timestamp = sessionStorage.getItem(`${CACHE_TIMESTAMP_PREFIX}${userId}`);
+    if (!loaded || !timestamp) return false;
+    // Verificar se o cache ainda é válido
+    const elapsed = Date.now() - parseInt(timestamp, 10);
+    return elapsed < CACHE_VALIDITY_MS;
+  } catch {
+    return false;
+  }
+};
+
+const markAsLoaded = (userId) => {
+  if (!userId) return;
+  try {
+    sessionStorage.setItem(`${CACHE_KEY_PREFIX}${userId}`, 'true');
+    sessionStorage.setItem(`${CACHE_TIMESTAMP_PREFIX}${userId}`, Date.now().toString());
+  } catch {
+    // Ignorar erros de storage
+  }
+};
+
 export default function ChatsPage() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  
   const [userChats, setUserChats] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Sempre iniciar como false
   const [chatReviews, setChatReviews] = useState({});
   const [selectedDiagnostico, setSelectedDiagnostico] = useState(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
@@ -32,9 +62,9 @@ export default function ChatsPage() {
   const [maxSessoesMap, setMaxSessoesMap] = useState({});
   const isMobile = useIsMobile();
   
-  // Refs para evitar chamadas duplicadas
+  // Refs para evitar chamadas duplicadas dentro de uma mesma montagem
   const isLoadingRef = useRef(false);
-  const lastUserIdRef = useRef(null);
+  const loadUserChatsRef = useRef(null);
 
   // Função auxiliar para determinar o limite máximo de sessões baseado no diagnóstico
   // Agora usa o valor do banco se disponível, senão usa fallback
@@ -69,71 +99,87 @@ export default function ChatsPage() {
   };
 
   // Memoizar loadUserChats para evitar recriações desnecessárias
-  const loadUserChats = useCallback(async () => {
-    // Evitar chamadas duplicadas simultâneas
-    if (isLoadingRef.current) {
-      console.log("loadUserChats: Já está carregando, ignorando chamada duplicada");
-      return;
-    }
-    
+  const loadUserChats = useCallback(async (forceReload = false) => {
     if (!user?.id) {
       return;
     }
-    
-    // Só evitar se for o mesmo usuário E já estiver carregando
-    // Se o usuário mudou, permitir carregar
-    if (lastUserIdRef.current === user.id && isLoadingRef.current) {
-      console.log("loadUserChats: Já carregando para este usuário, ignorando");
-      return;
-    }
-    
-    isLoadingRef.current = true;
+
     const currentUserId = user.id;
-    lastUserIdRef.current = currentUserId;
+
     
+    // Setar flag de carregando
+    isLoadingRef.current = true;
+
     try {
+      console.log("[loadUserChats] 🔄 Chamando getUserChats...");
       setLoading(true);
-      const chats = await supabaseService.getUserChats(user.id);
+      const chats = await supabaseService.getUserChats(currentUserId);
+      console.log("[loadUserChats] ✅ getUserChats retornou", { count: chats?.length });
+      
       setUserChats(chats);
 
-      // Check review status for each chat
-      const reviewStatuses = {};
-      for (const chat of chats) {
-        try {
-          const response = await fetch(`/api/reviews/${chat.chat_id}`);
-          reviewStatuses[chat.chat_id] = response.ok;
-        } catch (error) {
-          console.error(
-            `Error checking review for chat ${chat.chat_id}:`,
-            error,
-          );
-          reviewStatuses[chat.chat_id] = false;
-        }
+      // Check review status for each chat (apenas se houver chats)
+      if (chats && chats.length > 0) {
+        const reviewStatuses = {};
+        const reviewPromises = chats.map(async (chat) => {
+          try {
+            const chatIdToUse = chat.chat_id;
+            if (!chatIdToUse || chatIdToUse.startsWith('thread_')) {
+              return { chatId: chatIdToUse, hasReview: false };
+            }
+            const response = await fetch(`/api/reviews/${chatIdToUse}`);
+            return { chatId: chatIdToUse, hasReview: response.ok };
+          } catch (error) {
+            return { chatId: chat.chat_id || null, hasReview: false };
+          }
+        });
+        
+        const reviewResults = await Promise.all(reviewPromises);
+        reviewResults.forEach(({ chatId, hasReview }) => {
+          reviewStatuses[chatId] = hasReview;
+        });
+        
+        setChatReviews(reviewStatuses);
       }
-      setChatReviews(reviewStatuses);
+      
+      // Marcar como carregado no sessionStorage (persiste entre remontagens)
+      markAsLoaded(currentUserId);
+      console.log("[loadUserChats] ✅ Marcado como carregado no sessionStorage");
+      
     } catch (error) {
       console.error("Erro ao carregar chats:", error);
     } finally {
       setLoading(false);
-      // Só resetar se ainda for o mesmo usuário
-      if (lastUserIdRef.current === currentUserId) {
-        isLoadingRef.current = false;
-      }
+      isLoadingRef.current = false;
     }
   }, [user?.id]);
 
+  // Atualizar ref da função
   useEffect(() => {
-    // Resetar referência quando o usuário mudar
-    if (user?.id !== lastUserIdRef.current) {
-      lastUserIdRef.current = null;
-      isLoadingRef.current = false;
+    loadUserChatsRef.current = loadUserChats;
+  }, [loadUserChats]);
+
+  // Carregar chats na montagem
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    // Se página está oculta, não carregar
+    if (document.hidden) return;
+
+    // Verificar se já carregou via sessionStorage
+    const alreadyLoaded = hasLoadedForUser(user.id);
+    
+    if (alreadyLoaded) {
+      console.log("[useEffect] ❌ Já carregou para este usuário (sessionStorage)");
+      return;
     }
     
-    if (user?.id && !isLoadingRef.current) {
-      loadUserChats();
+    // Carregar apenas se não carregou ainda
+    if (loadUserChatsRef.current && !isLoadingRef.current) {
+      console.log("[useEffect] ✅ Primeira carga para usuário");
+      loadUserChatsRef.current();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Carregar diagnósticos para mapear código -> nome e max_sessoes
   useEffect(() => {
@@ -194,8 +240,8 @@ export default function ChatsPage() {
     );
   }
 
-  // LOG para depuração da home de chats
-  console.log("ChatsPage userChats:", userChats);
+  // LOG para depuração da home de chats (comentado para reduzir logs)
+  // console.log("ChatsPage userChats:", userChats);
 
   // Agrupa por chat_id (ou thread_id se disponível), mantendo apenas a sessão mais alta
   // Usa chat_id como chave principal pois thread_id pode estar vazio
