@@ -169,10 +169,10 @@ export default function ChatsPage() {
     // Verificar se já carregou via sessionStorage
     const alreadyLoaded = hasLoadedForUser(user.id);
     
-    if (alreadyLoaded) {
-      console.log("[useEffect] ❌ Já carregou para este usuário (sessionStorage)");
-      return;
-    }
+    // if (alreadyLoaded) {
+    //   console.log("[useEffect] ❌ Já carregou para este usuário (sessionStorage)");
+    //   return;
+    // }
     
     // Carregar apenas se não carregou ainda
     if (loadUserChatsRef.current && !isLoadingRef.current) {
