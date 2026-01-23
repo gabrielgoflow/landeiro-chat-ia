@@ -122,6 +122,24 @@ export class SupabaseService {
       const currentSession = lastSession?.sessao || 0;
       const nextSession = currentSession + 1;
       
+      // Verificar se a próxima sessão já existe (evitar duplicatas)
+      const { data: existingNextSession, error: checkError } = await supabase
+        .from("chat_threads")
+        .select("id, sessao")
+        .eq("chat_id", chatId)
+        .eq("sessao", nextSession)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== "PGRST116") {
+        throw checkError;
+      }
+
+      // Se a próxima sessão já existe, retornar ela em vez de criar duplicado
+      if (existingNextSession) {
+        console.log("Próxima sessão já existe, retornando existente:", existingNextSession);
+        return { data: existingNextSession, error: null, newSession: nextSession };
+      }
+      
       // Obter limite máximo baseado no diagnóstico (buscar do banco)
       const maxSessions = await this.getMaxSessionsForDiagnosticoAsync(lastSession?.diagnostico);
 
@@ -360,6 +378,25 @@ export class SupabaseService {
     sessao = 1,
   ) {
     try {
+      // Verificar se já existe um registro com mesmo chat_id e sessao para evitar duplicatas
+      const { data: existingThread, error: checkError } = await supabase
+        .from("chat_threads")
+        .select("id, chat_id, sessao")
+        .eq("chat_id", chatId)
+        .eq("sessao", sessao)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== "PGRST116") {
+        console.error("Error checking existing thread:", checkError);
+        throw checkError;
+      }
+
+      // Se já existe, retornar o existente em vez de criar duplicado
+      if (existingThread) {
+        console.log("Thread já existe, retornando existente:", existingThread);
+        return { data: existingThread, error: null };
+      }
+
       const now = new Date().toISOString();
       const { data, error } = await supabase
         .from("chat_threads")

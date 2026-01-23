@@ -65,10 +65,14 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
     }
   };
 
+  // IMPORTANTE: Se está pausado, não considerar como expirado
+  // Sessões pausadas não devem mostrar mensagem de expiração
+  const effectiveIsExpired = isSessionExpired && !isPaused;
+  
   return (
     <div className="bg-white border-t border-gray-200 px-2 sm:px-4 py-2 sm:py-4 flex-shrink-0 relative">
       {/* Overlay when finalized, session expired, or paused */}
-      {(isFinalized || isSessionExpired || isPaused) && (
+      {(isFinalized || effectiveIsExpired || isPaused) && (
         <div className="absolute inset-0 bg-gray-100 bg-opacity-90 flex items-center justify-center z-10 rounded-t-lg">
           <div className="text-center px-2">
             {isFinalized ? (
@@ -77,19 +81,19 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
                 <p className="text-gray-700 font-medium text-sm sm:text-base">Atendimento finalizado</p>
                 <p className="text-gray-500 text-xs sm:text-sm">Esta conversa não pode mais receber mensagens</p>
               </>
-            ) : isSessionExpired ? (
-              <>
-                <i className="fas fa-clock text-red-500 text-xl sm:text-2xl mb-2"></i>
-                <p className="text-gray-700 font-medium text-sm sm:text-base">Sessão expirada</p>
-                <p className="text-gray-500 text-xs sm:text-sm">Tempo de 1 hora esgotado. Esta sessão não pode mais receber mensagens.</p>
-              </>
-            ) : (
+            ) : isPaused ? (
               <>
                 <i className="fas fa-pause text-yellow-500 text-xl sm:text-2xl mb-2"></i>
                 <p className="text-gray-700 font-medium text-sm sm:text-base">Sessão pausada</p>
                 <p className="text-gray-500 text-xs sm:text-sm">O timer está pausado. Retome o timer para continuar interagindo com a IA.</p>
               </>
-            )}
+            ) : effectiveIsExpired ? (
+              <>
+                <i className="fas fa-clock text-red-500 text-xl sm:text-2xl mb-2"></i>
+                <p className="text-gray-700 font-medium text-sm sm:text-base">Sessão expirada</p>
+                <p className="text-gray-500 text-xs sm:text-sm">Tempo de 1 hora esgotado. Esta sessão não pode mais receber mensagens.</p>
+              </>
+            ) : null}
           </div>
         </div>
       )}
@@ -106,7 +110,7 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
                 placeholder="Digite sua mensagem..."
                 className="w-full px-3 sm:px-4 py-2 sm:py-3 pr-10 sm:pr-12 text-sm sm:text-base border border-gray-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent resize-none overflow-hidden min-h-[44px] sm:min-h-[48px] max-h-[120px]"
                 data-testid="message-input"
-                disabled={isLoading || isFinalized || isSessionExpired || isPaused}
+                disabled={isLoading || isFinalized || effectiveIsExpired || isPaused}
               />
             </div>
           </div>
@@ -118,7 +122,7 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
           
           <Button
             type="submit"
-            disabled={!message.trim() || isLoading || isFinalized || isSessionExpired || isPaused}
+            disabled={!message.trim() || isLoading || isFinalized || effectiveIsExpired || isPaused}
             className="p-2 sm:p-3 bg-primary text-white rounded-full hover:bg-indigo-600 focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="send-button"
           >
@@ -133,10 +137,10 @@ export function MessageInput({ onSendMessage, isLoading, error, onClearError, is
         <div className="mt-1.5 sm:mt-2 text-[10px] sm:text-xs text-gray-500 text-center">
           {isFinalized 
             ? "Esta conversa foi finalizada" 
-            : isSessionExpired 
-            ? "Sessão expirada - Tempo de 1 hora esgotado"
             : isPaused
             ? "Sessão pausada - Retome o timer para continuar"
+            : effectiveIsExpired 
+            ? "Sessão expirada - Tempo de 1 hora esgotado"
             : "Pressione Enter para enviar, Shift+Enter para nova linha"}
         </div>
       </div>

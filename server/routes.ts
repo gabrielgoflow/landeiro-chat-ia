@@ -21,6 +21,89 @@ import { sendPasswordResetEmail } from "./emailService.js";
 import { randomUUID } from "crypto";
 import { sql } from "drizzle-orm";
 
+/**
+ * Extrai o texto da resposta da IA, tratando casos onde o output pode vir
+ * como uma string JSON (ex: {"output": "texto"}) ou diretamente como texto.
+ * Também remove aspas duplas do início e fim do texto.
+ */
+function extractAIText(aiData: any): string {
+  // Tenta extrair de diferentes campos possíveis
+  let rawText = aiData.output || aiData.response || aiData.message || aiData.text || "";
+  
+  if (!rawText) {
+    return "";
+  }
+  
+  // Se não é string, converter para string
+  if (typeof rawText !== "string") {
+    rawText = String(rawText);
+  }
+
+  // Primeiro, remover aspas externas se existirem
+  let cleaned = removeQuotes(rawText);
+  
+  // Verifica se é uma string JSON válida (pode estar dentro de aspas ou não)
+  const trimmed = cleaned.trim();
+  
+  // Tentar detectar e extrair JSON de diferentes formatos
+  // Formato 1: {"output": "texto"} ou {'output': 'texto'}
+  // Formato 2: "{'output': 'texto'}" (JSON string dentro de string)
+  // Formato 3: texto direto com aspas
+  
+  // Tentar parsear como JSON primeiro
+  if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || 
+      (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.includes("output"))) {
+    try {
+      // Tentar parsear diretamente
+      let parsed = JSON.parse(trimmed);
+      
+      // Se parseou, extrair recursivamente
+      if (parsed && typeof parsed === "object") {
+        const extracted = parsed.output || parsed.response || parsed.message || parsed.text || "";
+        return extractAIText({ output: extracted });
+      }
+    } catch (e) {
+      // Se falhou, tentar tratar como string Python dict (com aspas simples)
+      try {
+        // Substituir aspas simples por duplas para tentar parsear
+        const normalized = trimmed.replace(/'/g, '"');
+        const parsed = JSON.parse(normalized);
+        if (parsed && typeof parsed === "object") {
+          const extracted = parsed.output || parsed.response || parsed.message || parsed.text || "";
+          return extractAIText({ output: extracted });
+        }
+      } catch (e2) {
+        // Se ainda falhou, tentar extrair usando regex
+        // Procurar por padrões como {'output': '...'} ou {"output": "..."}
+        const outputMatch = trimmed.match(/(?:output|response|message|text)\s*[:=]\s*['"]([^'"]+)['"]/);
+        if (outputMatch && outputMatch[1]) {
+          return removeQuotes(outputMatch[1]);
+        }
+      }
+    }
+  }
+  
+  // Se não conseguiu extrair JSON, retornar texto limpo sem aspas
+  return removeQuotes(cleaned);
+}
+
+/**
+ * Remove aspas duplas do início e fim do texto, se presentes
+ */
+function removeQuotes(text: string): string {
+  if (!text || typeof text !== "string") {
+    return text || "";
+  }
+  
+  const trimmed = text.trim();
+  // Remove aspas duplas do início e fim se ambas estiverem presentes
+  if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1).trim();
+  }
+  
+  return trimmed;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get user status (public endpoint for checking user status)
   app.get("/api/auth/user-status/:userId", async (req, res) => {
@@ -644,7 +727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Track cost for this interaction
       const userMessage = typeof message === "string" ? message : JSON.stringify(message);
-      const aiResponseText = aiData.output || aiData.response || aiData.message || aiData.text || "";
+      const aiResponseText = extractAIText(aiData);
       
       // Track cost asynchronously (don't wait for it)
       if (chat_id) {
@@ -677,12 +760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Return text response - handle multiple possible response formats
-        const messageText =
-          aiData.output ||
-          aiData.response ||
-          aiData.message ||
-          aiData.text ||
-          "No response";
+        const messageText = extractAIText(aiData) || "No response";
         res.json({
           type: "text",
           message: messageText,

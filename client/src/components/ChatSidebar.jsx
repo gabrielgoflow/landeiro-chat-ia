@@ -60,6 +60,16 @@ export function ChatSidebar({
   // Função auxiliar para formatar nome do diagnóstico (abreviar "Transtorno" para "T.")
   const formatDiagnosticoName = (nome) => {
     if (!nome) return "Diagnóstico";
+    
+    // Caso especial: T. DE ANSIEDADE GENERALIDA -> TAG
+    const nomeLower = nome.toLowerCase().trim();
+    if (nomeLower.includes('ansiedade generalizada') || 
+        nomeLower.includes('ansiedade generalida') ||
+        nomeLower === 'tag' ||
+        nomeLower === 'transtorno_ansiedade_generalizada') {
+      return 'TAG';
+    }
+    
     // Se começar com "Transtorno", substitui por "T."
     if (nome.toLowerCase().startsWith('transtorno')) {
       return nome.replace(/^transtorno\s+/i, 'T. ');

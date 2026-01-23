@@ -232,15 +232,17 @@ export function SessionTabs({
     const sessionsWithStatus = await Promise.all(
       chatThreads.map(async (thread) => {
         // Verificar se existe review para este chat_id e sessao
+        // Usar maybeSingle() para evitar erro quando não existe review
         const { data: review, error: reviewError } = await supabase
           .from("chat_reviews")
           .select("*")
           .eq("chat_id", thread.chat_id)
           .eq("sessao", thread.sessao)
-          .single();
+          .maybeSingle();
 
-        const hasReview = !reviewError && review;
-        console.log(`Session ${thread.sessao} - has review:`, hasReview);
+        // Considerar como finalizado apenas se realmente existe review (não apenas ausência de erro)
+        const hasReview = review && !reviewError && review.id;
+        console.log(`Session ${thread.sessao} - has review:`, hasReview, reviewError?.code);
 
         return {
           chat_id: thread.chat_id,
@@ -521,7 +523,7 @@ export function SessionTabs({
             </TabsList>
           </div>
 
-          {/* Botão para nova sessão */}
+          {/* Botão para nova sessão
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -545,7 +547,7 @@ export function SessionTabs({
                 </TooltipContent>
               )}
             </Tooltip>
-          </TooltipProvider>
+          </TooltipProvider> */}
         </div>
 
         {/* Content das sessões */}

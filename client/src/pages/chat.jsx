@@ -47,6 +47,8 @@ export default function Chat() {
   }, []);
   const messagesEndRef = useRef(null);
   const lastChatIdRef = useRef(null);
+  const isInitializingChatRef = useRef(false); // Flag para prevenir inicializações duplicadas
+  const initializationPromiseRef = useRef(null); // Promise da inicialização em andamento
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -338,165 +340,196 @@ export default function Chat() {
     // Aguardar um pouco para dar tempo da restauração do sessionStorage executar
     // Isso garante que selectedSessaoNumber seja restaurado antes da inicialização
     const initializeChat = async () => {
-      // Pequeno delay para permitir que a restauração do sessionStorage execute primeiro
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
-      // Evitar re-inicialização se o chatId não mudou e já temos um thread carregado
-      if (lastChatIdRef.current === chatId && lastChatIdRef.current !== null) {
-        // Se já temos o thread carregado para este chatId, não reinicializar
-        if (currentThread && currentThread.id === chatId) {
-          console.log('Chat já inicializado para chatId:', chatId, '- Pulando reinicialização');
-          return;
+      // Prevenir inicializações duplicadas simultâneas
+      if (isInitializingChatRef.current) {
+        console.log('Inicialização já em andamento, aguardando...');
+        // Se há uma promise de inicialização em andamento, aguardar ela
+        if (initializationPromiseRef.current) {
+          try {
+            await initializationPromiseRef.current;
+          } catch (error) {
+            console.error('Erro na inicialização anterior:', error);
+          }
         }
-      }
-      
-      console.log('Initializing chat with chatId:', chatId, '| Last chatId:', lastChatIdRef.current);
-      lastChatIdRef.current = chatId;
-      
-      // Reset session finalized state only when navigating to a different chat
-      if (currentThread?.id !== chatId) {
-        setIsCurrentSessionFinalized(false);
-      }
-      
-      if (chatId === 'new') {
-        // Always show dialog for /chat/new
-        console.log('Opening new chat dialog for /chat/new');
-        setShowNewChatDialog(true);
         return;
       }
       
-      if (chatId && chatId !== 'new') {
-        // Close any open dialog when loading specific chat
-        setShowNewChatDialog(false);
-        
-        // Verificar se há sessão salva no sessionStorage OU se já temos selectedSessaoNumber restaurado
-        let savedSessao = selectedSessaoNumber; // Usar selectedSessaoNumber se já foi restaurado
-        if (!savedSessao) {
-          try {
-            const savedState = sessionStorage.getItem(storageKeyRef.current);
-            if (savedState) {
-              const state = JSON.parse(savedState);
-              if (state.selectedSessionId === chatId && state.selectedSessaoNumber) {
-                savedSessao = state.selectedSessaoNumber;
-                console.log('Sessão salva encontrada no sessionStorage:', savedSessao);
-              }
+      // Marcar como inicializando
+      isInitializingChatRef.current = true;
+      
+      // Criar promise para rastrear esta inicialização
+      const initPromise = (async () => {
+        try {
+          // Pequeno delay para permitir que a restauração do sessionStorage execute primeiro
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          // Evitar re-inicialização se o chatId não mudou e já temos um thread carregado
+          if (lastChatIdRef.current === chatId && lastChatIdRef.current !== null) {
+            // Se já temos o thread carregado para este chatId, não reinicializar
+            if (currentThread && currentThread.id === chatId) {
+              console.log('Chat já inicializado para chatId:', chatId, '- Pulando reinicialização');
+              return;
             }
-          } catch (error) {
-            console.error('Erro ao verificar sessão salva:', error);
           }
-        } else {
-          console.log('Usando selectedSessaoNumber já restaurado:', savedSessao);
-        }
-        
-        // Load specific chat by ID
-        const existingThread = threads.find((t) => t.id === chatId);
-        if (existingThread) {
-          console.log('Found existing thread locally:', chatId);
-          // Usar sessão salva/restaurada se disponível, senão usar a sessão do thread, ou 1 como fallback
-          const sessao = savedSessao || existingThread.sessionData?.sessao || 1;
-          console.log('Selecionando thread com sessão:', sessao, savedSessao ? '(da sessão salva/restaurada)' : '(do thread)');
-          await selectThreadRef.current(existingThread.id, sessao);
-        } else {
-          // Chat ID not found in current threads, try to load from Supabase
-          console.log(
-            "Thread not found locally, trying to load from Supabase (chat_id):",
-            chatId,
-          );
-          const createdThread = await createThreadFromSupabaseRef.current(chatId);
-          if (createdThread) {
-            console.log('Thread created from Supabase using chat_id, now selecting:', createdThread.chat_id || chatId);
-            // Usar sessão salva/restaurada se disponível, senão usar a sessão do thread criado, ou 1 como fallback
-            // Verificar novamente se selectedSessaoNumber foi atualizado durante a busca
-            const sessaoToUse = selectedSessaoNumber || savedSessao || createdThread.sessionData?.sessao || 1;
-            console.log('Selecionando thread com sessão:', sessaoToUse, (selectedSessaoNumber || savedSessao) ? '(da sessão salva/restaurada)' : '(do thread criado)');
-            await selectThreadRef.current(createdThread.chat_id || chatId, sessaoToUse);
-          } else {
-            console.warn(
-              "Chat ID not found by chat_id. Trying fallback search by thread_id:",
-              chatId,
-            );
-
-            // Fallback: tentar interpretar o parâmetro como thread_id e buscar qualquer sessão
-            try {
-              const { data: fallbackSessions, error: fallbackError } = await supabase
-                .from("chat_threads")
-                .select("*")
-                .eq("thread_id", chatId)
-                .order("sessao", { ascending: false })
-                .limit(1);
-
-              if (!fallbackError && fallbackSessions && fallbackSessions.length > 0) {
-                const fallback = fallbackSessions[0];
-                console.log(
-                  "[FALLBACK] Encontrado chat usando thread_id. Usando chat_id alternativo:",
-                  fallback.chat_id,
-                  "sessao:",
-                  fallback.sessao,
-                );
-                const createdFromFallback = await createThreadFromSupabaseRef.current(
-                  fallback.chat_id,
-                );
-                if (createdFromFallback) {
-                  // Verificar se há sessão salva para este chat_id
-                  let savedSessaoForFallback = null;
-                  try {
-                    const fallbackStorageKey = `chat_state_${fallback.chat_id}`;
-                    const savedState = sessionStorage.getItem(fallbackStorageKey);
-                    if (savedState) {
-                      const state = JSON.parse(savedState);
-                      if (state.selectedSessionId === fallback.chat_id && state.selectedSessaoNumber) {
-                        savedSessaoForFallback = state.selectedSessaoNumber;
-                      }
-                    }
-                  } catch (error) {
-                    console.error('Erro ao verificar sessão salva no fallback:', error);
+          
+          console.log('Initializing chat with chatId:', chatId, '| Last chatId:', lastChatIdRef.current);
+          lastChatIdRef.current = chatId;
+          
+          // Reset session finalized state only when navigating to a different chat
+          if (currentThread?.id !== chatId) {
+            setIsCurrentSessionFinalized(false);
+          }
+          
+          if (chatId === 'new') {
+            // Always show dialog for /chat/new
+            console.log('Opening new chat dialog for /chat/new');
+            setShowNewChatDialog(true);
+            return;
+          }
+          
+          if (chatId && chatId !== 'new') {
+            // Close any open dialog when loading specific chat
+            setShowNewChatDialog(false);
+            
+            // Verificar se há sessão salva no sessionStorage OU se já temos selectedSessaoNumber restaurado
+            let savedSessao = selectedSessaoNumber; // Usar selectedSessaoNumber se já foi restaurado
+            if (!savedSessao) {
+              try {
+                const savedState = sessionStorage.getItem(storageKeyRef.current);
+                if (savedState) {
+                  const state = JSON.parse(savedState);
+                  if (state.selectedSessionId === chatId && state.selectedSessaoNumber) {
+                    savedSessao = state.selectedSessaoNumber;
+                    console.log('Sessão salva encontrada no sessionStorage:', savedSessao);
                   }
-                  
-                  const sessao = savedSessaoForFallback || createdFromFallback.sessionData?.sessao || fallback.sessao || 1;
-                  console.log('Selecionando thread fallback com sessão:', sessao, savedSessaoForFallback ? '(da sessão salva)' : '(do thread)');
-                  await selectThreadRef.current(
-                    createdFromFallback.chat_id || fallback.chat_id,
-                    sessao,
-                  );
-                  return;
                 }
-              } else {
-                if (fallbackError) {
-                  console.error(
-                    "[FALLBACK] Erro ao buscar sessão por thread_id:",
-                    fallbackError,
-                  );
-                } else {
-                  console.warn(
-                    "[FALLBACK] Nenhuma sessão encontrada para thread_id:",
-                    chatId,
-                  );
-                }
+              } catch (error) {
+                console.error('Erro ao verificar sessão salva:', error);
               }
-            } catch (fallbackException) {
-              console.error(
-                "[FALLBACK] Exceção ao tentar buscar sessão por thread_id:",
-                fallbackException,
-              );
+            } else {
+              console.log('Usando selectedSessaoNumber já restaurado:', savedSessao);
             }
+            
+            // Load specific chat by ID
+            const existingThread = threads.find((t) => t.id === chatId);
+            if (existingThread) {
+              console.log('Found existing thread locally:', chatId);
+              // Usar sessão salva/restaurada se disponível, senão usar a sessão do thread, ou 1 como fallback
+              const sessao = savedSessao || existingThread.sessionData?.sessao || 1;
+              console.log('Selecionando thread com sessão:', sessao, savedSessao ? '(da sessão salva/restaurada)' : '(do thread)');
+              await selectThreadRef.current(existingThread.id, sessao);
+            } else {
+              // Chat ID not found in current threads, try to load from Supabase
+              console.log(
+                "Thread not found locally, trying to load from Supabase (chat_id):",
+                chatId,
+              );
+              const createdThread = await createThreadFromSupabaseRef.current(chatId);
+              if (createdThread) {
+                console.log('Thread created from Supabase using chat_id, now selecting:', createdThread.chat_id || chatId);
+                // Usar sessão salva/restaurada se disponível, senão usar a sessão do thread criado, ou 1 como fallback
+                // Verificar novamente se selectedSessaoNumber foi atualizado durante a busca
+                const sessaoToUse = selectedSessaoNumber || savedSessao || createdThread.sessionData?.sessao || 1;
+                console.log('Selecionando thread com sessão:', sessaoToUse, (selectedSessaoNumber || savedSessao) ? '(da sessão salva/restaurada)' : '(do thread criado)');
+                await selectThreadRef.current(createdThread.chat_id || chatId, sessaoToUse);
+              } else {
+                console.warn(
+                  "Chat ID not found by chat_id. Trying fallback search by thread_id:",
+                  chatId,
+                );
 
-            console.warn(
-              "Chat não encontrado nem por chat_id nem por thread_id. Redirecionando para novo chat:",
-              chatId,
-            );
-            // Redireciona em vez de apenas abrir dialog para evitar loop infinito
-            navigate('/chat/new');
-            return; // Importante para evitar continuar
+                // Fallback: tentar interpretar o parâmetro como thread_id e buscar qualquer sessão
+                try {
+                  const { data: fallbackSessions, error: fallbackError } = await supabase
+                    .from("chat_threads")
+                    .select("*")
+                    .eq("thread_id", chatId)
+                    .order("sessao", { ascending: false })
+                    .limit(1);
+
+                  if (!fallbackError && fallbackSessions && fallbackSessions.length > 0) {
+                    const fallback = fallbackSessions[0];
+                    console.log(
+                      "[FALLBACK] Encontrado chat usando thread_id. Usando chat_id alternativo:",
+                      fallback.chat_id,
+                      "sessao:",
+                      fallback.sessao,
+                    );
+                    const createdFromFallback = await createThreadFromSupabaseRef.current(
+                      fallback.chat_id,
+                    );
+                    if (createdFromFallback) {
+                      // Verificar se há sessão salva para este chat_id
+                      let savedSessaoForFallback = null;
+                      try {
+                        const fallbackStorageKey = `chat_state_${fallback.chat_id}`;
+                        const savedState = sessionStorage.getItem(fallbackStorageKey);
+                        if (savedState) {
+                          const state = JSON.parse(savedState);
+                          if (state.selectedSessionId === fallback.chat_id && state.selectedSessaoNumber) {
+                            savedSessaoForFallback = state.selectedSessaoNumber;
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Erro ao verificar sessão salva no fallback:', error);
+                      }
+                      
+                      const sessao = savedSessaoForFallback || createdFromFallback.sessionData?.sessao || fallback.sessao || 1;
+                      console.log('Selecionando thread fallback com sessão:', sessao, savedSessaoForFallback ? '(da sessão salva)' : '(do thread)');
+                      await selectThreadRef.current(
+                        createdFromFallback.chat_id || fallback.chat_id,
+                        sessao,
+                      );
+                      return;
+                    }
+                  } else {
+                    if (fallbackError) {
+                      console.error(
+                        "[FALLBACK] Erro ao buscar sessão por thread_id:",
+                        fallbackError,
+                      );
+                    } else {
+                      console.warn(
+                        "[FALLBACK] Nenhuma sessão encontrada para thread_id:",
+                        chatId,
+                      );
+                    }
+                  }
+                } catch (fallbackException) {
+                  console.error(
+                    "[FALLBACK] Exceção ao tentar buscar sessão por thread_id:",
+                    fallbackException,
+                  );
+                }
+
+                console.warn(
+                  "Chat não encontrado nem por chat_id nem por thread_id. Redirecionando para novo chat:",
+                  chatId,
+                );
+                // Redireciona em vez de apenas abrir dialog para evitar loop infinito
+                navigate('/chat/new');
+                return; // Importante para evitar continuar
+              }
+            }
+          } else if (threads.length === 0 && !chatId && !currentThread) {
+            // Show dialog when no threads exist and no chatId and no currentThread
+            // Mas só se não estivermos no meio de uma operação de nova sessão
+            if (!isStartingNextSession) {
+              console.log('No threads found, showing new chat dialog');
+              setShowNewChatDialog(true);
           }
         }
-      } else if (threads.length === 0 && !chatId && !currentThread) {
-        // Show dialog when no threads exist and no chatId and no currentThread
-        // Mas só se não estivermos no meio de uma operação de nova sessão
-        if (!isStartingNextSession) {
-          console.log('No threads found, showing new chat dialog');
-          setShowNewChatDialog(true);
+        } catch (error) {
+          console.error('Erro na inicialização do chat:', error);
+        } finally {
+          // Sempre liberar a flag de inicialização ao finalizar
+          isInitializingChatRef.current = false;
+          initializationPromiseRef.current = null;
         }
-      }
+      })();
+      
+      initializationPromiseRef.current = initPromise;
+      await initPromise;
     };
 
     initializeChat();
@@ -883,6 +916,8 @@ export default function Chat() {
             pontosPositivos: minimalReview.pontosPositivos,
             pontosNegativos: minimalReview.pontosNegativos
           });
+          // Forçar refresh do SessionTabs para atualizar status
+          setSessionTabsRefreshKey(prev => prev + 1);
         }
       } else {
         // Usar review do webhook
@@ -899,6 +934,8 @@ export default function Chat() {
         const saved = await saveReview(transformedReview);
         if (saved) {
           updateReviewState(reviewOutput);
+          // Forçar refresh do SessionTabs para atualizar status
+          setSessionTabsRefreshKey(prev => prev + 1);
         }
       }
     } catch (error) {
@@ -938,6 +975,17 @@ export default function Chat() {
       return;
     }
     
+    // IMPORTANTE: NÃO finalizar se o timer estiver pausado
+    // Sessões pausadas não devem ser finalizadas automaticamente
+    if (isTimerPaused) {
+      console.log('Sessão está pausada, não finalizando automaticamente:', {
+        chatId: selectedSessionId,
+        sessao: selectedSessaoNumber,
+        isTimerPaused
+      });
+      return;
+    }
+    
     // Verificar se a sessão realmente expirou (timer inicializado E expirado E tempo calculado)
     // timeRemaining !== null garante que o cálculo do tempo foi feito corretamente
     const isReallyExpired = isSessionExpired && timeRemaining !== null && timeRemaining <= 0;
@@ -959,6 +1007,20 @@ export default function Chat() {
       // Se entramos na sessão há menos de 5 segundos e ela já está expirada,
       // provavelmente é uma sessão antiga - verificar no banco se já tem review antes de finalizar
       const SESSION_ENTRY_GRACE_PERIOD = 5000; // 5 segundos de graça após entrar na sessão
+      
+      // Validações adicionais para evitar finalização prematura:
+      // 1. Mínimo de 4 mensagens (2 do usuário + 2 da IA)
+      // 2. Tempo mínimo de sessão (pelo menos 1 minuto de atividade)
+      const MIN_MESSAGES_FOR_AUTO_FINALIZE = 4;
+      const MIN_SESSION_DURATION_MS = 60 * 1000; // 1 minuto mínimo
+      
+      // Calcular duração da sessão baseado no session_started_at
+      let sessionDuration = 0;
+      if (sessionStartedAt) {
+        const startTime = new Date(sessionStartedAt).getTime();
+        const now = Date.now();
+        sessionDuration = now - startTime;
+      }
       
       if (timeSinceEntry < SESSION_ENTRY_GRACE_PERIOD) {
         // Verificar assincronamente se já existe review no banco antes de finalizar
@@ -982,12 +1044,16 @@ export default function Chat() {
               return;
             }
             
-            // Não tem review, pode finalizar
-            if (currentMessages.length >= 1) {
+            // Não tem review, mas verificar se atende critérios mínimos antes de finalizar
+            const hasEnoughMessages = currentMessages.length >= MIN_MESSAGES_FOR_AUTO_FINALIZE;
+            const hasMinDuration = sessionDuration >= MIN_SESSION_DURATION_MS;
+            
+            if (hasEnoughMessages && hasMinDuration) {
               console.log('Sessão expirada automaticamente, finalizando atendimento...', {
                 chatId: selectedSessionId,
                 sessao: selectedSessaoNumber,
                 messageCount: currentMessages.length,
+                sessionDuration: Math.floor(sessionDuration / 1000) + 's',
                 timeRemaining,
                 isTimerInitialized,
                 timeSinceEntry
@@ -996,6 +1062,13 @@ export default function Chat() {
               hasAutoFinalizedRef.current = true;
               lastExpiredSessionRef.current = sessionKey;
               handleFinalizeChat();
+            } else {
+              console.log('Sessão expirada mas não atende critérios mínimos para auto-finalização:', {
+                messageCount: currentMessages.length,
+                requiredMessages: MIN_MESSAGES_FOR_AUTO_FINALIZE,
+                sessionDuration: Math.floor(sessionDuration / 1000) + 's',
+                requiredDuration: Math.floor(MIN_SESSION_DURATION_MS / 1000) + 's'
+              });
             }
           } catch (err) {
             console.error('Erro ao verificar review antes de finalizar:', err);
@@ -1007,11 +1080,16 @@ export default function Chat() {
       }
       
       // Sessão expirou "ao vivo" (estamos nela há mais de 5 segundos)
-      if (currentMessages.length >= 1) {
+      // Aplicar mesmas validações de mensagens e duração mínima
+      const hasEnoughMessages = currentMessages.length >= MIN_MESSAGES_FOR_AUTO_FINALIZE;
+      const hasMinDuration = sessionDuration >= MIN_SESSION_DURATION_MS;
+      
+      if (hasEnoughMessages && hasMinDuration) {
         console.log('Sessão expirada automaticamente (ao vivo), finalizando atendimento...', {
           chatId: selectedSessionId,
           sessao: selectedSessaoNumber,
           messageCount: currentMessages.length,
+          sessionDuration: Math.floor(sessionDuration / 1000) + 's',
           timeRemaining,
           isTimerInitialized,
           timeSinceEntry
@@ -1023,10 +1101,14 @@ export default function Chat() {
         // Chamar finalização automática
         handleFinalizeChat();
       } else {
-        // Sessão expirada sem mensagens - manter sessão, apenas logar para debug
-        console.log('Sessão expirada sem mensagens. Mantendo sessão (deleção automática desativada).', {
+        // Sessão expirada mas não atende critérios mínimos - manter sessão, apenas logar para debug
+        console.log('Sessão expirada mas não atende critérios mínimos. Mantendo sessão.', {
           chatId: selectedSessionId,
-          sessao: selectedSessaoNumber
+          sessao: selectedSessaoNumber,
+          messageCount: currentMessages.length,
+          requiredMessages: MIN_MESSAGES_FOR_AUTO_FINALIZE,
+          sessionDuration: Math.floor(sessionDuration / 1000) + 's',
+          requiredDuration: Math.floor(MIN_SESSION_DURATION_MS / 1000) + 's'
         });
       }
     } else if (!isSessionExpired || !isTimerInitialized) {
@@ -1036,7 +1118,7 @@ export default function Chat() {
         hasAutoFinalizedRef.current = false;
       }
     }
-  }, [isSessionExpired, isTimerInitialized, timeRemaining, hasReview, currentThread, selectedSessionId, selectedSessaoNumber, currentMessages.length, handleFinalizeChat]);
+  }, [isSessionExpired, isTimerInitialized, timeRemaining, hasReview, currentThread, selectedSessionId, selectedSessaoNumber, currentMessages.length, handleFinalizeChat, isTimerPaused, sessionStartedAt]);
 
   const handleStartNextSession = async () => {
     if (!currentThread) return;
@@ -1444,7 +1526,7 @@ export default function Chat() {
           error={error}
           onClearError={clearError}
           isFinalized={isCurrentSessionFinalized}
-          isSessionExpired={isSessionExpired}
+          isSessionExpired={isSessionExpired && !isTimerPaused}
           isPaused={isTimerPaused}
         />
       </div>

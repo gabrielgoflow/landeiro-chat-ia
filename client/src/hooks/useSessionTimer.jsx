@@ -80,6 +80,12 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
             // Também atualizar estado pausado
             isPausedRef.current = sessionData.timer_paused || false;
             pausedTimeRef.current = sessionData.timer_paused_time || null;
+            
+            // IMPORTANTE: Se está pausado, garantir que isExpired seja false
+            if (isPausedRef.current && pausedTimeRef.current !== null) {
+              setIsExpired(false);
+              console.log("useSessionTimer: Estado pausado detectado durante busca de session_started_at, resetando isExpired");
+            }
           }
         } catch (err) {
           console.error("useSessionTimer: Erro ao buscar session_started_at da sessão específica:", err);
@@ -201,6 +207,12 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
             isPausedRef.current = pausedStateData.timer_paused || false;
             pausedTimeRef.current = pausedStateData.timer_paused_time || null;
             
+            // IMPORTANTE: Se está pausado, garantir que isExpired seja false
+            if (isPausedRef.current && pausedTimeRef.current !== null) {
+              setIsExpired(false);
+              console.log("useSessionTimer: Estado pausado detectado ANTES de calcular timeRemaining, resetando isExpired");
+            }
+            
             console.log("useSessionTimer: Estado pausado carregado ANTES de calcular timeRemaining:", {
               chatId,
               sessao,
@@ -231,10 +243,16 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
         const now = new Date().getTime();
         const elapsed = now - startTime;
         
+        // IMPORTANTE: Se o timer está pausado, não verificar se está "muito antigo" baseado no elapsed
+        // porque o elapsed não reflete o tempo real da sessão (já que foi pausado)
+        // Se está pausado e temos um pausedTime válido, usar esse tempo diretamente
+        const isPausedBeforeCheck = isPausedRef.current || pausedTimeRef.current !== null;
+        
         // Se o tempo decorrido for maior que a duração da sessão, a sessão já expirou
         // Se for muito antigo (mais de 2 horas), verificar se é a sessão correta
         // Se não for, tentar buscar a sessão correta do banco
-        if (elapsed > SESSION_DURATION_MS * 2) {
+        // MAS: Se está pausado, não fazer essa verificação porque o elapsed não é confiável
+        if (!isPausedBeforeCheck && elapsed > SESSION_DURATION_MS * 2) {
           // Verificar se já corrigimos do banco para esta combinação de chatId/sessao
           const correctionKey = `${chatId}-${sessao}`;
           const alreadyCorrected = correctedFromDbRef.current === correctionKey;
@@ -325,7 +343,22 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
             }
           }
           
-          // Se não encontrou uma sessão mais recente, marcar como expirado
+          // Se não encontrou uma sessão mais recente, verificar se está pausado antes de marcar como expirado
+          // Se está pausado, usar o tempo pausado em vez de marcar como expirado
+          if (isPausedRef.current && pausedTimeRef.current !== null) {
+            console.log("useSessionTimer: Timer muito antigo mas está pausado, usando tempo pausado:", {
+              pausedTime: pausedTimeRef.current,
+              remainingMinutes: Math.floor(pausedTimeRef.current / 60000)
+            });
+            setTimeRemaining(pausedTimeRef.current);
+            setIsExpired(false);
+            setIsInitialized(true);
+            lastInitializedRef.current = { chatId, sessao, sessionStartedAt: startedAt };
+            correctedFromDbRef.current = correctionKey;
+            return;
+          }
+          
+          // Se não está pausado, marcar como expirado
           setTimeRemaining(0);
           setIsExpired(true);
           setIsInitialized(true);
@@ -335,14 +368,19 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
         }
         
         // Verificar se o timer está pausado - se estiver, usar o tempo pausado
+        // IMPORTANTE: Verificar pausedTimeRef ANTES de verificar isPausedRef para evitar race conditions
+        // Se temos um pausedTime válido, significa que está pausado (mesmo que isPausedRef ainda não esteja atualizado)
+        const isPausedNow = isPausedRef.current || pausedTimeRef.current !== null;
         let remaining;
-        if (isPausedRef.current && pausedTimeRef.current !== null) {
+        if (isPausedNow && pausedTimeRef.current !== null) {
           // Se está pausado, usar o tempo pausado diretamente e NÃO calcular baseado no tempo decorrido
           remaining = pausedTimeRef.current;
           console.log("Timer Debug: Timer está pausado, usando timer_paused_time (NÃO calculando):", {
             pausedTime: pausedTimeRef.current,
             remainingMinutes: Math.floor(remaining / 60000),
-            isPaused: isPausedRef.current
+            isPaused: isPausedRef.current,
+            isPausedNow,
+            note: "Usando pausedTimeRef para determinar estado pausado"
           });
         } else if (lastPausedTimeBeforeResumeRef.current !== null) {
           // Se não está pausado mas temos um tempo pausado salvo (indicando que foi retomado),
@@ -373,14 +411,36 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
             remaining,
             remainingMinutes: Math.floor(remaining / 60000),
             isExpired: remaining <= 0,
-            isPaused: isPausedRef.current
+            isPaused: isPausedRef.current,
+            pausedTimeRef: pausedTimeRef.current
           });
         }
         
         setTimeRemaining(Math.max(0, remaining));
-        // Se está pausado, não marcar como expirado (o tempo pausado já foi validado)
-        setIsExpired(!isPausedRef.current && remaining <= 0);
+        // IMPORTANTE: Se está pausado (verificado via pausedTimeRef), NUNCA marcar como expirado
+        // Isso previne finalização de sessões pausadas
+        const shouldBeExpired = !isPausedNow && remaining <= 0;
+        console.log("Timer Debug: Calculando isExpired:", {
+          isPausedNow,
+          isPausedRef: isPausedRef.current,
+          pausedTimeRef: pausedTimeRef.current,
+          remaining,
+          remainingMinutes: Math.floor(remaining / 60000),
+          shouldBeExpired
+        });
+        setIsExpired(shouldBeExpired);
         setIsInitialized(true);
+        
+        // Verificação adicional: se descobrimos que está pausado após o cálculo, resetar isExpired
+        // Isso previne race conditions onde o estado pausado é carregado após o cálculo inicial
+        if (isPausedNow && shouldBeExpired) {
+          console.warn("Timer Debug: CORREÇÃO - Timer está pausado mas foi marcado como expirado, resetando:", {
+            isPausedNow,
+            pausedTimeRef: pausedTimeRef.current,
+            remaining
+          });
+          setIsExpired(false);
+        }
         // Marcar como inicializado para evitar reinicializações
         lastInitializedRef.current = { chatId, sessao, sessionStartedAt: startedAt };
       } else {
@@ -499,9 +559,19 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
             isPausedRef.current = newIsPaused;
             pausedTimeRef.current = newPausedTime;
             
-            // Se está pausado, usar o tempo pausado
+            // Se está pausado, usar o tempo pausado e garantir que não está expirado
             if (newIsPaused && newPausedTime !== null) {
               setTimeRemaining(newPausedTime);
+              // IMPORTANTE: Se está pausado, NUNCA deve estar expirado
+              if (isExpired) {
+                console.log("useSessionTimer: Timer está pausado, resetando isExpired:", {
+                  chatId,
+                  sessao,
+                  wasExpired: isExpired,
+                  pausedTime: newPausedTime
+                });
+                setIsExpired(false);
+              }
             }
           } else if (wouldOverridePausedState) {
             console.log("useSessionTimer: Ignorando atualização que sobrescreveria estado pausado:", {
@@ -529,26 +599,37 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
       clearTimeout(initialTimeout);
       clearInterval(interval);
     };
-  }, [isInitialized, chatId, sessao]);
+  }, [isInitialized, chatId, sessao, isExpired]);
 
   // Atualizar timer a cada segundo
   // IMPORTANTE: Não atualizar se o timer estiver pausado
   useEffect(() => {
-    if (!isInitialized || isExpired) return;
+    if (!isInitialized) return;
     
     // Se está pausado, não criar intervalo e manter o timeRemaining fixo
+    // IMPORTANTE: Se está pausado, NÃO considerar isExpired (sessões pausadas não expiram)
     if (isPausedRef.current && pausedTimeRef.current !== null) {
       // Garantir que o timeRemaining está no valor pausado
       if (timeRemaining !== pausedTimeRef.current) {
         setTimeRemaining(pausedTimeRef.current);
       }
+      // Garantir que isExpired seja false quando pausado
+      if (isExpired) {
+        console.log("useSessionTimer: Timer está pausado mas isExpired é true, resetando");
+        setIsExpired(false);
+      }
       return;
     }
+    
+    // Se não está pausado, verificar se expirou
+    if (isExpired) return;
 
     const interval = setInterval(() => {
       // Verificar novamente se está pausado antes de atualizar
       if (isPausedRef.current && pausedTimeRef.current !== null) {
         setTimeRemaining(pausedTimeRef.current);
+        // Garantir que isExpired seja false quando pausado
+        setIsExpired(false);
         return;
       }
       
@@ -556,7 +637,8 @@ export function useSessionTimer(chatId, sessionStartedAt, sessao = null) {
         if (prev === null) return null;
         const newRemaining = prev - 1000;
         
-        if (newRemaining <= 0) {
+        // IMPORTANTE: Só marcar como expirado se NÃO estiver pausado
+        if (newRemaining <= 0 && !isPausedRef.current) {
           setIsExpired(true);
           return 0;
         }
